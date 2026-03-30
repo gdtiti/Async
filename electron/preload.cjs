@@ -31,6 +31,10 @@ const INVOKE_CHANNELS = new Set([
 	'terminal:execLine',
 	'agent:applyDiffChunk',
 	'agent:applyDiffChunks',
+	'agent:keepLastTurn',
+	'agent:revertLastTurn',
+	'agent:keepFile',
+	'agent:revertFile',
 	'plan:save',
 ]);
 

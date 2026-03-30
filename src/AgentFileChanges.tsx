@@ -8,6 +8,8 @@ type Props = {
 	onOpenFile?: (relPath: string, revealLine?: number) => void;
 	onKeepAll?: () => void;
 	onRevertAll?: () => void;
+	onKeepFile?: (relPath: string) => void;
+	onRevertFile?: (relPath: string) => void;
 };
 
 function basename(p: string): string {
@@ -15,7 +17,7 @@ function basename(p: string): string {
 	return i >= 0 ? p.slice(i + 1) : p;
 }
 
-export function AgentFileChangesPanel({ files, onOpenFile, onKeepAll, onRevertAll }: Props) {
+export function AgentFileChangesPanel({ files, onOpenFile, onKeepAll, onRevertAll, onKeepFile, onRevertFile }: Props) {
 	const { t } = useI18n();
 	const [expanded, setExpanded] = useState(true);
 
@@ -63,28 +65,51 @@ export function AgentFileChangesPanel({ files, onOpenFile, onKeepAll, onRevertAl
 					{files.map((f) => {
 						const name = basename(f.path);
 						return (
-							<button
-								key={f.path}
-								type="button"
-								className="ref-fc-row"
-								title={f.path}
-								onClick={() => onOpenFile?.(f.path, f.startLine)}
-							>
-								<FileTypeIcon
-									fileName={name}
-									isDirectory={false}
-									className="ref-fc-icon"
-								/>
-								<span className="ref-fc-name">{name}</span>
-								<span className="ref-fc-stats">
-									{f.additions > 0 && (
-										<span className="ref-fc-add">+{f.additions}</span>
-									)}
-									{f.deletions > 0 && (
-										<span className="ref-fc-del">-{f.deletions}</span>
-									)}
+							<div key={f.path} className="ref-fc-row-wrap">
+								<button
+									type="button"
+									className="ref-fc-row"
+									title={f.path}
+									onClick={() => onOpenFile?.(f.path, f.startLine)}
+								>
+									<FileTypeIcon
+										fileName={name}
+										isDirectory={false}
+										className="ref-fc-icon"
+									/>
+									<span className="ref-fc-name">{name}</span>
+									<span className="ref-fc-stats">
+										{f.additions > 0 && (
+											<span className="ref-fc-add">+{f.additions}</span>
+										)}
+										{f.deletions > 0 && (
+											<span className="ref-fc-del">-{f.deletions}</span>
+										)}
+									</span>
+								</button>
+								<span className="ref-fc-file-actions">
+									<button
+										type="button"
+										className="ref-fc-file-btn ref-fc-file-btn--keep"
+										title={t('agent.keepFile')}
+										onClick={(e) => { e.stopPropagation(); onKeepFile?.(f.path); }}
+									>
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+											<polyline points="20 6 9 17 4 12" />
+										</svg>
+									</button>
+									<button
+										type="button"
+										className="ref-fc-file-btn ref-fc-file-btn--revert"
+										title={t('agent.revertFile')}
+										onClick={(e) => { e.stopPropagation(); onRevertFile?.(f.path); }}
+									>
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+											<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+										</svg>
+									</button>
 								</span>
-							</button>
+							</div>
 						);
 					})}
 				</div>

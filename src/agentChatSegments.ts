@@ -32,6 +32,7 @@ export type ActivitySegment = {
 	text: string;
 	status: ActivityStatus;
 	detail?: string;
+	summary?: string;
 };
 
 export type ToolCallSegment = {
@@ -233,10 +234,39 @@ export function assistantMessageUsesAgentToolProtocol(content: string): boolean 
 	return content.includes(TOOL_CALL_OPEN) || content.includes('<tool_result tool="');
 }
 
+function extractResultSummary(name: string, result: string | undefined, t: TFunction): string | undefined {
+	if (!result) return undefined;
+	switch (name) {
+		case 'read_file': {
+			const lines = result.split('\n');
+			const count = lines.filter((l) => /^\s*\d+\|/.test(l)).length || lines.length;
+			return t('agent.summary.readLines', { count });
+		}
+		case 'list_dir': {
+			const entries = result.split('\n').filter((l) => l.trim()).length;
+			if (result === '(empty directory)') return t('agent.summary.emptyDir');
+			return t('agent.summary.dirEntries', { count: entries });
+		}
+		case 'search_files': {
+			if (result === 'No matches found.') return t('agent.summary.noMatches');
+			const lines = result.split('\n').filter((l) => l.trim());
+			return t('agent.summary.searchMatches', { count: lines.length });
+		}
+		case 'execute_command': {
+			const lines = result.split('\n').filter((l) => l.trim());
+			if (lines.length === 1 && result.includes('(command completed with no output)')) return t('agent.summary.cmdNoOutput');
+			return t('agent.summary.cmdOutput', { lines: lines.length });
+		}
+		default:
+			return undefined;
+	}
+}
+
 function summarizeToolActivity(mk: ParsedMarker, t: TFunction): ActivitySegment {
 	const inProgress = mk.result === undefined;
 	const failed = mk.success === false;
 	const detail = failed ? compactActivityDetail(mk.result, t) : undefined;
+	const summary = (!inProgress && !failed) ? extractResultSummary(mk.name, mk.result, t) : undefined;
 	switch (mk.name) {
 		case 'read_file': {
 			const p = String(mk.args.path ?? '');
@@ -245,6 +275,7 @@ function summarizeToolActivity(mk: ParsedMarker, t: TFunction): ActivitySegment 
 				text: inProgress ? t('agent.activity.reading', { path: p }) : t('agent.activity.read', { path: p }),
 				status: inProgress ? 'pending' : 'success',
 				detail,
+				summary,
 			};
 		}
 		case 'write_to_file': {
@@ -285,6 +316,7 @@ function summarizeToolActivity(mk: ParsedMarker, t: TFunction): ActivitySegment 
 				text: inProgress ? t('agent.activity.listing', { path: p }) : t('agent.activity.listed', { path: p }),
 				status: inProgress ? 'pending' : 'success',
 				detail,
+				summary,
 			};
 		}
 		case 'search_files': {
@@ -296,6 +328,7 @@ function summarizeToolActivity(mk: ParsedMarker, t: TFunction): ActivitySegment 
 					: t('agent.activity.searched', { pattern: pat }),
 				status: inProgress ? 'pending' : 'success',
 				detail,
+				summary,
 			};
 		}
 		case 'execute_command': {
@@ -309,6 +342,7 @@ function summarizeToolActivity(mk: ParsedMarker, t: TFunction): ActivitySegment 
 						: t('agent.activity.ran', { cmd }),
 				status: failed ? 'error' : inProgress ? 'pending' : 'success',
 				detail,
+				summary,
 			};
 		}
 		default:

@@ -137,7 +137,9 @@ function executeStrReplace(call: ToolCall, hooks: ToolExecutionHooks): ToolResul
 		: rawNewStr.replace(/\r\n/g, '\n');
 
 	let idx = source.indexOf(oldStr);
+	let matchLen = oldStr.length;
 
+	// Fallback 1: strip trailing whitespace per line
 	if (idx === -1) {
 		const stripped = stripTrailingSpacesPerLine(oldStr);
 		const sourceStripped = stripTrailingSpacesPerLine(source);
@@ -153,6 +155,17 @@ function executeStrReplace(call: ToolCall, hooks: ToolExecutionHooks): ToolResul
 		}
 	}
 
+	// Fallback 2: LF-normalized search — handles CRLF/LF/mixed-ending mismatches
+	if (idx === -1) {
+		const srcLF = source.replace(/\r\n/g, '\n');
+		const oldLF = rawOldStr.replace(/\r\n/g, '\n');
+		const lfIdx = srcLF.indexOf(oldLF);
+		if (lfIdx !== -1 && srcLF.indexOf(oldLF, lfIdx + 1) === -1) {
+			idx = lfPosToOriginal(source, lfIdx);
+			matchLen = lfPosToOriginal(source, lfIdx + oldLF.length) - idx;
+		}
+	}
+
 	if (idx === -1) {
 		const preview = rawOldStr.length > 200 ? rawOldStr.slice(0, 200) + '...' : rawOldStr;
 		const hint = fileHasCRLF ? ' (note: file uses CRLF line endings)' : '';
@@ -164,8 +177,8 @@ function executeStrReplace(call: ToolCall, hooks: ToolExecutionHooks): ToolResul
 		};
 	}
 
-	const secondIdx = source.indexOf(oldStr, idx + 1);
-	if (secondIdx !== -1) {
+	const verifySecond = source.indexOf(oldStr, idx + 1);
+	if (verifySecond !== -1) {
 		return {
 			toolCallId: call.id,
 			name: call.name,
@@ -175,7 +188,6 @@ function executeStrReplace(call: ToolCall, hooks: ToolExecutionHooks): ToolResul
 	}
 
 	const lineNumber = source.slice(0, idx).split('\n').length;
-	const matchLen = oldStr.length;
 	const patched = source.slice(0, idx) + newStr + source.slice(idx + matchLen);
 	void hooks.beforeWrite?.({ path: relPath, previousContent: source });
 	fs.writeFileSync(full, patched, 'utf8');
@@ -190,6 +202,21 @@ function executeStrReplace(call: ToolCall, hooks: ToolExecutionHooks): ToolResul
 
 function stripTrailingSpacesPerLine(s: string): string {
 	return s.replace(/[ \t]+(\r?\n)/g, '$1').replace(/[ \t]+$/, '');
+}
+
+/** Map a position in the LF-normalized string back to the original (potentially CRLF) string. */
+function lfPosToOriginal(original: string, lfPos: number): number {
+	let origIdx = 0;
+	let lfIdx = 0;
+	while (lfIdx < lfPos && origIdx < original.length) {
+		if (original[origIdx] === '\r' && original[origIdx + 1] === '\n') {
+			origIdx += 2;
+		} else {
+			origIdx += 1;
+		}
+		lfIdx += 1;
+	}
+	return origIdx;
 }
 
 function executeListDir(call: ToolCall): ToolResult {

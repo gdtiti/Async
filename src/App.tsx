@@ -445,6 +445,7 @@ export default function App() {
 	>({});
 	const [agentReviewBusy, setAgentReviewBusy] = useState(false);
 	const [fileChangesDismissed, setFileChangesDismissed] = useState(false);
+	const [dismissedFiles, setDismissedFiles] = useState<Set<string>>(new Set());
 	/** Plan 模式 — 结构化问题弹窗 */
 	const [planQuestion, setPlanQuestion] = useState<PlanQuestion | null>(null);
 	/** Plan 模式 — 解析出的计划文档 */
@@ -833,6 +834,7 @@ export default function App() {
 				setAwaitingReply(false);
 				setStreaming('');
 				setFileChangesDismissed(false);
+				setDismissedFiles(new Set());
 				if (payload.pendingAgentPatches && payload.pendingAgentPatches.length > 0) {
 					setAgentReviewPendingByThread((prev) => ({
 						...prev,
@@ -1520,8 +1522,9 @@ export default function App() {
 		const lastAssistant = [...displayMessages].reverse().find((m) => m.role === 'assistant');
 		if (!lastAssistant) return [];
 		const segs = segmentAssistantContent(lastAssistant.content, { t });
-		return collectFileChanges(segs);
-	}, [displayMessages, composerMode, t]);
+		const all = collectFileChanges(segs);
+		return dismissedFiles.size > 0 ? all.filter((f) => !dismissedFiles.has(f.path)) : all;
+	}, [displayMessages, composerMode, t, dismissedFiles]);
 
 	const onKeepAllEdits = useCallback(async () => {
 		if (shell && currentId) {
@@ -1536,19 +1539,33 @@ export default function App() {
 
 	const onRevertAllEdits = useCallback(async () => {
 		if (!shell || composerMode !== 'agent' || !currentId) return;
-		let reverted = 0;
 		try {
 			const result = (await shell.invoke('agent:revertLastTurn', currentId)) as { ok?: boolean; reverted?: number };
-			reverted = result.reverted ?? 0;
+			if ((result.reverted ?? 0) > 0) {
+				void refreshGit();
+			}
 		} catch {
-			return;
-		}
-		if (reverted <= 0) {
-			return;
+			/* IPC error — still dismiss panel to unblock the user */
 		}
 		setFileChangesDismissed(true);
-		void refreshGit();
 	}, [shell, composerMode, currentId, refreshGit]);
+
+	const onKeepFileEdit = useCallback(async (relPath: string) => {
+		if (!shell || !currentId) return;
+		try {
+			await shell.invoke('agent:keepFile', currentId, relPath);
+		} catch { /* ignore */ }
+		setDismissedFiles((prev) => new Set(prev).add(relPath));
+	}, [shell, currentId]);
+
+	const onRevertFileEdit = useCallback(async (relPath: string) => {
+		if (!shell || !currentId) return;
+		try {
+			await shell.invoke('agent:revertFile', currentId, relPath);
+			void refreshGit();
+		} catch { /* ignore */ }
+		setDismissedFiles((prev) => new Set(prev).add(relPath));
+	}, [shell, currentId, refreshGit]);
 
 	const onMessagesScroll = useCallback(() => {
 		const el = messagesViewportRef.current;
@@ -2346,6 +2363,8 @@ export default function App() {
 								onOpenFile={(rel, line) => void onExplorerOpenFile(rel, line)}
 								onKeepAll={onKeepAllEdits}
 								onRevertAll={() => void onRevertAllEdits()}
+								onKeepFile={(rel) => void onKeepFileEdit(rel)}
+								onRevertFile={(rel) => void onRevertFileEdit(rel)}
 							/>
 						) : null}
 						{hasConversation ? (

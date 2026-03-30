@@ -214,6 +214,8 @@ export const messagesZhCN: Record<string, string> = {
 	'agent.files.count': '{{count}} 个文件',
 	'agent.keepAll': '全部保留',
 	'agent.revertAll': '全部撤销',
+	'agent.keepFile': '保留此文件改动',
+	'agent.revertFile': '撤销此文件改动',
 	'agent.edit.expand': '展开预览（{{lines}} 行）',
 	'agent.edit.collapse': '收起预览',
 	'agent.working': '正在继续处理本次改动…',
@@ -237,6 +239,13 @@ export const messagesZhCN: Record<string, string> = {
 	'agent.activity.cmdFailed': '命令失败：{{cmd}}',
 	'agent.activity.running': '正在运行 `{{cmd}}`',
 	'agent.activity.ran': '已运行 `{{cmd}}`',
+	'agent.summary.readLines': '{{count}} 行',
+	'agent.summary.emptyDir': '空目录',
+	'agent.summary.dirEntries': '{{count}} 项',
+	'agent.summary.noMatches': '无匹配',
+	'agent.summary.searchMatches': '{{count}} 条结果',
+	'agent.summary.cmdNoOutput': '无输出',
+	'agent.summary.cmdOutput': '{{lines}} 行输出',
 
 	// agent tool card labels
 	'agent.tool.read_file': '读取文件',

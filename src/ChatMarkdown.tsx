@@ -85,6 +85,9 @@ export function ChatMarkdown({
 								<div className="ref-agent-activity-main">
 									<span className="ref-agent-activity-dot" aria-hidden />
 									<span className="ref-agent-activity-text">{seg.text}</span>
+									{seg.summary ? (
+										<span className="ref-agent-activity-summary">{seg.summary}</span>
+									) : null}
 								</div>
 								{seg.detail ? (
 									<pre className="ref-agent-activity-detail">{seg.detail}</pre>

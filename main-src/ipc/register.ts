@@ -446,6 +446,32 @@ export function registerIpc(): void {
 		return { ok: true as const, reverted: snapshots.size };
 	});
 
+	ipcMain.handle('agent:keepFile', (_e, threadId: string, relPath: string) => {
+		const snapshots = agentRevertSnapshotsByThread.get(threadId);
+		if (!snapshots) return { ok: true as const };
+		snapshots.delete(relPath);
+		if (snapshots.size === 0) agentRevertSnapshotsByThread.delete(threadId);
+		return { ok: true as const };
+	});
+
+	ipcMain.handle('agent:revertFile', (_e, threadId: string, relPath: string) => {
+		const snapshots = agentRevertSnapshotsByThread.get(threadId);
+		if (!snapshots || !snapshots.has(relPath)) {
+			return { ok: true as const, reverted: false };
+		}
+		const previousContent = snapshots.get(relPath)!;
+		const full = resolveWorkspacePath(relPath);
+		if (previousContent === null) {
+			if (fs.existsSync(full)) fs.unlinkSync(full);
+		} else {
+			fs.mkdirSync(path.dirname(full), { recursive: true });
+			fs.writeFileSync(full, previousContent, 'utf8');
+		}
+		snapshots.delete(relPath);
+		if (snapshots.size === 0) agentRevertSnapshotsByThread.delete(threadId);
+		return { ok: true as const, reverted: true };
+	});
+
 	ipcMain.handle('fs:listDir', (_e, relPath: string) => {
 		try {
 			const root = getWorkspaceRoot();
