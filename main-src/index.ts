@@ -1,4 +1,5 @@
 import { app, BrowserWindow, screen } from 'electron';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { initSettingsStore, getRestorableWorkspace } from './settingsStore.js';
 import { ensureDefaultThread, initThreadStore } from './threadStore.js';
@@ -14,6 +15,26 @@ const loadDistFlag =
 /** 仅在连开发服务器时可选打开开发者工具（默认关闭，避免像「浏览器调试页」）。 */
 const openDevTools =
 	process.env.ASYNC_SHELL_DEVTOOLS === '1' || process.env.VOID_SHELL_DEVTOOLS === '1';
+
+/** 任务栏 / 窗口图标；资源放在 `resources/icons/`（Windows 优先 .ico，否则 .png）。 */
+let appIconPath: string | undefined;
+
+function resolveAppIconPath(): string | undefined {
+	const iconsDir = path.join(app.getAppPath(), 'resources', 'icons');
+	const names =
+		process.platform === 'win32'
+			? ['icon.ico', 'icon.png']
+			: process.platform === 'darwin'
+				? ['icon.icns', 'icon.png']
+				: ['icon.png'];
+	for (const name of names) {
+		const full = path.join(iconsDir, name);
+		if (existsSync(full)) {
+			return full;
+		}
+	}
+	return undefined;
+}
 
 function createWindow(): void {
 	const preloadPath = path.join(__dirname, 'preload.cjs');
@@ -47,6 +68,7 @@ function createWindow(): void {
 		minWidth: 800,
 		minHeight: 600,
 		backgroundColor: '#0c0c0e',
+		...(appIconPath ? { icon: appIconPath } : {}),
 		...titleBarOptions,
 		webPreferences: {
 			preload: preloadPath,
@@ -81,6 +103,11 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+	appIconPath = resolveAppIconPath();
+	if (process.platform === 'darwin' && appIconPath) {
+		app.dock.setIcon(appIconPath);
+	}
+
 	const userData = app.getPath('userData');
 	initSettingsStore(userData);
 	const restored = getRestorableWorkspace();
