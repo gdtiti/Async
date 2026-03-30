@@ -19,6 +19,7 @@ export type AgentSkill = {
 	/** 对话里以「点斜杠 + slug」触发，slug 不含前缀 */
 	slug: string;
 	content: string;
+	enabled?: boolean;
 };
 
 export type AgentSubagent = {
@@ -26,6 +27,7 @@ export type AgentSubagent = {
 	name: string;
 	description: string;
 	instructions: string;
+	enabled?: boolean;
 };
 
 export type AgentCommand = {

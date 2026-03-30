@@ -17,6 +17,7 @@ export type AgentSkill = {
 	description: string;
 	slug: string;
 	content: string;
+	enabled?: boolean;
 };
 
 export type AgentSubagent = {
@@ -24,6 +25,7 @@ export type AgentSubagent = {
 	name: string;
 	description: string;
 	instructions: string;
+	enabled?: boolean;
 };
 
 export type AgentCommand = {

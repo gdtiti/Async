@@ -58,21 +58,47 @@ function normalizeCaretLikeRect(rect: DOMRect, lineHeightPx: number): DOMRect {
 /**
  * @ 菜单锚点：优先用「当前 @ 查询」在 DOM 中的范围（与可见文字一致）；
  * 选区 getBoundingClientRect 在 contenteditable 里偶发不准，且窗口改高后若晚两帧才量会明显错位。
+ *
+ * 返回的 rect 会被 clamp 到容器的可视区域内——当富文本输入框自身有滚动时，
+ * 光标的原始 DOMRect 可能超出输入框 visible bounds，导致 @ 菜单偏到奇怪的位置。
  */
 export function getCaretRectFromRichRoot(root: HTMLElement): DOMRect | null {
 	const lineH = Number.parseFloat(getComputedStyle(root).lineHeight) || 20;
 	const mentionR = findAtMentionDomRange(root);
+	let raw: DOMRect | null = null;
 	if (mentionR) {
-		const rect = mentionR.getBoundingClientRect();
-		return normalizeCaretLikeRect(rect, lineH);
+		raw = normalizeCaretLikeRect(mentionR.getBoundingClientRect(), lineH);
+	} else {
+		const sel = window.getSelection();
+		if (!sel || sel.rangeCount === 0 || !root.contains(sel.anchorNode)) {
+			return null;
+		}
+		const r = sel.getRangeAt(0).cloneRange();
+		raw = normalizeCaretLikeRect(r.getBoundingClientRect(), lineH);
 	}
-	const sel = window.getSelection();
-	if (!sel || sel.rangeCount === 0 || !root.contains(sel.anchorNode)) {
+	if (!raw) {
 		return null;
 	}
-	const r = sel.getRangeAt(0).cloneRange();
-	const rect = r.getBoundingClientRect();
-	return normalizeCaretLikeRect(rect, lineH);
+	// Clamp to container visible bounds
+	return clampRectToContainer(raw, root);
+}
+
+/**
+ * 将光标矩形限制在容器的可视区域内。
+ * 当 contenteditable 有自身滚动时，光标可能落在 overflow 裁剪区外。
+ */
+function clampRectToContainer(rect: DOMRect, container: HTMLElement): DOMRect {
+	const cb = container.getBoundingClientRect();
+	const top = Math.max(rect.top, cb.top);
+	const bottom = Math.min(rect.bottom, cb.bottom);
+	const left = Math.max(rect.left, cb.left);
+	const right = Math.min(rect.right, cb.right);
+	// 如果光标完全在容器外（上/下溢出），返回容器边缘
+	if (top >= bottom) {
+		const clampedTop = rect.top < cb.top ? cb.top : cb.bottom - rect.height;
+		return new DOMRect(left, clampedTop, Math.max(1, right - left), rect.height);
+	}
+	return new DOMRect(left, top, Math.max(1, right - left), Math.max(1, bottom - top));
 }
 
 export function findAtMentionDomRange(root: HTMLElement): Range | null {

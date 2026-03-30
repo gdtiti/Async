@@ -398,4 +398,32 @@ export const messagesZhCN: Record<string, string> = {
 	'errors.modelNameEmpty': '模型请求名称为空。请在「模型」中编辑该条目的「请求名称」。',
 	'errors.proxyInvalid': '代理地址无效。',
 	'errors.noMessages': '没有可发送的对话消息。',
+
+	// settings nav
+	'settings.nav.editor': '编辑器',
+	'settings.title.editor': '编辑器',
+
+	// editor settings panel
+	'editorSettings.lead': '自定义编辑器外观与行为，改动即时生效。',
+	'editorSettings.textFormatting': '文本与格式',
+	'editorSettings.tabSize': 'Tab 宽度',
+	'editorSettings.insertSpaces': '以空格代替 Tab',
+	'editorSettings.insertSpacesDesc': '按下 Tab 时插入空格而非制表符。',
+	'editorSettings.wordWrap': '自动换行',
+	'editorSettings.renderWhitespace': '渲染空白字符',
+	'editorSettings.font': '字体',
+	'editorSettings.fontSize': '字号',
+	'editorSettings.fontFamily': '字体族',
+	'editorSettings.display': '显示',
+	'editorSettings.lineNumbers': '行号',
+	'editorSettings.cursorStyle': '光标样式',
+	'editorSettings.minimap': '迷你地图',
+	'editorSettings.minimapDesc': '在编辑器右侧显示代码缩略图。',
+	'editorSettings.bracketColorization': '括号对着色',
+	'editorSettings.bracketColorizationDesc': '用不同颜色区分匹配的括号对。',
+	'editorSettings.smoothScrolling': '平滑滚动',
+	'editorSettings.saveBehavior': '保存行为',
+	'editorSettings.formatOnSave': '保存时格式化',
+	'editorSettings.formatOnSaveDesc': '在保存文件时自动格式化代码（需接入格式化工具）。',
+	'editorSettings.autoSave': '自动保存',
 };

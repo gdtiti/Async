@@ -68,6 +68,7 @@ import { useComposerAtMention } from './useComposerAtMention';
 import { UserMessageRich } from './UserMessageRich';
 import { BrandLogo } from './BrandLogo';
 import { defaultAgentCustomization, type AgentCustomization } from './agentSettingsTypes';
+import { defaultEditorSettings, editorSettingsToMonacoOptions, type EditorSettings } from './EditorSettingsPanel';
 import { useI18n, translateChatError, normalizeLocale, type AppLocale, type TFunction } from './i18n';
 import './monacoSetup';
 
@@ -504,6 +505,7 @@ export default function App() {
 	const [modelEntries, setModelEntries] = useState<UserModelEntry[]>([]);
 	const [enabledModelIds, setEnabledModelIds] = useState<string[]>([]);
 	const [agentCustomization, setAgentCustomization] = useState<AgentCustomization>(() => defaultAgentCustomization());
+	const [editorSettings, setEditorSettings] = useState<EditorSettings>(() => defaultEditorSettings());
 	const [filePath, setFilePath] = useState('');
 	const [editorValue, setEditorValue] = useState('');
 	const monacoEditorRef = useRef<MonacoEditorNS.IStandaloneCodeEditor | null>(null);
@@ -790,6 +792,7 @@ export default function App() {
 						thinkingByModelId?: Record<string, unknown>;
 					};
 					agent?: AgentCustomization;
+					editor?: Partial<EditorSettings>;
 					ui?: { sidebarLayout?: { left?: unknown; right?: unknown } };
 				};
 				setLocale(normalizeLocale(st.language));
@@ -831,6 +834,9 @@ export default function App() {
 					subagents: Array.isArray(ag?.subagents) ? ag.subagents : [],
 					commands: Array.isArray(ag?.commands) ? ag.commands : [],
 				});
+				if (st.editor) {
+					setEditorSettings({ ...defaultEditorSettings(), ...st.editor });
+				}
 				await refreshGit();
 			} catch (e) {
 				setIpcOk(String(e));
@@ -1336,6 +1342,7 @@ export default function App() {
 				subagents: agentCustomization.subagents ?? [],
 				commands: agentCustomization.commands ?? [],
 			},
+			editor: editorSettings,
 		});
 	}, [
 		shell,
@@ -1350,6 +1357,7 @@ export default function App() {
 		enabledModelIds,
 		thinkingByModelId,
 		agentCustomization,
+		editorSettings,
 		locale,
 	]);
 
@@ -2834,9 +2842,7 @@ export default function App() {
 													monacoEditorRef.current = ed;
 												}}
 												options={{
-													minimap: { enabled: true },
-													fontSize: 13,
-													wordWrap: 'on',
+													...editorSettingsToMonacoOptions(editorSettings),
 													scrollbar: {
 														verticalScrollbarSize: 8,
 														horizontalScrollbarSize: 8,
@@ -2994,6 +3000,8 @@ export default function App() {
 							onPickDefaultModel={(id) => void onPickDefaultModel(id)}
 							agentCustomization={agentCustomization}
 							onChangeAgentCustomization={setAgentCustomization}
+							editorSettings={editorSettings}
+							onChangeEditorSettings={setEditorSettings}
 							onPersistLanguage={(loc) => void onPersistLanguage(loc)}
 						/>
 					</div>

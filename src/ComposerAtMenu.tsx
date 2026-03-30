@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { POPOVER_VIEW_MARGIN } from './anchorPopoverLayout';
+import { computeClampedPopoverLayout, POPOVER_VIEW_MARGIN } from './anchorPopoverLayout';
 import type { CaretRectSnapshot } from './caretRectSnapshot';
 import type { AtMenuItem } from './composerAtMention';
 import { FileTypeIcon } from './fileTypeIcons';
@@ -95,7 +95,7 @@ export function ComposerAtMenu({ open, items, highlightIndex, caretRect, onHighl
 		return () => document.removeEventListener('mousedown', onDoc);
 	}, [open, onClose]);
 
-	/** 键盘上下选中项超出 max-height 滚动区时，滚入可视区域（id 含 `:` 不用 # 选择器） */
+	/** 键盘上下选中项超出 max-height 滚动区时，滚入可视区域 */
 	useLayoutEffect(() => {
 		if (!open || items.length === 0) {
 			return;
@@ -116,14 +116,29 @@ export function ComposerAtMenu({ open, items, highlightIndex, caretRect, onHighl
 	const vw = typeof window !== 'undefined' ? window.innerWidth : 1024;
 	const vh = typeof window !== 'undefined' ? window.innerHeight : 768;
 	const menuWidth = Math.min(340, vw - 2 * POPOVER_VIEW_MARGIN);
-	let left = caretRect.left;
-	let top = caretRect.bottom + 6;
-	if (left + menuWidth > vw - POPOVER_VIEW_MARGIN) {
-		left = Math.max(POPOVER_VIEW_MARGIN, vw - menuWidth - POPOVER_VIEW_MARGIN);
-	}
 	const estHeight = Math.min(Math.max(items.length, 1) * 56 + 16, vh * 0.45);
-	if (top + estHeight > vh - POPOVER_VIEW_MARGIN) {
-		top = Math.max(POPOVER_VIEW_MARGIN, caretRect.top - estHeight - 6);
+
+	// 使用统一的 popover 定位逻辑（自动处理上/下展开、视口边界裁剪）
+	const anchorRect = new DOMRect(caretRect.left, caretRect.top, caretRect.width, caretRect.height);
+	const layout = computeClampedPopoverLayout(anchorRect, {
+		viewportWidth: vw,
+		viewportHeight: vh,
+		menuWidth,
+		contentHeight: estHeight,
+	});
+
+	const posStyle: React.CSSProperties = {
+		position: 'fixed',
+		left: layout.left,
+		width: layout.width,
+		maxHeight: layout.maxHeightPx,
+		zIndex: 20000,
+	};
+	if (layout.top !== undefined) {
+		posStyle.top = layout.top;
+	}
+	if (layout.bottom !== undefined) {
+		posStyle.bottom = layout.bottom;
 	}
 
 	if (items.length === 0) {
@@ -131,7 +146,7 @@ export function ComposerAtMenu({ open, items, highlightIndex, caretRect, onHighl
 			<div
 				ref={menuRef}
 				className="ref-at-menu ref-at-menu--empty"
-				style={{ position: 'fixed', left, top, width: menuWidth, zIndex: 20000 }}
+				style={posStyle}
 				onMouseDown={(e) => e.preventDefault()}
 				role="status"
 			>
@@ -149,7 +164,7 @@ export function ComposerAtMenu({ open, items, highlightIndex, caretRect, onHighl
 			className="ref-at-menu"
 			role="listbox"
 			aria-activedescendant={items[safeHi] ? `at-item-${items[safeHi].id}` : undefined}
-			style={{ position: 'fixed', left, top, width: menuWidth, zIndex: 20000 }}
+			style={posStyle}
 			onMouseDown={(e) => e.preventDefault()}
 		>
 			{items.map((it, i) => (

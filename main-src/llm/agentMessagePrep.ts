@@ -44,7 +44,7 @@ export function applySkillInvocation(
 	}
 	const slug = m[1]!.toLowerCase();
 	const rest = (m[2] ?? '').trim();
-	const sk = skills.find((s) => s.slug.trim().toLowerCase() === slug);
+	const sk = skills.find((s) => s.slug.trim().toLowerCase() === slug && s.enabled !== false);
 	if (!sk) {
 		return { userText: raw, skillSystemBlock: '' };
 	}
@@ -130,7 +130,7 @@ export function buildAgentSystemAppend(opts: {
 		parts.push(opts.skillSystemBlock.trim());
 	}
 
-	const subs = agent?.subagents ?? [];
+	const subs = (agent?.subagents ?? []).filter((s) => s.enabled !== false);
 	if (subs.length > 0) {
 		const body = subs
 			.map((s) => `##### Subagent: ${s.name}\n- ${s.description}\n\n${s.instructions}`)

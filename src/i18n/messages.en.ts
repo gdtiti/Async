@@ -381,4 +381,32 @@ export const messagesEn: Record<string, string> = {
 	'errors.modelNameEmpty': 'Model request name is empty. Edit the entry in Models.',
 	'errors.proxyInvalid': 'Invalid proxy URL.',
 	'errors.noMessages': 'No messages to send.',
+
+	// settings nav
+	'settings.nav.editor': 'Editor',
+	'settings.title.editor': 'Editor',
+
+	// editor settings panel
+	'editorSettings.lead': 'Customize editor appearance and behavior. Changes apply instantly.',
+	'editorSettings.textFormatting': 'Text & Formatting',
+	'editorSettings.tabSize': 'Tab Size',
+	'editorSettings.insertSpaces': 'Insert Spaces',
+	'editorSettings.insertSpacesDesc': 'Insert spaces instead of tabs when pressing Tab.',
+	'editorSettings.wordWrap': 'Word Wrap',
+	'editorSettings.renderWhitespace': 'Render Whitespace',
+	'editorSettings.font': 'Font',
+	'editorSettings.fontSize': 'Font Size',
+	'editorSettings.fontFamily': 'Font Family',
+	'editorSettings.display': 'Display',
+	'editorSettings.lineNumbers': 'Line Numbers',
+	'editorSettings.cursorStyle': 'Cursor Style',
+	'editorSettings.minimap': 'Minimap',
+	'editorSettings.minimapDesc': 'Show the minimap on the right side of the editor.',
+	'editorSettings.bracketColorization': 'Bracket Pair Colorization',
+	'editorSettings.bracketColorizationDesc': 'Colorize matching bracket pairs.',
+	'editorSettings.smoothScrolling': 'Smooth Scrolling',
+	'editorSettings.saveBehavior': 'Save Behavior',
+	'editorSettings.formatOnSave': 'Format On Save',
+	'editorSettings.formatOnSaveDesc': 'Automatically format code when saving (requires a formatter).',
+	'editorSettings.autoSave': 'Auto Save',
 };

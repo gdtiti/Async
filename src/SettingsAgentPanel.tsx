@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useI18n } from './i18n';
 import type {
 	AgentCommand,
@@ -23,6 +23,66 @@ function IconInfo({ className }: { className?: string }) {
 	);
 }
 
+function IconDrag({ className }: { className?: string }) {
+	return (
+		<svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+			<circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none" />
+			<circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none" />
+			<circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none" />
+			<circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none" />
+			<circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none" />
+			<circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none" />
+		</svg>
+	);
+}
+
+function IconChevDown({ className }: { className?: string }) {
+	return (
+		<svg className={className} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+			<path d="M6 9l6 6 6-6" strokeLinecap="round" />
+		</svg>
+	);
+}
+
+/** Generic drag-to-reorder for a list of {id} items */
+function useDragReorder<T extends { id: string }>(items: T[], onReorder: (next: T[]) => void) {
+	const [dragId, setDragId] = useState<string | null>(null);
+
+	const onDragStart = (e: React.DragEvent, id: string) => {
+		setDragId(id);
+		e.dataTransfer.effectAllowed = 'move';
+		e.dataTransfer.setData('text/plain', id);
+	};
+
+	const onDragOver = (e: React.DragEvent) => {
+		e.preventDefault();
+		e.dataTransfer.dropEffect = 'move';
+	};
+
+	const onDrop = (e: React.DragEvent, targetId: string) => {
+		e.preventDefault();
+		if (!dragId || dragId === targetId) {
+			setDragId(null);
+			return;
+		}
+		const fromIdx = items.findIndex((x) => x.id === dragId);
+		const toIdx = items.findIndex((x) => x.id === targetId);
+		if (fromIdx < 0 || toIdx < 0) {
+			setDragId(null);
+			return;
+		}
+		const next = [...items];
+		const [moved] = next.splice(fromIdx, 1);
+		next.splice(toIdx, 0, moved!);
+		onReorder(next);
+		setDragId(null);
+	};
+
+	const onDragEnd = () => setDragId(null);
+
+	return { dragId, onDragStart, onDragOver, onDrop, onDragEnd };
+}
+
 type Props = {
 	value: AgentCustomization;
 	onChange: (next: AgentCustomization) => void;
@@ -36,6 +96,22 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 	const subagents = v.subagents ?? [];
 	const commands = v.commands ?? [];
 
+	/** 折叠状态 */
+	const [collapsedRules, setCollapsedRules] = useState<Set<string>>(new Set());
+	const [collapsedSkills, setCollapsedSkills] = useState<Set<string>>(new Set());
+	const [collapsedSubs, setCollapsedSubs] = useState<Set<string>>(new Set());
+	const [collapsedCmds, setCollapsedCmds] = useState<Set<string>>(new Set());
+
+	const toggleCollapse = (set: Set<string>, setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) => {
+		const next = new Set(set);
+		if (next.has(id)) {
+			next.delete(id);
+		} else {
+			next.add(id);
+		}
+		setter(next);
+	};
+
 	const patch = useCallback(
 		(p: Partial<AgentCustomization>) => {
 			onChange({ ...v, ...p });
@@ -43,6 +119,7 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 		[v, onChange]
 	);
 
+	// ─── Rules ────────────────────────────────────────────
 	const addRule = () => {
 		const r: AgentRule = {
 			id: newId(),
@@ -59,7 +136,9 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 	const removeRule = (id: string) => {
 		patch({ rules: rules.filter((x) => x.id !== id) });
 	};
+	const rulesDrag = useDragReorder(rules, (next) => patch({ rules: next }));
 
+	// ─── Skills ───────────────────────────────────────────
 	const addSkill = () => {
 		const s: AgentSkill = {
 			id: newId(),
@@ -67,6 +146,7 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 			slug: 'myskill',
 			description: '',
 			content: '',
+			enabled: true,
 		};
 		patch({ skills: [...skills, s] });
 	};
@@ -76,13 +156,16 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 	const removeSkill = (id: string) => {
 		patch({ skills: skills.filter((x) => x.id !== id) });
 	};
+	const skillsDrag = useDragReorder(skills, (next) => patch({ skills: next }));
 
+	// ─── Subagents ────────────────────────────────────────
 	const addSub = () => {
 		const s: AgentSubagent = {
 			id: newId(),
 			name: '新 Subagent',
 			description: '',
 			instructions: '',
+			enabled: true,
 		};
 		patch({ subagents: [...subagents, s] });
 	};
@@ -92,7 +175,9 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 	const removeSub = (id: string) => {
 		patch({ subagents: subagents.filter((x) => x.id !== id) });
 	};
+	const subsDrag = useDragReorder(subagents, (next) => patch({ subagents: next }));
 
+	// ─── Commands ─────────────────────────────────────────
 	const addCmd = () => {
 		const c: AgentCommand = {
 			id: newId(),
@@ -108,6 +193,7 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 	const removeCmd = (id: string) => {
 		patch({ commands: commands.filter((x) => x.id !== id) });
 	};
+	const cmdsDrag = useDragReorder(commands, (next) => patch({ commands: next }));
 
 	return (
 		<div className="ref-settings-panel ref-settings-panel--agent">
@@ -137,6 +223,7 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 				</div>
 			</div>
 
+			{/* ─── Rules ─── */}
 			<section className="ref-settings-agent-section" aria-labelledby="agent-rules-h">
 				<div className="ref-settings-agent-section-head">
 					<h2 id="agent-rules-h" className="ref-settings-agent-section-title">
@@ -151,65 +238,92 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 				</div>
 				<p className="ref-settings-agent-section-desc">{t('agentSettings.rulesDesc')}</p>
 				<ul className="ref-settings-agent-list">
-					{rules.map((r) => (
-						<li key={r.id} className="ref-settings-agent-item">
-							<div className="ref-settings-agent-item-head">
-								<button
-									type="button"
-									className={`ref-settings-toggle ref-settings-toggle--sm ${r.enabled ? 'is-on' : ''}`}
-									role="switch"
-									aria-checked={r.enabled}
-									title={r.enabled ? t('settings.enabled') : t('settings.disabled')}
-									onClick={() => updateRule(r.id, { enabled: !r.enabled })}
-								>
-									<span className="ref-settings-toggle-knob" />
-								</button>
-								<input
-									className="ref-settings-agent-item-name"
-									value={r.name}
-									onChange={(e) => updateRule(r.id, { name: e.target.value })}
-									aria-label={t('agentSettings.ruleNameAria')}
-								/>
-								<button type="button" className="ref-settings-agent-remove" onClick={() => removeRule(r.id)}>
-									{t('settings.removeModel')}
-								</button>
-							</div>
-							<label className="ref-settings-field ref-settings-field--compact">
-								<span>{t('agentSettings.scope')}</span>
-								<select
-									value={r.scope}
-									onChange={(e) => updateRule(r.id, { scope: e.target.value as AgentRuleScope })}
-								>
-									<option value="always">{t('agentSettings.scopeAlways')}</option>
-									<option value="glob">{t('agentSettings.scopeGlob')}</option>
-									<option value="manual">{t('agentSettings.scopeManual')}</option>
-								</select>
-							</label>
-							{r.scope === 'glob' ? (
-								<label className="ref-settings-field ref-settings-field--compact">
-									<span>{t('agentSettings.globPattern')}</span>
+					{rules.map((r) => {
+						const collapsed = collapsedRules.has(r.id);
+						return (
+							<li
+								key={r.id}
+								className={`ref-settings-agent-item ${rulesDrag.dragId === r.id ? 'is-dragging' : ''}`}
+								draggable
+								onDragStart={(e) => rulesDrag.onDragStart(e, r.id)}
+								onDragOver={rulesDrag.onDragOver}
+								onDrop={(e) => rulesDrag.onDrop(e, r.id)}
+								onDragEnd={rulesDrag.onDragEnd}
+							>
+								<div className="ref-settings-agent-item-head">
+									<span className="ref-settings-agent-drag-handle" aria-hidden>
+										<IconDrag />
+									</span>
+									<button
+										type="button"
+										className={`ref-settings-toggle ref-settings-toggle--sm ${r.enabled ? 'is-on' : ''}`}
+										role="switch"
+										aria-checked={r.enabled}
+										title={r.enabled ? t('settings.enabled') : t('settings.disabled')}
+										onClick={() => updateRule(r.id, { enabled: !r.enabled })}
+									>
+										<span className="ref-settings-toggle-knob" />
+									</button>
 									<input
-										value={r.globPattern ?? ''}
-										onChange={(e) => updateRule(r.id, { globPattern: e.target.value })}
-										placeholder="**/*.tsx"
+										className="ref-settings-agent-item-name"
+										value={r.name}
+										onChange={(e) => updateRule(r.id, { name: e.target.value })}
+										aria-label={t('agentSettings.ruleNameAria')}
 									/>
-								</label>
-							) : null}
-							<label className="ref-settings-field ref-settings-field--compact">
-								<span>{t('agentSettings.ruleBody')}</span>
-								<textarea
-									rows={4}
-									value={r.content}
-									onChange={(e) => updateRule(r.id, { content: e.target.value })}
-									placeholder={t('agentSettings.ruleBodyPh')}
-								/>
-							</label>
-						</li>
-					))}
+									<button
+										type="button"
+										className={`ref-settings-agent-collapse ${collapsed ? 'is-collapsed' : ''}`}
+										onClick={() => toggleCollapse(collapsedRules, setCollapsedRules, r.id)}
+										aria-label={collapsed ? 'Expand' : 'Collapse'}
+									>
+										<IconChevDown />
+									</button>
+									<button type="button" className="ref-settings-agent-remove" onClick={() => removeRule(r.id)}>
+										{t('settings.removeModel')}
+									</button>
+								</div>
+								{!collapsed && (
+									<>
+										<label className="ref-settings-field ref-settings-field--compact">
+											<span>{t('agentSettings.scope')}</span>
+											<select
+												value={r.scope}
+												onChange={(e) => updateRule(r.id, { scope: e.target.value as AgentRuleScope })}
+											>
+												<option value="always">{t('agentSettings.scopeAlways')}</option>
+												<option value="glob">{t('agentSettings.scopeGlob')}</option>
+												<option value="manual">{t('agentSettings.scopeManual')}</option>
+											</select>
+										</label>
+										{r.scope === 'glob' ? (
+											<label className="ref-settings-field ref-settings-field--compact">
+												<span>{t('agentSettings.globPattern')}</span>
+												<input
+													value={r.globPattern ?? ''}
+													onChange={(e) => updateRule(r.id, { globPattern: e.target.value })}
+													placeholder="**/*.tsx"
+												/>
+											</label>
+										) : null}
+										<label className="ref-settings-field ref-settings-field--compact">
+											<span>{t('agentSettings.ruleBody')}</span>
+											<textarea
+												rows={4}
+												value={r.content}
+												onChange={(e) => updateRule(r.id, { content: e.target.value })}
+												placeholder={t('agentSettings.ruleBodyPh')}
+											/>
+										</label>
+									</>
+								)}
+							</li>
+						);
+					})}
 				</ul>
 				{rules.length === 0 ? <p className="ref-settings-agent-empty">{t('agentSettings.rulesEmpty')}</p> : null}
 			</section>
 
+			{/* ─── Skills ─── */}
 			<section className="ref-settings-agent-section" aria-labelledby="agent-skills-h">
 				<div className="ref-settings-agent-section-head">
 					<h2 id="agent-skills-h" className="ref-settings-agent-section-title">
@@ -224,46 +338,82 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 				</div>
 				<p className="ref-settings-agent-section-desc">{t('agentSettings.skillsDesc')}</p>
 				<ul className="ref-settings-agent-list">
-					{skills.map((s) => (
-						<li key={s.id} className="ref-settings-agent-item">
-							<div className="ref-settings-agent-item-head">
-								<input
-									className="ref-settings-agent-item-name"
-									value={s.name}
-									onChange={(e) => updateSkill(s.id, { name: e.target.value })}
-									aria-label={t('agentSettings.skillNameAria')}
-								/>
-								<button type="button" className="ref-settings-agent-remove" onClick={() => removeSkill(s.id)}>
-									{t('settings.removeModel')}
-								</button>
-							</div>
-							<label className="ref-settings-field ref-settings-field--compact">
-								<span>{t('agentSettings.slugLabel')}</span>
-								<input
-									value={s.slug}
-									onChange={(e) => updateSkill(s.id, { slug: e.target.value.replace(/^\.\//, '') })}
-									placeholder="review"
-								/>
-							</label>
-							<label className="ref-settings-field ref-settings-field--compact">
-								<span>{t('agentSettings.skillIntro')}</span>
-								<input
-									value={s.description}
-									onChange={(e) => updateSkill(s.id, { description: e.target.value })}
-									placeholder={t('agentSettings.skillIntroPh')}
-								/>
-							</label>
-							<label className="ref-settings-field ref-settings-field--compact">
-								<span>{t('agentSettings.skillBody')}</span>
-								<textarea
-									rows={5}
-									value={s.content}
-									onChange={(e) => updateSkill(s.id, { content: e.target.value })}
-									placeholder={t('agentSettings.skillBodyPh')}
-								/>
-							</label>
-						</li>
-					))}
+					{skills.map((s) => {
+						const collapsed = collapsedSkills.has(s.id);
+						return (
+							<li
+								key={s.id}
+								className={`ref-settings-agent-item ${skillsDrag.dragId === s.id ? 'is-dragging' : ''}`}
+								draggable
+								onDragStart={(e) => skillsDrag.onDragStart(e, s.id)}
+								onDragOver={skillsDrag.onDragOver}
+								onDrop={(e) => skillsDrag.onDrop(e, s.id)}
+								onDragEnd={skillsDrag.onDragEnd}
+							>
+								<div className="ref-settings-agent-item-head">
+									<span className="ref-settings-agent-drag-handle" aria-hidden>
+										<IconDrag />
+									</span>
+									<button
+										type="button"
+										className={`ref-settings-toggle ref-settings-toggle--sm ${s.enabled !== false ? 'is-on' : ''}`}
+										role="switch"
+										aria-checked={s.enabled !== false}
+										title={s.enabled !== false ? t('settings.enabled') : t('settings.disabled')}
+										onClick={() => updateSkill(s.id, { enabled: s.enabled === false ? true : false })}
+									>
+										<span className="ref-settings-toggle-knob" />
+									</button>
+									<input
+										className="ref-settings-agent-item-name"
+										value={s.name}
+										onChange={(e) => updateSkill(s.id, { name: e.target.value })}
+										aria-label={t('agentSettings.skillNameAria')}
+									/>
+									<button
+										type="button"
+										className={`ref-settings-agent-collapse ${collapsed ? 'is-collapsed' : ''}`}
+										onClick={() => toggleCollapse(collapsedSkills, setCollapsedSkills, s.id)}
+										aria-label={collapsed ? 'Expand' : 'Collapse'}
+									>
+										<IconChevDown />
+									</button>
+									<button type="button" className="ref-settings-agent-remove" onClick={() => removeSkill(s.id)}>
+										{t('settings.removeModel')}
+									</button>
+								</div>
+								{!collapsed && (
+									<>
+										<label className="ref-settings-field ref-settings-field--compact">
+											<span>{t('agentSettings.slugLabel')}</span>
+											<input
+												value={s.slug}
+												onChange={(e) => updateSkill(s.id, { slug: e.target.value.replace(/^\.\//, '') })}
+												placeholder="review"
+											/>
+										</label>
+										<label className="ref-settings-field ref-settings-field--compact">
+											<span>{t('agentSettings.skillIntro')}</span>
+											<input
+												value={s.description}
+												onChange={(e) => updateSkill(s.id, { description: e.target.value })}
+												placeholder={t('agentSettings.skillIntroPh')}
+											/>
+										</label>
+										<label className="ref-settings-field ref-settings-field--compact">
+											<span>{t('agentSettings.skillBody')}</span>
+											<textarea
+												rows={5}
+												value={s.content}
+												onChange={(e) => updateSkill(s.id, { content: e.target.value })}
+												placeholder={t('agentSettings.skillBodyPh')}
+											/>
+										</label>
+									</>
+								)}
+							</li>
+						);
+					})}
 				</ul>
 				{skills.length === 0 ? (
 					<div className="ref-settings-agent-empty-block">
@@ -275,6 +425,7 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 				) : null}
 			</section>
 
+			{/* ─── Subagents ─── */}
 			<section className="ref-settings-agent-section" aria-labelledby="agent-subs-h">
 				<div className="ref-settings-agent-section-head">
 					<h2 id="agent-subs-h" className="ref-settings-agent-section-title">
@@ -289,38 +440,74 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 				</div>
 				<p className="ref-settings-agent-section-desc">{t('agentSettings.subagentsDesc')}</p>
 				<ul className="ref-settings-agent-list">
-					{subagents.map((s) => (
-						<li key={s.id} className="ref-settings-agent-item">
-							<div className="ref-settings-agent-item-head">
-								<input
-									className="ref-settings-agent-item-name"
-									value={s.name}
-									onChange={(e) => updateSub(s.id, { name: e.target.value })}
-									aria-label={t('agentSettings.subNameAria')}
-								/>
-								<button type="button" className="ref-settings-agent-remove" onClick={() => removeSub(s.id)}>
-									{t('settings.removeModel')}
-								</button>
-							</div>
-							<label className="ref-settings-field ref-settings-field--compact">
-								<span>{t('agentSettings.subDesc')}</span>
-								<input
-									value={s.description}
-									onChange={(e) => updateSub(s.id, { description: e.target.value })}
-									placeholder={t('agentSettings.subDescPh')}
-								/>
-							</label>
-							<label className="ref-settings-field ref-settings-field--compact">
-								<span>{t('agentSettings.subInstr')}</span>
-								<textarea
-									rows={5}
-									value={s.instructions}
-									onChange={(e) => updateSub(s.id, { instructions: e.target.value })}
-									placeholder={t('agentSettings.subInstrPh')}
-								/>
-							</label>
-						</li>
-					))}
+					{subagents.map((s) => {
+						const collapsed = collapsedSubs.has(s.id);
+						return (
+							<li
+								key={s.id}
+								className={`ref-settings-agent-item ${subsDrag.dragId === s.id ? 'is-dragging' : ''}`}
+								draggable
+								onDragStart={(e) => subsDrag.onDragStart(e, s.id)}
+								onDragOver={subsDrag.onDragOver}
+								onDrop={(e) => subsDrag.onDrop(e, s.id)}
+								onDragEnd={subsDrag.onDragEnd}
+							>
+								<div className="ref-settings-agent-item-head">
+									<span className="ref-settings-agent-drag-handle" aria-hidden>
+										<IconDrag />
+									</span>
+									<button
+										type="button"
+										className={`ref-settings-toggle ref-settings-toggle--sm ${s.enabled !== false ? 'is-on' : ''}`}
+										role="switch"
+										aria-checked={s.enabled !== false}
+										title={s.enabled !== false ? t('settings.enabled') : t('settings.disabled')}
+										onClick={() => updateSub(s.id, { enabled: s.enabled === false ? true : false })}
+									>
+										<span className="ref-settings-toggle-knob" />
+									</button>
+									<input
+										className="ref-settings-agent-item-name"
+										value={s.name}
+										onChange={(e) => updateSub(s.id, { name: e.target.value })}
+										aria-label={t('agentSettings.subNameAria')}
+									/>
+									<button
+										type="button"
+										className={`ref-settings-agent-collapse ${collapsed ? 'is-collapsed' : ''}`}
+										onClick={() => toggleCollapse(collapsedSubs, setCollapsedSubs, s.id)}
+										aria-label={collapsed ? 'Expand' : 'Collapse'}
+									>
+										<IconChevDown />
+									</button>
+									<button type="button" className="ref-settings-agent-remove" onClick={() => removeSub(s.id)}>
+										{t('settings.removeModel')}
+									</button>
+								</div>
+								{!collapsed && (
+									<>
+										<label className="ref-settings-field ref-settings-field--compact">
+											<span>{t('agentSettings.subDesc')}</span>
+											<input
+												value={s.description}
+												onChange={(e) => updateSub(s.id, { description: e.target.value })}
+												placeholder={t('agentSettings.subDescPh')}
+											/>
+										</label>
+										<label className="ref-settings-field ref-settings-field--compact">
+											<span>{t('agentSettings.subInstr')}</span>
+											<textarea
+												rows={5}
+												value={s.instructions}
+												onChange={(e) => updateSub(s.id, { instructions: e.target.value })}
+												placeholder={t('agentSettings.subInstrPh')}
+											/>
+										</label>
+									</>
+								)}
+							</li>
+						);
+					})}
 				</ul>
 				{subagents.length === 0 ? (
 					<div className="ref-settings-agent-empty-block">
@@ -332,6 +519,7 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 				) : null}
 			</section>
 
+			{/* ─── Commands ─── */}
 			<section className="ref-settings-agent-section" aria-labelledby="agent-cmd-h">
 				<div className="ref-settings-agent-section-head">
 					<h2 id="agent-cmd-h" className="ref-settings-agent-section-title">
@@ -346,38 +534,64 @@ export function SettingsAgentPanel({ value, onChange }: Props) {
 				</div>
 				<p className="ref-settings-agent-section-desc">{t('agentSettings.cmdDesc')}</p>
 				<ul className="ref-settings-agent-list">
-					{commands.map((c) => (
-						<li key={c.id} className="ref-settings-agent-item">
-							<div className="ref-settings-agent-item-head">
-								<input
-									className="ref-settings-agent-item-name"
-									value={c.name}
-									onChange={(e) => updateCmd(c.id, { name: e.target.value })}
-									aria-label={t('agentSettings.cmdNameAria')}
-								/>
-								<button type="button" className="ref-settings-agent-remove" onClick={() => removeCmd(c.id)}>
-									{t('settings.removeModel')}
-								</button>
-							</div>
-							<label className="ref-settings-field ref-settings-field--compact">
-								<span>{t('agentSettings.slashLabel')}</span>
-								<input
-									value={c.slash}
-									onChange={(e) => updateCmd(c.id, { slash: e.target.value.replace(/^\//, '') })}
-									placeholder="plan"
-								/>
-							</label>
-							<label className="ref-settings-field ref-settings-field--compact">
-								<span>{t('agentSettings.cmdTemplate')}</span>
-								<textarea
-									rows={4}
-									value={c.body}
-									onChange={(e) => updateCmd(c.id, { body: e.target.value })}
-									placeholder={t('agentSettings.cmdTemplatePh')}
-								/>
-							</label>
-						</li>
-					))}
+					{commands.map((c) => {
+						const collapsed = collapsedCmds.has(c.id);
+						return (
+							<li
+								key={c.id}
+								className={`ref-settings-agent-item ${cmdsDrag.dragId === c.id ? 'is-dragging' : ''}`}
+								draggable
+								onDragStart={(e) => cmdsDrag.onDragStart(e, c.id)}
+								onDragOver={cmdsDrag.onDragOver}
+								onDrop={(e) => cmdsDrag.onDrop(e, c.id)}
+								onDragEnd={cmdsDrag.onDragEnd}
+							>
+								<div className="ref-settings-agent-item-head">
+									<span className="ref-settings-agent-drag-handle" aria-hidden>
+										<IconDrag />
+									</span>
+									<input
+										className="ref-settings-agent-item-name"
+										value={c.name}
+										onChange={(e) => updateCmd(c.id, { name: e.target.value })}
+										aria-label={t('agentSettings.cmdNameAria')}
+									/>
+									<button
+										type="button"
+										className={`ref-settings-agent-collapse ${collapsed ? 'is-collapsed' : ''}`}
+										onClick={() => toggleCollapse(collapsedCmds, setCollapsedCmds, c.id)}
+										aria-label={collapsed ? 'Expand' : 'Collapse'}
+									>
+										<IconChevDown />
+									</button>
+									<button type="button" className="ref-settings-agent-remove" onClick={() => removeCmd(c.id)}>
+										{t('settings.removeModel')}
+									</button>
+								</div>
+								{!collapsed && (
+									<>
+										<label className="ref-settings-field ref-settings-field--compact">
+											<span>{t('agentSettings.slashLabel')}</span>
+											<input
+												value={c.slash}
+												onChange={(e) => updateCmd(c.id, { slash: e.target.value.replace(/^\//, '') })}
+												placeholder="plan"
+											/>
+										</label>
+										<label className="ref-settings-field ref-settings-field--compact">
+											<span>{t('agentSettings.cmdTemplate')}</span>
+											<textarea
+												rows={4}
+												value={c.body}
+												onChange={(e) => updateCmd(c.id, { body: e.target.value })}
+												placeholder={t('agentSettings.cmdTemplatePh')}
+											/>
+										</label>
+									</>
+								)}
+							</li>
+						);
+					})}
 				</ul>
 				{commands.length === 0 ? (
 					<div className="ref-settings-agent-empty-block">
