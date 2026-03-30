@@ -29,6 +29,10 @@ const INVOKE_CHANNELS = new Set([
 	'git:push',
 	'git:diffPreviews',
 	'terminal:execLine',
+	'terminal:ptyCreate',
+	'terminal:ptyWrite',
+	'terminal:ptyResize',
+	'terminal:ptyKill',
 	'agent:applyDiffChunk',
 	'agent:applyDiffChunks',
 	'agent:keepLastTurn',
@@ -70,6 +74,20 @@ contextBridge.exposeInMainWorld('asyncShell', {
 			throw new Error(`async-shell: blocked IPC channel "${channel}"`);
 		}
 		return ipcRenderer.invoke(channel, ...args);
+	},
+	subscribeTerminalPtyData(callback) {
+		const handler = (_e, id, data) => {
+			callback(String(id), String(data));
+		};
+		ipcRenderer.on('terminal:ptyData', handler);
+		return () => ipcRenderer.removeListener('terminal:ptyData', handler);
+	},
+	subscribeTerminalPtyExit(callback) {
+		const handler = (_e, id, code) => {
+			callback(String(id), code);
+		};
+		ipcRenderer.on('terminal:ptyExit', handler);
+		return () => ipcRenderer.removeListener('terminal:ptyExit', handler);
 	},
 	subscribeChat(callback) {
 		const id = ++chatSeq;

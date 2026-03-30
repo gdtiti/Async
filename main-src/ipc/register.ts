@@ -36,6 +36,7 @@ import {
 import { runAgentLoop } from '../agent/agentLoop.js';
 import { prepareUserTurnForChat } from '../llm/agentMessagePrep.js';
 import { summarizeThreadForSidebar, isTimestampToday } from '../threadListSummary.js';
+import { registerTerminalPtyIpc } from '../terminalPty.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -157,6 +158,8 @@ function runChatStream(
 }
 
 export function registerIpc(): void {
+	registerTerminalPtyIpc();
+
 	ipcMain.handle('async-shell:ping', () => ({ ok: true, message: 'pong' }));
 
 	ipcMain.handle('app:getPaths', () => ({

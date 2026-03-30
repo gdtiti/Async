@@ -30,6 +30,14 @@ export const messagesEn: Record<string, string> = {
 	'app.menuEdit': 'Edit',
 	'app.menuView': 'View',
 	'app.menuHelp': 'Help',
+	'app.menuTerminal': 'Terminal',
+	'app.menuNewTerminal': 'New Terminal',
+	'app.terminalTab': 'Terminal',
+	'app.newTerminalTitle': 'New terminal',
+	'app.closeTerminalPanel': 'Close panel',
+	'app.terminalTabN': 'Terminal {{n}}',
+	'app.terminalStarting': 'Starting terminal…',
+	'app.closeTerminalTab': 'Close terminal tab',
 	'app.searchAria': 'Search',
 
 	'quickOpen.placeholder':

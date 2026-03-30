@@ -10,7 +10,8 @@ import {
 } from 'react';
 import type { editor as MonacoEditorNS } from 'monaco-editor';
 import Editor from '@monaco-editor/react';
-import { Terminal } from './TerminalPane';
+import { PtyTerminalView } from './PtyTerminalView';
+import { DrawerPtyTerminal } from './DrawerPtyTerminal';
 import { ChatMarkdown } from './ChatMarkdown';
 import { languageFromFilePath } from './fileTypeIcons';
 import { OpenWorkspaceModal } from './OpenWorkspaceModal';
@@ -92,6 +93,7 @@ type ThreadInfo = {
 	subtitleFallback?: string;
 };
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
+type EditorPtySession = { id: string; title: string };
 type DiffPreview = { diff: string; isBinary: boolean; additions: number; deletions: number };
 
 const SIDEBAR_LAYOUT_KEY = 'async:sidebar-widths-v1';
@@ -139,6 +141,24 @@ function workspacePathParent(full: string): string {
 		return '';
 	}
 	return norm.slice(0, i);
+}
+
+function EditorFileBreadcrumb({ filePath }: { filePath: string }) {
+	const parts = filePath.replace(/\\/g, '/').split('/').filter(Boolean);
+	return (
+		<div className="ref-editor-breadcrumb-inner" aria-label={filePath}>
+			{parts.map((p, i) => (
+				<Fragment key={`${i}-${p}`}>
+					{i > 0 ? (
+						<span className="ref-editor-bc-sep" aria-hidden>
+							›
+						</span>
+					) : null}
+					<span className={i === parts.length - 1 ? 'ref-editor-bc-current' : 'ref-editor-bc-part'}>{p}</span>
+				</Fragment>
+			))}
+		</div>
+	);
 }
 
 function clampSidebarLayout(left: number, right: number): { left: number; right: number } {
@@ -353,6 +373,14 @@ function IconPlus({ className }: { className?: string }) {
 	return (
 		<svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
 			<path d="M12 5v14M5 12h14" strokeLinecap="round" />
+		</svg>
+	);
+}
+
+function IconCloseSmall({ className }: { className?: string }) {
+	return (
+		<svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+			<path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
 		</svg>
 	);
 }
@@ -587,6 +615,12 @@ export default function App() {
 	const [quickOpenOpen, setQuickOpenOpen] = useState(false);
 	const [quickOpenSeed, setQuickOpenSeed] = useState('');
 	const [sidebarSearchDraft, setSidebarSearchDraft] = useState('');
+	const [editorTerminalVisible, setEditorTerminalVisible] = useState(true);
+	const [editorTerminalSessions, setEditorTerminalSessions] = useState<EditorPtySession[]>([]);
+	const [activeEditorTerminalId, setActiveEditorTerminalId] = useState<string | null>(null);
+	const editorTerminalCreateLockRef = useRef(false);
+	const [terminalMenuOpen, setTerminalMenuOpen] = useState(false);
+	const terminalMenuRef = useRef<HTMLDivElement>(null);
 	const [homePath, setHomePath] = useState('');
 	const [railWidths, setRailWidths] = useState(() => {
 		const s = readSidebarLayout();
@@ -1714,6 +1748,105 @@ export default function App() {
 		setLayoutMode('agent');
 		setRightPanelTab('search');
 	}, []);
+
+	const appendEditorTerminal = useCallback(async () => {
+		if (editorTerminalCreateLockRef.current || !shell) {
+			return;
+		}
+		editorTerminalCreateLockRef.current = true;
+		try {
+			const r = (await shell.invoke('terminal:ptyCreate')) as {
+				ok: boolean;
+				id?: string;
+				error?: string;
+			};
+			if (!r.ok || !r.id) {
+				return;
+			}
+			setEditorTerminalSessions((prev) => {
+				const n = prev.length + 1;
+				return [...prev, { id: r.id!, title: t('app.terminalTabN', { n: String(n) }) }];
+			});
+			setActiveEditorTerminalId(r.id);
+		} finally {
+			editorTerminalCreateLockRef.current = false;
+		}
+	}, [shell, t]);
+
+	useEffect(() => {
+		if (!editorTerminalVisible || !workspace || layoutMode !== 'editor') {
+			return;
+		}
+		if (editorTerminalSessions.length > 0) {
+			return;
+		}
+		void appendEditorTerminal();
+	}, [editorTerminalVisible, workspace, layoutMode, editorTerminalSessions.length, appendEditorTerminal]);
+
+	useEffect(() => {
+		if (editorTerminalSessions.length === 0) {
+			setActiveEditorTerminalId(null);
+			return;
+		}
+		setActiveEditorTerminalId((cur) =>
+			cur && editorTerminalSessions.some((s) => s.id === cur) ? cur : editorTerminalSessions[0]!.id
+		);
+	}, [editorTerminalSessions]);
+
+	const closeEditorTerminalPanel = useCallback(() => {
+		setEditorTerminalSessions((prev) => {
+			for (const s of prev) {
+				void shell?.invoke('terminal:ptyKill', s.id);
+			}
+			return [];
+		});
+		setActiveEditorTerminalId(null);
+		setEditorTerminalVisible(false);
+	}, [shell]);
+
+	const closeEditorTerminalSession = useCallback(
+		(id: string) => {
+			void shell?.invoke('terminal:ptyKill', id);
+			setEditorTerminalSessions((prev) => {
+				const next = prev.filter((s) => s.id !== id);
+				if (next.length === 0) {
+					setEditorTerminalVisible(false);
+				}
+				return next;
+			});
+		},
+		[shell]
+	);
+
+	const onEditorTerminalSessionExit = useCallback((id: string) => {
+		setEditorTerminalSessions((prev) => {
+			const next = prev.filter((s) => s.id !== id);
+			if (next.length === 0) {
+				setEditorTerminalVisible(false);
+			}
+			return next;
+		});
+	}, []);
+
+	const spawnEditorTerminal = useCallback(() => {
+		setEditorTerminalVisible(true);
+		setTerminalMenuOpen(false);
+		void appendEditorTerminal();
+	}, [appendEditorTerminal]);
+
+	useEffect(() => {
+		if (!terminalMenuOpen) {
+			return;
+		}
+		const onDoc = (e: MouseEvent) => {
+			if (terminalMenuRef.current?.contains(e.target as Node)) {
+				return;
+			}
+			setTerminalMenuOpen(false);
+		};
+		document.addEventListener('mousedown', onDoc);
+		return () => document.removeEventListener('mousedown', onDoc);
+	}, [terminalMenuOpen]);
 
 	// Ctrl/Cmd+P quick open, Ctrl/Cmd+Shift+P command mode (VS Code-style)
 	useEffect(() => {
@@ -2884,6 +3017,32 @@ export default function App() {
 								{label}
 							</button>
 						))}
+						{layoutMode === 'editor' && workspace ? (
+							<div className="ref-menu-dropdown-wrap" ref={terminalMenuRef}>
+								<button
+									type="button"
+									className={`ref-menu-item${terminalMenuOpen ? ' is-active' : ''}`}
+									aria-expanded={terminalMenuOpen}
+									aria-haspopup="menu"
+									onClick={() => setTerminalMenuOpen((o) => !o)}
+								>
+									{t('app.menuTerminal')}
+									<IconChevron className="ref-menu-chevron" />
+								</button>
+								{terminalMenuOpen ? (
+									<div className="ref-menu-dropdown" role="menu">
+										<button
+											type="button"
+											role="menuitem"
+											className="ref-menu-dropdown-item"
+											onClick={() => spawnEditorTerminal()}
+										>
+											{t('app.menuNewTerminal')}
+										</button>
+									</div>
+								) : null}
+							</div>
+						) : null}
 					</nav>
 				</div>
 				<div className="ref-menubar-center">
@@ -3170,69 +3329,48 @@ export default function App() {
 					{renderAgentConversationBelowContext()}
 				</main>
 				) : (
-				/* ═══ Editor：中间 = 标签 + 编辑器，底部 = 终端（参考 Cursor） ═══ */
+				/* ═══ Editor：中间 = 标签 + 面包屑 + 编辑器（扁平，贴近 VS Code）；底部终端可关 ═══ */
 				<main
 					className="ref-center ref-center--editor-workspace"
 					aria-label={t('app.editorWorkspaceMainAria')}
 				>
 					<div className="ref-editor-center-split">
 						<div className="ref-editor-split-top">
-							<div className="ref-editor-layout-main">
-								<div className="ref-editor-workspace-topbar">
-									<div className="ref-editor-workspace-title">
-										<span className="ref-editor-workspace-kicker">{workspaceBasename}</span>
-										<span
-											className="ref-editor-workspace-path"
-											title={filePath.trim() || workspace || undefined}
-										>
-											{filePath.trim() || workspace || t('app.noWorkspace')}
-										</span>
-									</div>
-									<div className="ref-editor-workspace-badges" aria-hidden>
-										<span className="ref-editor-workspace-badge">{t('app.editorAgentChatRail')}</span>
-										<span className="ref-editor-workspace-badge ref-editor-workspace-badge--muted">
-											{composerModeLabel(composerMode, t)}
-										</span>
-									</div>
-								</div>
-								<EditorTabBar
-									tabs={openTabs}
-									activeTabId={activeTabId}
-									onSelect={(id) => void onSelectTab(id)}
-									onClose={onCloseTab}
-								/>
-								{filePath.trim() ? (
-									<div className="ref-editor-canvas">
-										<div className="ref-editor-toolbar ref-editor-toolbar--workspace">
-											<div className="ref-editor-file-meta">
-												<span className="ref-editor-file-name" title={filePath.trim() || undefined}>
-													{editorFileBasename || t('app.noFileSelected')}
+							<EditorTabBar
+								tabs={openTabs}
+								activeTabId={activeTabId}
+								onSelect={(id) => void onSelectTab(id)}
+								onClose={onCloseTab}
+							/>
+							{filePath.trim() ? (
+								<>
+									<div className="ref-editor-bc-toolbar-row">
+										<div className="ref-editor-bc-toolbar-inner">
+											<EditorFileBreadcrumb filePath={filePath.trim()} />
+											<div className="ref-editor-bc-actions">
+												<button
+													type="button"
+													className="ref-icon-tile"
+													aria-label={t('app.reloadFileAria')}
+													onClick={() => void onLoadFile()}
+												>
+													<IconRefresh />
+												</button>
+												<span className="ref-lsp-pill" title={t('app.lspSoon')}>
+													LSP
 												</span>
-												<span className="ref-editor-file-path">
-													{workspacePathParent(filePath.trim()) || workspaceBasename}
-												</span>
+												<button
+													type="button"
+													className="ref-editor-save"
+													disabled={!filePath.trim()}
+													onClick={() => void onSaveFile()}
+												>
+													{t('common.save')}
+												</button>
 											</div>
-											<button
-												type="button"
-												className="ref-icon-tile"
-												aria-label={t('app.reloadFileAria')}
-												onClick={() => void onLoadFile()}
-											>
-												<IconRefresh />
-											</button>
-											<span className="ref-lsp-pill" title={t('app.lspSoon')}>
-												LSP
-											</span>
-											<div className="ref-editor-toolbar-spacer" />
-											<button
-												type="button"
-												className="ref-editor-save"
-												disabled={!filePath.trim()}
-												onClick={() => void onSaveFile()}
-											>
-												{t('common.save')}
-											</button>
 										</div>
+									</div>
+									<div className="ref-editor-canvas">
 										<div className="ref-editor-pane">
 											<div className="ref-monaco-fill">
 												<Editor
@@ -3265,33 +3403,99 @@ export default function App() {
 											</div>
 										</div>
 									</div>
-								) : (
-									<div className="ref-editor-empty-state">
-										<div className="ref-editor-empty-card">
-											<BrandLogo className="ref-editor-empty-logo" size={28} />
-											<div className="ref-editor-empty-copy">
-												<strong className="ref-editor-empty-title">{t('app.editorEmptyTitle')}</strong>
-												<p className="ref-editor-empty-description">{t('app.editorEmptyDescription')}</p>
-											</div>
-											<button
-												type="button"
-												className="ref-open-workspace ref-open-workspace--inline"
-												onClick={() => setWorkspacePickerOpen(true)}
-											>
-												{t('app.openWorkspace')}
-											</button>
+								</>
+							) : (
+								<div className="ref-editor-empty-state">
+									<div className="ref-editor-empty-card">
+										<BrandLogo className="ref-editor-empty-logo" size={28} />
+										<div className="ref-editor-empty-copy">
+											<strong className="ref-editor-empty-title">{t('app.editorEmptyTitle')}</strong>
+											<p className="ref-editor-empty-description">{t('app.editorEmptyDescription')}</p>
 										</div>
+										<button
+											type="button"
+											className="ref-open-workspace ref-open-workspace--inline"
+											onClick={() => setWorkspacePickerOpen(true)}
+										>
+											{t('app.openWorkspace')}
+										</button>
 									</div>
-								)}
-							</div>
+								</div>
+							)}
 						</div>
-						<div className="ref-editor-split-bottom" aria-label={t('app.terminalEmbeddedAria')}>
-							<div className="ref-editor-panel-head">
-								<span className="ref-editor-panel-title">{t('app.terminalEmbeddedAria')}</span>
-								<span className="ref-editor-panel-caption">{workspaceBasename}</span>
+						{editorTerminalVisible ? (
+							<div className="ref-editor-split-bottom">
+								<div className="ref-editor-panel-terminal-tabs">
+									<div className="ref-editor-terminal-tabs-scroll" role="tablist" aria-label={t('app.terminalTab')}>
+										{editorTerminalSessions.map((s) => {
+											const isActive = s.id === activeEditorTerminalId;
+											return (
+												<div
+													key={s.id}
+													className={`ref-editor-terminal-tab ${isActive ? 'is-active' : ''}`}
+													role="presentation"
+												>
+													<button
+														type="button"
+														role="tab"
+														aria-selected={isActive}
+														className="ref-editor-terminal-tab-main"
+														onClick={() => setActiveEditorTerminalId(s.id)}
+													>
+														{s.title}
+													</button>
+													<button
+														type="button"
+														className="ref-editor-terminal-tab-close"
+														aria-label={t('app.closeTerminalTab')}
+														onClick={(e) => {
+															e.stopPropagation();
+															closeEditorTerminalSession(s.id);
+														}}
+													>
+														<IconCloseSmall />
+													</button>
+												</div>
+											);
+										})}
+									</div>
+									<span className="ref-editor-panel-tab-spacer" aria-hidden />
+									<button
+										type="button"
+										className="ref-editor-terminal-icon-btn"
+										title={t('app.newTerminalTitle')}
+										aria-label={t('app.menuNewTerminal')}
+										onClick={() => void appendEditorTerminal()}
+									>
+										<IconPlus />
+									</button>
+									<button
+										type="button"
+										className="ref-editor-terminal-icon-btn"
+										title={t('app.closeTerminalPanel')}
+										aria-label={t('app.closeTerminalPanel')}
+										onClick={() => closeEditorTerminalPanel()}
+									>
+										<IconCloseSmall />
+									</button>
+								</div>
+								<div className="ref-editor-terminal-stack">
+									{editorTerminalSessions.map((s) => (
+										<div
+											key={s.id}
+											className={`ref-editor-terminal-pane ${s.id === activeEditorTerminalId ? 'is-active' : ''}`}
+										>
+											<PtyTerminalView
+												sessionId={s.id}
+												active={s.id === activeEditorTerminalId}
+												compactChrome
+												onSessionExit={() => onEditorTerminalSessionExit(s.id)}
+											/>
+										</div>
+									))}
+								</div>
 							</div>
-							<Terminal />
-						</div>
+						) : null}
 					</div>
 				</main>
 				)}
@@ -3572,7 +3776,7 @@ export default function App() {
 						</button>
 					</div>
 					<div className="ref-drawer-terminal">
-						<Terminal />
+						<DrawerPtyTerminal placeholder={t('app.terminalStarting')} />
 					</div>
 				</section>
 			) : null}

@@ -34,6 +34,14 @@ export const messagesZhCN: Record<string, string> = {
 	'app.menuEdit': '编辑',
 	'app.menuView': '视图',
 	'app.menuHelp': '帮助',
+	'app.menuTerminal': '终端',
+	'app.menuNewTerminal': '新建终端',
+	'app.terminalTab': '终端',
+	'app.newTerminalTitle': '新建终端',
+	'app.closeTerminalPanel': '关闭面板',
+	'app.terminalTabN': '终端 {{n}}',
+	'app.terminalStarting': '正在启动终端…',
+	'app.closeTerminalTab': '关闭此终端标签',
 	'app.searchAria': '搜索',
 
 	'quickOpen.placeholder':

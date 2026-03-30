@@ -13,7 +13,7 @@ const ctx = await esbuild.context({
 	target: 'node20',
 	format: 'cjs',
 	outfile: path.join(__dirname, 'electron', 'main.bundle.cjs'),
-	external: ['electron'],
+	external: ['electron', 'node-pty'],
 	sourcemap: true,
 });
 

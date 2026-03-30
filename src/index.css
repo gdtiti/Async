@@ -481,6 +481,18 @@ body {
 	min-width: 0;
 }
 
+.terminal-panel--embedded {
+	border: none;
+	border-radius: 0;
+	flex: 1;
+	min-height: 0;
+	background: #0c0c0e;
+}
+
+.terminal-panel--embedded .xterm-viewport {
+	padding: 2px 4px 4px;
+}
+
 .panel-title {
 	font-size: 11px;
 	padding: 6px 10px;
@@ -934,6 +946,58 @@ body {
 .ref-menu-item:hover {
 	color: var(--void-fg-0);
 	background: var(--void-bg-2);
+}
+
+.ref-menu-item.is-active {
+	color: var(--void-fg-0);
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.ref-menu-dropdown-wrap {
+	position: relative;
+}
+
+.ref-menu-dropdown-wrap > .ref-menu-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+}
+
+.ref-menu-chevron {
+	opacity: 0.55;
+	flex-shrink: 0;
+}
+
+.ref-menu-dropdown {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	margin-top: 4px;
+	min-width: 188px;
+	padding: 4px 0;
+	border-radius: 8px;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: rgba(22, 22, 28, 0.98);
+	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+	z-index: 30000;
+}
+
+.ref-menu-dropdown-item {
+	display: block;
+	width: 100%;
+	text-align: left;
+	padding: 8px 14px;
+	border: none;
+	background: transparent;
+	color: var(--void-fg-1);
+	font-size: 12px;
+	cursor: pointer;
+	font-family: inherit;
+}
+
+.ref-menu-dropdown-item:hover {
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--void-fg-0);
 }
 
 .ref-icon-tile {
@@ -7008,6 +7072,11 @@ body {
 	scrollbar-width: none;
 }
 
+.ref-editor-split-top > .ref-tab-bar {
+	background: rgba(8, 10, 14, 0.92);
+	border-bottom-color: var(--void-border-soft);
+}
+
 .ref-tab-bar::-webkit-scrollbar {
 	display: none;
 }
@@ -7421,32 +7490,21 @@ body {
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
-	padding: 10px 12px 0;
-}
-
-.ref-editor-split-top .ref-editor-layout-main {
-	flex: 1;
-	min-height: 0;
-	display: flex;
-	flex-direction: column;
-	border: 1px solid rgba(255, 255, 255, 0.07);
-	border-radius: 16px 16px 0 0;
+	padding: 0;
 	overflow: hidden;
-	background: rgba(10, 12, 18, 0.94);
-	box-shadow: 0 16px 42px rgba(0, 0, 0, 0.22);
 }
 
 .ref-editor-split-bottom {
-	flex: 0 0 min(32vh, 280px);
-	min-height: 160px;
-	max-height: 55vh;
+	flex: 0 0 min(30vh, 260px);
+	min-height: 120px;
+	max-height: 50vh;
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
-	margin: 0 12px 12px;
-	border: 1px solid rgba(255, 255, 255, 0.07);
-	border-top: none;
-	border-radius: 0 0 16px 16px;
+	margin: 0;
+	border: none;
+	border-top: 1px solid var(--void-border-soft);
+	border-radius: 0;
 	background: rgba(8, 10, 14, 0.98);
 	overflow: hidden;
 }
@@ -7454,15 +7512,196 @@ body {
 .ref-editor-split-bottom .terminal-panel {
 	flex: 1;
 	min-height: 0;
-	border: none;
-	border-radius: 0;
 }
 
-.ref-editor-layout-main {
+/* 底部终端：VS Code 式顶栏（标签 + 操作） */
+.ref-editor-panel-terminal-tabs {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding: 0 6px 0 8px;
+	height: 35px;
+	flex-shrink: 0;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+	background: rgba(17, 20, 28, 0.98);
+}
+
+.ref-editor-terminal-tabs-scroll {
+	display: flex;
+	align-items: stretch;
+	gap: 2px;
 	flex: 1;
+	min-width: 0;
+	overflow-x: auto;
+	scrollbar-width: thin;
+}
+
+.ref-editor-terminal-tab {
+	display: flex;
+	align-items: stretch;
+	flex-shrink: 0;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px;
+	border-radius: 4px 4px 0 0;
+}
+
+.ref-editor-terminal-tab.is-active {
+	border-bottom-color: #818cf8;
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.ref-editor-terminal-tab-main {
+	border: none;
+	background: transparent;
+	color: var(--void-fg-2);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	padding: 0 10px 0 12px;
+	cursor: pointer;
+	font-family: inherit;
+}
+
+.ref-editor-terminal-tab.is-active .ref-editor-terminal-tab-main {
+	color: var(--void-fg-0);
+}
+
+.ref-editor-terminal-tab-close {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--void-fg-3);
+	cursor: pointer;
+	padding: 0;
+	margin-right: 4px;
+}
+
+.ref-editor-terminal-tab-close:hover {
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--void-fg-0);
+}
+
+.ref-editor-terminal-stack {
+	flex: 1;
+	min-height: 0;
+	position: relative;
 	display: flex;
 	flex-direction: column;
+}
+
+.ref-editor-terminal-pane {
+	flex: 1;
 	min-height: 0;
+	display: none;
+	flex-direction: column;
+}
+
+.ref-editor-terminal-pane.is-active {
+	display: flex;
+}
+
+.pty-term-root {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.pty-term-root--embedded .xterm-viewport {
+	flex: 1;
+	min-height: 0;
+	padding: 2px 4px 4px;
+}
+
+.pty-drawer-placeholder {
+	padding: 16px;
+	font-size: 12px;
+}
+
+.ref-editor-panel-tab-spacer {
+	flex: 1;
+	min-width: 8px;
+}
+
+.ref-editor-terminal-icon-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--void-fg-3);
+	cursor: pointer;
+}
+
+.ref-editor-terminal-icon-btn:hover {
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--void-fg-1);
+}
+
+/* 面包屑 + 工具（单行，贴近 VS Code） */
+.ref-editor-bc-toolbar-row {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	min-height: 28px;
+	padding: 0 6px 0 8px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	background: linear-gradient(180deg, rgba(19, 22, 29, 0.98) 0%, rgba(13, 15, 21, 0.98) 100%);
+}
+
+.ref-editor-bc-toolbar-inner {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	gap: 10px;
+	min-width: 0;
+}
+
+.ref-editor-breadcrumb-inner {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 2px 0;
+	min-width: 0;
+	font-size: 12px;
+	line-height: 1.4;
+	color: var(--void-fg-3);
+}
+
+.ref-editor-bc-sep {
+	margin: 0 6px;
+	color: var(--void-fg-3);
+	opacity: 0.5;
+	user-select: none;
+}
+
+.ref-editor-bc-part {
+	color: var(--void-fg-2);
+}
+
+.ref-editor-bc-current {
+	color: var(--void-fg-0);
+	font-weight: 500;
+}
+
+.ref-editor-bc-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex-shrink: 0;
+}
+
+.ref-editor-bc-actions .ref-lsp-pill {
+	margin: 0 4px;
 }
 
 .ref-editor-workspace-topbar {
@@ -7528,7 +7767,13 @@ body {
 	background: #0b0e14;
 }
 
-.ref-editor-layout-main .ref-monaco-fill {
+.ref-editor-canvas .ref-editor-pane {
+	flex: 1;
+	min-height: 0;
+	border: none;
+}
+
+.ref-editor-canvas .ref-monaco-fill {
 	flex: 1;
 	min-height: 0;
 }
