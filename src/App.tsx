@@ -15,7 +15,13 @@ import { ChatMarkdown } from './ChatMarkdown';
 import { languageFromFilePath } from './fileTypeIcons';
 import { OpenWorkspaceModal } from './OpenWorkspaceModal';
 import { WorkspaceExplorer, type GitPathStatusMap } from './WorkspaceExplorer';
-import type { AgentPendingPatch, ChatStreamPayload } from './ipcTypes';
+import {
+	type AgentPendingPatch,
+	type ChatStreamPayload,
+	coerceThinkingLevel,
+	type ThinkingLevel,
+} from './ipcTypes';
+import { AgentStreamingToolPreview } from './AgentStreamingToolPreview';
 import { AgentReviewPanel } from './AgentReviewPanel';
 import { AgentFileChangesPanel } from './AgentFileChanges';
 import {
@@ -471,6 +477,13 @@ export default function App() {
 	const [anthropicBaseURL, setAnthropicBaseURL] = useState('');
 	const [geminiApiKey, setGeminiApiKey] = useState('');
 	const [defaultModel, setDefaultModel] = useState(AUTO_MODEL_ID);
+	const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>('off');
+	const [streamingThinking, setStreamingThinking] = useState('');
+	const [streamingToolPreview, setStreamingToolPreview] = useState<{
+		name: string;
+		partialJson: string;
+		index: number;
+	} | null>(null);
 	const [modelEntries, setModelEntries] = useState<UserModelEntry[]>([]);
 	const [enabledModelIds, setEnabledModelIds] = useState<string[]>([]);
 	const [agentCustomization, setAgentCustomization] = useState<AgentCustomization>(() => defaultAgentCustomization());
@@ -767,6 +780,7 @@ export default function App() {
 				const saneEnabled = sanitizeEnabledIds(rawEntries, st.models?.enabledIds);
 				setEnabledModelIds(saneEnabled);
 				setDefaultModel(coerceDefaultModel(st.defaultModel, rawEntries, saneEnabled));
+				setThinkingLevel(coerceThinkingLevel((st as { thinkingLevel?: unknown }).thinkingLevel));
 				const ag = st.agent;
 				setAgentCustomization({
 					...defaultAgentCustomization(),
@@ -807,7 +821,16 @@ export default function App() {
 					}
 					return s + payload.text;
 				});
+			} else if (payload.type === 'thinking_delta') {
+				setStreamingThinking((s) => s + payload.text);
+			} else if (payload.type === 'tool_input_delta') {
+				setStreamingToolPreview({
+					name: payload.name,
+					partialJson: payload.partialJson,
+					index: payload.index,
+				});
 			} else if (payload.type === 'tool_call') {
+				setStreamingToolPreview(null);
 				const marker = `\n<tool_call tool="${payload.name}">${payload.args}</tool_call>\n`;
 				setStreaming((s) => s + marker);
 			} else if (payload.type === 'tool_result') {
@@ -833,6 +856,8 @@ export default function App() {
 				firstTokenAtRef.current = null;
 				setAwaitingReply(false);
 				setStreaming('');
+				setStreamingThinking('');
+				setStreamingToolPreview(null);
 				setFileChangesDismissed(false);
 				setDismissedFiles(new Set());
 				if (payload.pendingAgentPatches && payload.pendingAgentPatches.length > 0) {
@@ -886,6 +911,8 @@ export default function App() {
 				firstTokenAtRef.current = null;
 				setAwaitingReply(false);
 				setStreaming('');
+				setStreamingThinking('');
+				setStreamingToolPreview(null);
 				setMessages((m) => [
 					...m,
 					{ role: 'assistant', content: t('app.errorPrefix', { message: translateChatError(payload.message, t) }) },
@@ -1114,6 +1141,8 @@ export default function App() {
 			setMessages((m) => [...m, { role: 'user', content: text }]);
 		}
 		setStreaming('');
+		setStreamingThinking('');
+		setStreamingToolPreview(null);
 		setWorkedSeconds(null);
 		firstTokenAtRef.current = null;
 		streamStartedAtRef.current = Date.now();
@@ -1159,6 +1188,8 @@ export default function App() {
 		firstTokenAtRef.current = null;
 		setAwaitingReply(false);
 		setStreaming('');
+		setStreamingThinking('');
+		setStreamingToolPreview(null);
 	};
 
 	const onPlanQuestionSubmit = (answer: string) => {
@@ -2211,7 +2242,12 @@ export default function App() {
 												? Math.max(0, (ftAt - stAt) / 1000)
 												: Math.max(0, (Date.now() - stAt) / 1000);
 									thoughtBlock = (
-										<ComposerThoughtBlock phase={phase} elapsedSeconds={elapsed} mode={composerMode} />
+										<ComposerThoughtBlock
+											phase={phase}
+											elapsedSeconds={elapsed}
+											mode={composerMode}
+											streamingThinking={streamingThinking}
+										/>
 									);
 								} else if (frozenSec != null) {
 									thoughtBlock = (
@@ -2316,6 +2352,21 @@ export default function App() {
 													showAgentWorking={composerMode === 'agent' && isLast && awaitingReply}
 												/>
 											)}
+											{composerMode === 'agent' &&
+											isLast &&
+											awaitingReply &&
+											streamingToolPreview ? (
+												<AgentStreamingToolPreview
+													toolName={streamingToolPreview.name}
+													partialJson={streamingToolPreview.partialJson}
+													toolIndex={streamingToolPreview.index}
+													labels={{
+														title: t('agent.streamTool.title'),
+														path: t('agent.streamTool.path'),
+														streaming: t('agent.streamTool.streaming'),
+													}}
+												/>
+											) : null}
 										</div>
 									</div>
 								);
@@ -2804,6 +2855,13 @@ export default function App() {
 				onSelectModel={(id) => void onPickDefaultModel(id)}
 				onNavigateToSettings={() => openSettingsPage('models')}
 				onAddModels={() => openSettingsPage('models')}
+				thinkingLevel={thinkingLevel}
+				onThinkingLevelChange={(v) => {
+					setThinkingLevel(v);
+					if (shell) {
+						void shell.invoke('settings:set', { thinkingLevel: v });
+					}
+				}}
 			/>
 
 			<ComposerAtMenu

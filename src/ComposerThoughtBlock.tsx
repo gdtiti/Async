@@ -1,4 +1,4 @@
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { ComposerMode } from './ComposerPlusMenu';
 import { useI18n } from './i18n';
 
@@ -13,6 +13,8 @@ type Props = {
 	mode: ComposerMode;
 	/** 受控折叠；默认收起 */
 	defaultOpen?: boolean;
+	/** 扩展思考流式正文（Anthropic 等）；不写入历史气泡 */
+	streamingThinking?: string;
 };
 
 export function ComposerThoughtBlock({
@@ -21,9 +23,16 @@ export function ComposerThoughtBlock({
 	totalStreamSeconds,
 	mode,
 	defaultOpen = false,
+	streamingThinking = '',
 }: Props) {
 	const { t } = useI18n();
 	const [open, setOpen] = useState(defaultOpen);
+
+	useEffect(() => {
+		if (streamingThinking.trim()) {
+			setOpen(true);
+		}
+	}, [streamingThinking]);
 	const id = useId();
 	const headId = `${id}-head`;
 	const panelId = `${id}-panel`;
@@ -94,6 +103,11 @@ export function ComposerThoughtBlock({
 			</button>
 			{open ? (
 				<div id={panelId} role="region" aria-labelledby={headId} className="ref-thought-panel">
+					{streamingThinking.trim() ? (
+						<div className="ref-thought-reasoning-wrap">
+							<pre className="ref-thought-reasoning-pre">{streamingThinking}</pre>
+						</div>
+					) : null}
 					<pre className="ref-thought-panel-pre">{detailText}</pre>
 				</div>
 			) : null}

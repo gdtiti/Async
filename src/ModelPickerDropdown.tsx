@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useI18n } from './i18n';
-import {
-	clampVerticalInViewport,
-	computeClampedPopoverLayout,
-	type ClampedPopoverLayout,
-} from './anchorPopoverLayout';
+import { computeClampedPopoverLayout, type ClampedPopoverLayout } from './anchorPopoverLayout';
 import type { SpeedTag } from './modelCatalog';
+import type { ThinkingLevel } from './ipcTypes';
+import { THINKING_EFFORT_IDS } from './ipcTypes';
 
 export type ModelPickerItem = {
 	id: string;
@@ -15,6 +13,8 @@ export type ModelPickerItem = {
 	speedTag: SpeedTag;
 	subtitle?: string;
 };
+
+const OPTIONS_PANEL_W = 276;
 
 function IconGlobe({ className }: { className?: string }) {
 	return (
@@ -41,12 +41,15 @@ type Props = {
 	selectedId: string;
 	/** 点击某一模型行时切换当前对话模型 */
 	onSelectModel: (id: string) => void;
-	/** Edit 按钮进入设置页 */
+	/** 在右栏底部「管理模型…」进入设置（非「编辑」按钮） */
 	onNavigateToSettings: () => void;
 	onAddModels: () => void;
+	/** 全局思考档位（写入 settings） */
+	thinkingLevel: ThinkingLevel;
+	onThinkingLevelChange: (level: ThinkingLevel) => void;
 };
 
-type MenuLayout = ClampedPopoverLayout & { minWidth: number };
+type MenuLayout = ClampedPopoverLayout & { minWidth: number; listMinW: number };
 
 export function ModelPickerDropdown({
 	open,
@@ -57,21 +60,34 @@ export function ModelPickerDropdown({
 	onSelectModel,
 	onNavigateToSettings,
 	onAddModels,
+	thinkingLevel,
+	onThinkingLevelChange,
 }: Props) {
 	const { t } = useI18n();
 	const menuRef = useRef<HTMLDivElement>(null);
 	const [menuLayout, setMenuLayout] = useState<MenuLayout>({
 		placement: 'below',
 		left: 0,
-		width: 300,
-		minWidth: 300,
+		width: 300 + OPTIONS_PANEL_W,
+		minWidth: 300 + OPTIONS_PANEL_W,
+		listMinW: 300,
 		top: 100,
 		maxHeightPx: 400,
 		minHeightPx: 160,
 	});
 	const [hoveredId, setHoveredId] = useState<string | null>(null);
-	const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
-	const rowRefs = useRef<Map<string, HTMLElement | null>>(new Map());
+	/** 点击「编辑」后展开右栏，并锁定为该条模型展示说明 */
+	const [optsOpen, setOptsOpen] = useState(false);
+	const [optsModelId, setOptsModelId] = useState<string | null>(null);
+
+	const thinkingOn = thinkingLevel !== 'off';
+
+	useEffect(() => {
+		if (!open) {
+			setOptsOpen(false);
+			setOptsModelId(null);
+		}
+	}, [open]);
 
 	const computeLayout = useCallback(() => {
 		const el = anchorRef.current;
@@ -82,18 +98,19 @@ export function ModelPickerDropdown({
 		const r = el.getBoundingClientRect();
 		const vw = window.innerWidth;
 		const vh = window.innerHeight;
-		const minW = Math.max(300, r.width);
+		const listMinW = Math.max(280, Math.ceil(r.width));
+		const totalW = listMinW + (optsOpen ? OPTIONS_PANEL_W : 0);
 		const estimate = Math.min(420, Math.max(160, items.length * 52 + 140));
 		const natural =
 			menu && menu.scrollHeight > 48 ? Math.max(menu.scrollHeight, estimate) : estimate;
 		const L = computeClampedPopoverLayout(r, {
 			viewportWidth: vw,
 			viewportHeight: vh,
-			menuWidth: minW,
+			menuWidth: totalW,
 			contentHeight: natural,
 		});
-		setMenuLayout({ ...L, minWidth: minW });
-	}, [anchorRef, items.length]);
+		setMenuLayout({ ...L, minWidth: totalW, listMinW });
+	}, [anchorRef, items.length, optsOpen]);
 
 	useLayoutEffect(() => {
 		if (!open) {
@@ -121,15 +138,15 @@ export function ModelPickerDropdown({
 			window.removeEventListener('resize', onWin);
 			window.removeEventListener('scroll', onWin, true);
 		};
-	}, [open, computeLayout]);
+	}, [open, computeLayout, optsOpen]);
 
 	useEffect(() => {
 		if (!open) {
 			return;
 		}
 		const onDoc = (e: MouseEvent) => {
-			const t = e.target as Node;
-			if (menuRef.current?.contains(t) || anchorRef.current?.contains(t)) {
+			const tgt = e.target as Node;
+			if (menuRef.current?.contains(tgt) || anchorRef.current?.contains(tgt)) {
 				return;
 			}
 			onClose();
@@ -147,129 +164,195 @@ export function ModelPickerDropdown({
 		};
 	}, [open, onClose, anchorRef]);
 
-	useLayoutEffect(() => {
-		if (!open || !hoveredId) {
-			setPopoverPos(null);
-			return;
-		}
-		const row = rowRefs.current.get(hoveredId);
-		if (!row) {
-			setPopoverPos(null);
-			return;
-		}
-		const rr = row.getBoundingClientRect();
-		const pw = 260;
-		let left = rr.right + 8;
-		const vh = window.innerHeight;
-		if (left + pw > window.innerWidth - 12) {
-			left = Math.max(12, rr.left - pw - 8);
-		}
-		const top = clampVerticalInViewport(rr.top, 120, vh);
-		setPopoverPos({ top, left });
-	}, [open, hoveredId]);
-
 	if (!open) {
 		return null;
 	}
 
-	const hovered = hoveredId ? items.find((i) => i.id === hoveredId) : undefined;
+	const focusId = optsOpen && optsModelId ? optsModelId : hoveredId ?? selectedId;
+	const focusItem = items.find((i) => i.id === focusId) ?? items.find((i) => i.id === selectedId);
+
+	const setThinkingToggle = (on: boolean) => {
+		if (on) {
+			onThinkingLevelChange(thinkingLevel === 'off' ? 'medium' : thinkingLevel);
+		} else {
+			onThinkingLevelChange('off');
+		}
+	};
 
 	const node = (
-		<>
-			<div
-				ref={menuRef}
-				className={`ref-model-dd ${menuLayout.placement === 'above' ? 'ref-model-dd--above' : ''}`}
-				style={{
-					left: menuLayout.left,
-					minWidth: menuLayout.minWidth,
-					top: menuLayout.placement === 'below' ? menuLayout.top : 'auto',
-					bottom: menuLayout.placement === 'above' ? menuLayout.bottom : 'auto',
-					maxHeight: menuLayout.maxHeightPx,
-					minHeight: menuLayout.minHeightPx,
-					overflowY: 'auto',
-				}}
-				role="listbox"
-				aria-label={t('modelPicker.selectAria')}
-				onMouseLeave={() => setHoveredId(null)}
-			>
-				<div className="ref-model-dd-inner">
-					{items.map((m) => {
-						const isSel = selectedId === m.id;
-						return (
-							<div
-								key={m.id}
-								ref={(el) => {
-									if (el) {
-										rowRefs.current.set(m.id, el);
-									} else {
-										rowRefs.current.delete(m.id);
-									}
-								}}
-								role="option"
-								aria-selected={isSel}
-								tabIndex={0}
-								className={`ref-model-dd-row ${isSel ? 'is-selected' : ''}`}
-								onMouseEnter={() => setHoveredId(m.id)}
-								onKeyDown={(e) => {
-									if (e.key === 'Enter' || e.key === ' ') {
-										e.preventDefault();
+		<div
+			ref={menuRef}
+			className={`ref-model-dd ref-model-dd--split ${optsOpen ? 'ref-model-dd--opts-open' : ''} ${menuLayout.placement === 'above' ? 'ref-model-dd--above' : ''}`}
+			style={{
+				left: menuLayout.left,
+				width: menuLayout.minWidth,
+				minWidth: menuLayout.minWidth,
+				top: menuLayout.placement === 'below' ? menuLayout.top : 'auto',
+				bottom: menuLayout.placement === 'above' ? menuLayout.bottom : 'auto',
+				maxHeight: menuLayout.maxHeightPx,
+				minHeight: menuLayout.minHeightPx,
+				display: 'flex',
+				flexDirection: 'column',
+				overflow: 'hidden',
+			}}
+			role="presentation"
+		>
+			<div className="ref-model-dd-split">
+				<div
+					className="ref-model-dd-col ref-model-dd-col--list"
+					style={{ flexBasis: menuLayout.listMinW, maxWidth: menuLayout.listMinW }}
+					onMouseLeave={() => setHoveredId(null)}
+				>
+					<div
+						className="ref-model-dd-inner"
+						role="listbox"
+						aria-label={t('modelPicker.selectAria')}
+					>
+						{items.map((m) => {
+							const isSel = selectedId === m.id;
+							return (
+								<div
+									key={m.id}
+									role="option"
+									aria-selected={isSel}
+									tabIndex={0}
+									className={`ref-model-dd-row ${isSel ? 'is-selected' : ''}`}
+									onMouseEnter={() => setHoveredId(m.id)}
+									onKeyDown={(e) => {
+										if (e.key === 'Enter' || e.key === ' ') {
+											e.preventDefault();
+											void onSelectModel(m.id);
+											onClose();
+										}
+									}}
+									onClick={() => {
 										void onSelectModel(m.id);
-										onClose();
-									}
-								}}
-								onClick={() => {
-									void onSelectModel(m.id);
-									onClose();
-								}}
-							>
-								<span className="ref-model-dd-globe" aria-hidden>
-									<IconGlobe />
-								</span>
-								<span className="ref-model-dd-main">
-									<span className="ref-model-dd-label">{m.label}</span>
-									{m.subtitle ? <span className="ref-model-dd-sub">{m.subtitle}</span> : null}
-								</span>
-								<span className={`ref-model-dd-tag ref-model-dd-tag--${m.speedTag.toLowerCase()}`}>
-									{t(`modelPicker.speed.${m.speedTag.toLowerCase()}`)}
-								</span>
-								{isSel ? (
-									<span className="ref-model-dd-check" aria-hidden>
-										<IconCheck />
-									</span>
-								) : (
-									<span className="ref-model-dd-check-placeholder" aria-hidden />
-								)}
-								<button
-									type="button"
-									className="ref-model-dd-edit"
-									onClick={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										onNavigateToSettings();
 										onClose();
 									}}
 								>
-									{t('modelPicker.edit')}
+									<span className="ref-model-dd-globe" aria-hidden>
+										<IconGlobe />
+									</span>
+									<span className="ref-model-dd-main">
+										<span className="ref-model-dd-label">{m.label}</span>
+										{m.subtitle ? <span className="ref-model-dd-sub">{m.subtitle}</span> : null}
+									</span>
+									<span className={`ref-model-dd-tag ref-model-dd-tag--${m.speedTag.toLowerCase()}`}>
+										{t(`modelPicker.speed.${m.speedTag.toLowerCase()}`)}
+									</span>
+									{isSel ? (
+										<span className="ref-model-dd-check" aria-hidden>
+											<IconCheck />
+										</span>
+									) : (
+										<span className="ref-model-dd-check-placeholder" aria-hidden />
+									)}
+									<button
+										type="button"
+										className="ref-model-dd-edit"
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											setOptsModelId(m.id);
+											setOptsOpen(true);
+										}}
+									>
+										{t('modelPicker.edit')}
+									</button>
+								</div>
+							);
+						})}
+					</div>
+					<div className="ref-model-dd-sep" role="separator" />
+					<button type="button" className="ref-model-dd-add" onClick={() => { onAddModels(); onClose(); }}>
+						{t('modelPicker.addModels')}
+					</button>
+				</div>
+
+				{optsOpen ? (
+					<>
+						<div className="ref-model-dd-col-divider" aria-hidden />
+
+						<aside
+							className="ref-model-dd-col ref-model-dd-col--opts"
+							aria-label={t('thinking.panelAria')}
+							onMouseDown={(e) => e.stopPropagation()}
+						>
+							<button
+								type="button"
+								className="ref-model-opts-collapse"
+								onClick={() => {
+									setOptsOpen(false);
+									setOptsModelId(null);
+								}}
+							>
+								<svg className="ref-model-opts-collapse-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+									<path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+								</svg>
+								{t('thinking.collapsePanel')}
+							</button>
+
+							<div className="ref-model-opts-focus">
+								<span className="ref-model-opts-focus-name">{focusItem?.label ?? '—'}</span>
+								<p className="ref-model-opts-focus-desc">{focusItem?.description ?? ''}</p>
+							</div>
+
+							<p className="ref-model-opts-hint">{t('thinking.panelHint')}</p>
+
+							<div className="ref-model-opts-section">{t('thinking.section.options')}</div>
+							<div className="ref-model-opts-toggle-row">
+								<span className="ref-model-opts-toggle-label">{t('thinking.toggleLabel')}</span>
+								<button
+									type="button"
+									className={`ref-model-opts-switch ${thinkingOn ? 'is-on' : ''}`}
+									role="switch"
+									aria-checked={thinkingOn}
+									onClick={() => setThinkingToggle(!thinkingOn)}
+								>
+									<span className="ref-model-opts-switch-knob" />
 								</button>
 							</div>
-						);
-					})}
-				</div>
-				<div className="ref-model-dd-sep" role="separator" />
-				<button type="button" className="ref-model-dd-add" onClick={() => { onAddModels(); onClose(); }}>
-					{t('modelPicker.addModels')}
-				</button>
+
+							<div className="ref-model-opts-section">{t('thinking.section.effort')}</div>
+							<div className={`ref-model-opts-effort ${!thinkingOn ? 'is-disabled' : ''}`}>
+								{THINKING_EFFORT_IDS.map((id) => {
+									const active = thinkingOn && thinkingLevel === id;
+									return (
+										<button
+											key={id}
+											type="button"
+											className={`ref-model-opts-effort-row ${active ? 'is-active' : ''}`}
+											disabled={!thinkingOn}
+											onClick={() => onThinkingLevelChange(id)}
+										>
+											<span>{t(`thinking.effort.${id}`)}</span>
+											{active ? (
+												<span className="ref-model-opts-effort-check" aria-hidden>
+													<IconCheck />
+												</span>
+											) : (
+												<span className="ref-model-opts-effort-check-placeholder" aria-hidden />
+											)}
+										</button>
+									);
+								})}
+							</div>
+
+							<button
+								type="button"
+								className="ref-model-opts-settings-foot"
+								onClick={() => {
+									onNavigateToSettings();
+									onClose();
+								}}
+							>
+								{t('modelPicker.manageInSettings')}
+							</button>
+						</aside>
+					</>
+				) : null}
 			</div>
-			{hovered && popoverPos ? (
-				<div
-					className="ref-model-dd-popover"
-					style={{ top: popoverPos.top, left: popoverPos.left }}
-					role="tooltip"
-				>
-					<p className="ref-model-dd-popover-text">{hovered.description}</p>
-				</div>
-			) : null}
-		</>
+		</div>
 	);
 
 	return createPortal(node, document.body);

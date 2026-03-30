@@ -4,6 +4,10 @@ import type { ChatMessage } from '../threadStore.js';
 import type { ShellSettings } from '../settingsStore.js';
 import { composeSystem, temperatureForMode } from './modePrompts.js';
 import type { StreamHandlers, UnifiedChatOptions } from './types.js';
+import {
+	anthropicMaxTokensWithThinking,
+	anthropicThinkingBudget,
+} from './thinkingLevel.js';
 
 function toAnthropicMessages(messages: ChatMessage[]): MessageParam[] {
 	const nonSystem = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
@@ -55,6 +59,13 @@ export async function streamAnthropic(
 		return;
 	}
 	const temperature = temperatureForMode(options.mode);
+	const thinkBudget = anthropicThinkingBudget(options.thinkingLevel ?? 'off');
+	const maxTokens =
+		thinkBudget !== null ? anthropicMaxTokensWithThinking(thinkBudget) : 8192;
+	const thinkingParam =
+		thinkBudget !== null
+			? ({ type: 'enabled' as const, budget_tokens: thinkBudget })
+			: undefined;
 
 	if (anthropicMessages.length === 0) {
 		handlers.onError('没有可发送的对话消息。');
@@ -66,10 +77,11 @@ export async function streamAnthropic(
 		const stream = client.messages.stream(
 			{
 				model,
-				max_tokens: 8192,
+				max_tokens: maxTokens,
 				system,
 				messages: anthropicMessages,
 				temperature,
+				...(thinkingParam ? { thinking: thinkingParam } : {}),
 			},
 			{ signal: options.signal }
 		);
@@ -78,11 +90,18 @@ export async function streamAnthropic(
 			if (options.signal.aborted) {
 				break;
 			}
-			if (ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') {
-				const piece = ev.delta.text;
-				if (piece) {
-					full += piece;
-					handlers.onDelta(piece);
+			if (ev.type === 'content_block_delta') {
+				if (ev.delta.type === 'text_delta') {
+					const piece = ev.delta.text;
+					if (piece) {
+						full += piece;
+						handlers.onDelta(piece);
+					}
+				} else if (ev.delta.type === 'thinking_delta') {
+					const piece = ev.delta.thinking;
+					if (piece) {
+						handlers.onThinkingDelta?.(piece);
+					}
 				}
 			}
 		}

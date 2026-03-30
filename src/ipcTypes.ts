@@ -1,5 +1,18 @@
 import type { ComposerMode } from './ComposerPlusMenu';
 
+/** 与 main-src/settingsStore 一致 */
+export type ThinkingLevel = 'off' | 'low' | 'medium' | 'high' | 'max';
+
+export const THINKING_EFFORT_IDS: Exclude<ThinkingLevel, 'off'>[] = ['low', 'medium', 'high', 'max'];
+
+const ALL_THINKING: ThinkingLevel[] = ['off', 'low', 'medium', 'high', 'max'];
+
+export function coerceThinkingLevel(v: unknown): ThinkingLevel {
+	const s = typeof v === 'string' ? v.toLowerCase().trim() : 'off';
+	if (s === 'minimal') return 'low';
+	return ALL_THINKING.includes(s as ThinkingLevel) ? (s as ThinkingLevel) : 'off';
+}
+
 /** Agent 审阅：主进程解析出的待应用 unified diff 块 */
 export type AgentPendingPatch = {
 	id: string;
@@ -12,7 +25,9 @@ export type ChatStreamPayload =
 	| { threadId: string; type: 'done'; text: string; pendingAgentPatches?: AgentPendingPatch[] }
 	| { threadId: string; type: 'error'; message: string }
 	| { threadId: string; type: 'tool_call'; name: string; args: string }
-	| { threadId: string; type: 'tool_result'; name: string; result: string; success: boolean };
+	| { threadId: string; type: 'tool_result'; name: string; result: string; success: boolean }
+	| { threadId: string; type: 'tool_input_delta'; name: string; partialJson: string; index: number }
+	| { threadId: string; type: 'thinking_delta'; text: string };
 
 /** `chat:send` IPC 载荷（与主进程一致） */
 export type ChatSendPayload = {

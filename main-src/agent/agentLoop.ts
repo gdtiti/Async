@@ -13,16 +13,27 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam, ContentBlockParam, ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages';
 import type { ChatMessage } from '../threadStore.js';
-import type { ShellSettings, ModelRequestParadigm } from '../settingsStore.js';
+import type { ShellSettings, ModelRequestParadigm, ThinkingLevel } from '../settingsStore.js';
 import { composeSystem, temperatureForMode } from '../llm/modePrompts.js';
+import {
+	anthropicMaxTokensWithThinking,
+	anthropicThinkingBudget,
+	openAIReasoningEffort,
+} from '../llm/thinkingLevel.js';
 import { AGENT_TOOLS, toOpenAITools, toAnthropicTools, type ToolCall } from './agentTools.js';
 import { executeTool, type ToolExecutionHooks } from './toolExecutor.js';
 
 const MAX_ROUNDS = 25;
 const AGENT_MAX_TOKENS = 16384;
 
+export type ToolInputDeltaPayload = { name: string; partialJson: string; index: number };
+
 export type AgentLoopHandlers = {
 	onTextDelta: (text: string) => void;
+	/** 模型边生成工具 JSON 参数时流式回调（便于 UI 实时预览写入内容） */
+	onToolInputDelta?: (payload: ToolInputDeltaPayload) => void;
+	/** Anthropic extended thinking 流式片段（不写入持久化 assistant 正文） */
+	onThinkingDelta?: (text: string) => void;
 	onToolCall: (name: string, args: Record<string, unknown>) => void;
 	onToolResult: (name: string, result: string, success: boolean) => void;
 	onDone: (fullContent: string) => void;
@@ -35,6 +46,7 @@ export type AgentLoopOptions = {
 	signal: AbortSignal;
 	agentSystemAppend?: string;
 	toolHooks?: ToolExecutionHooks;
+	thinkingLevel?: ThinkingLevel;
 };
 
 /**
@@ -116,6 +128,7 @@ async function runOpenAILoop(
 	const conversation: OAIMsg[] = threadToOpenAI(threadMessages, systemContent);
 	const tools = toOpenAITools(AGENT_TOOLS);
 	let fullContent = '';
+	const effort = openAIReasoningEffort(options.thinkingLevel ?? 'off');
 
 	for (let round = 0; round < MAX_ROUNDS; round++) {
 		if (options.signal.aborted) break;
@@ -132,6 +145,7 @@ async function runOpenAILoop(
 					stream: true,
 					temperature,
 					max_tokens: AGENT_MAX_TOKENS,
+					...(effort ? { reasoning_effort: effort } : {}),
 				},
 				{ signal: options.signal }
 			);
@@ -155,7 +169,13 @@ async function runOpenAILoop(
 						}
 						if (tc.id) turnToolCalls[idx]!.id = tc.id;
 						if (tc.function?.name) turnToolCalls[idx]!.name = tc.function.name;
-						if (tc.function?.arguments) turnToolCalls[idx]!.arguments += tc.function.arguments;
+						if (tc.function?.arguments) {
+							turnToolCalls[idx]!.arguments += tc.function.arguments;
+							const row = turnToolCalls[idx]!;
+							if (row.name) {
+								handlers.onToolInputDelta?.({ name: row.name, partialJson: row.arguments, index: idx });
+							}
+						}
 					}
 				}
 			}
@@ -254,24 +274,35 @@ async function runAnthropicLoop(
 
 	const tools = toAnthropicTools(AGENT_TOOLS);
 	let fullContent = '';
+	const thinkBudget = anthropicThinkingBudget(options.thinkingLevel ?? 'off');
 
 	for (let round = 0; round < MAX_ROUNDS; round++) {
 		if (options.signal.aborted) break;
 
 		let turnText = '';
+		let turnThinking = '';
+		let turnThinkingSignature = '';
 		const turnToolUses: { id: string; name: string; input: string }[] = [];
-		let currentBlockType: 'text' | 'tool_use' | null = null;
+		let currentBlockType: 'text' | 'tool_use' | 'thinking' | null = null;
 		let currentBlockIdx = -1;
+
+		const maxTokens =
+			thinkBudget !== null ? anthropicMaxTokensWithThinking(thinkBudget) : AGENT_MAX_TOKENS;
+		const thinkingParam =
+			thinkBudget !== null
+				? ({ type: 'enabled' as const, budget_tokens: thinkBudget })
+				: undefined;
 
 		try {
 			const stream = client.messages.stream(
 				{
 					model,
-					max_tokens: AGENT_MAX_TOKENS,
+					max_tokens: maxTokens,
 					system,
 					messages: conversation,
 					tools: tools as Anthropic.Messages.Tool[],
 					temperature,
+					...(thinkingParam ? { thinking: thinkingParam } : {}),
 				},
 				{ signal: options.signal }
 			);
@@ -286,14 +317,32 @@ async function runAnthropicLoop(
 						currentBlockType = 'tool_use';
 						currentBlockIdx = turnToolUses.length;
 						turnToolUses.push({ id: ev.content_block.id, name: ev.content_block.name, input: '' });
+					} else if (ev.content_block.type === 'thinking') {
+						currentBlockType = 'thinking';
+					} else {
+						currentBlockType = null;
 					}
 				} else if (ev.type === 'content_block_delta') {
 					if (currentBlockType === 'text' && ev.delta.type === 'text_delta') {
 						turnText += ev.delta.text;
 						handlers.onTextDelta(ev.delta.text);
+					} else if (currentBlockType === 'thinking' && ev.delta.type === 'thinking_delta') {
+						const piece = ev.delta.thinking;
+						if (piece) {
+							turnThinking += piece;
+							handlers.onThinkingDelta?.(piece);
+						}
+					} else if (currentBlockType === 'thinking' && ev.delta.type === 'signature_delta') {
+						turnThinkingSignature += ev.delta.signature;
 					} else if (currentBlockType === 'tool_use' && ev.delta.type === 'input_json_delta') {
 						if (currentBlockIdx >= 0 && turnToolUses[currentBlockIdx]) {
 							turnToolUses[currentBlockIdx]!.input += ev.delta.partial_json;
+							const tu = turnToolUses[currentBlockIdx]!;
+							handlers.onToolInputDelta?.({
+								name: tu.name,
+								partialJson: tu.input,
+								index: currentBlockIdx,
+							});
 						}
 					}
 				} else if (ev.type === 'content_block_stop') {
@@ -314,6 +363,13 @@ async function runAnthropicLoop(
 		}
 
 		const assistantContent: ContentBlockParam[] = [];
+		if (turnThinking.trim()) {
+			assistantContent.push({
+				type: 'thinking',
+				thinking: turnThinking,
+				signature: turnThinkingSignature || '',
+			});
+		}
 		if (turnText) {
 			assistantContent.push({ type: 'text', text: turnText });
 		}

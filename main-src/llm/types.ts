@@ -1,10 +1,12 @@
 import type { ComposerMode } from './composerMode.js';
-import type { ModelRequestParadigm } from '../settingsStore.js';
+import type { ModelRequestParadigm, ThinkingLevel } from '../settingsStore.js';
 
 export type StreamHandlers = {
 	onDelta: (text: string) => void;
 	onDone: (fullText: string) => void;
 	onError: (message: string) => void;
+	/** Anthropic extended thinking：不进入持久化 assistant 正文 */
+	onThinkingDelta?: (text: string) => void;
 };
 
 export type UnifiedChatOptions = {
@@ -14,4 +16,6 @@ export type UnifiedChatOptions = {
 	paradigm: ModelRequestParadigm;
 	/** 本回合注入系统提示（Rules / Skills / Subagents / 导入规则） */
 	agentSystemAppend?: string;
+	/** 扩展思考 / reasoning 强度，默认 off */
+	thinkingLevel?: ThinkingLevel;
 };

@@ -4,6 +4,7 @@ import type { ChatMessage } from '../threadStore.js';
 import type { ShellSettings } from '../settingsStore.js';
 import { composeSystem, temperatureForMode } from './modePrompts.js';
 import type { StreamHandlers, UnifiedChatOptions } from './types.js';
+import { openAIReasoningEffort } from './thinkingLevel.js';
 
 export async function streamOpenAICompatible(
 	settings: ShellSettings,
@@ -49,6 +50,7 @@ export async function streamOpenAICompatible(
 	const storedSystem = messages.find((m) => m.role === 'system');
 	const systemContent = composeSystem(storedSystem?.content, options.mode, options.agentSystemAppend);
 	const temperature = temperatureForMode(options.mode);
+	const effort = openAIReasoningEffort(options.thinkingLevel ?? 'off');
 
 	let full = '';
 	try {
@@ -58,6 +60,7 @@ export async function streamOpenAICompatible(
 				messages: [{ role: 'system' as const, content: systemContent }, ...apiMessages],
 				stream: true,
 				temperature,
+				...(effort ? { reasoning_effort: effort } : {}),
 			},
 			{ signal: options.signal }
 		);

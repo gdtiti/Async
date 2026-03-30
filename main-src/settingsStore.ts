@@ -2,6 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AgentCustomization } from './agentSettingsTypes.js';
 import { resolveAsyncDataDir } from './dataDir.js';
+import type { ThinkingLevel } from './llm/thinkingLevel.js';
+export type { ThinkingLevel } from './llm/thinkingLevel.js';
 export type { AgentCustomization, AgentRule, AgentSkill, AgentSubagent, AgentCommand } from './agentSettingsTypes.js';
 
 /** 单条用户模型实际请求时使用的协议（与适配器一致） */
@@ -48,6 +50,11 @@ export type ShellSettings = {
 	};
 	/** 当前选择：`auto` 或某条用户模型的 id */
 	defaultModel?: string;
+	/**
+	 * 推理/扩展思考强度（Anthropic extended thinking、OpenAI reasoning_effort 等）。
+	 * Gemini 等路径可能忽略。
+	 */
+	thinkingLevel?: ThinkingLevel;
 	models?: {
 		/** 用户自添加的模型条目 */
 		entries?: UserModelEntry[];
@@ -65,6 +72,7 @@ export type ShellSettings = {
 const defaultSettings: ShellSettings = {
 	language: 'zh-CN',
 	defaultModel: 'auto',
+	thinkingLevel: 'off',
 	recentWorkspaces: [],
 	lastOpenedWorkspace: null,
 };

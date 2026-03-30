@@ -120,9 +120,22 @@ export const messagesEn: Record<string, string> = {
 	'modelPicker.selectAria': 'Select model',
 	'modelPicker.edit': 'Edit',
 	'modelPicker.addModels': 'Add models',
+	'modelPicker.manageInSettings': 'Manage models & API keys in Settings…',
 	'modelPicker.speed.fast': 'Fast',
 	'modelPicker.speed.medium': 'Medium',
 	'modelPicker.speed.high': 'High',
+
+	'thinking.panelAria': 'Model and thinking options',
+	'thinking.collapsePanel': 'Back to model list',
+	'thinking.panelHint':
+		'Extended thinking: Anthropic uses a thinking budget; OpenAI-compatible uses reasoning_effort. Unsupported models/gateways may ignore. Gemini may not apply.',
+	'thinking.section.options': 'Options',
+	'thinking.section.effort': 'Effort',
+	'thinking.toggleLabel': 'Thinking',
+	'thinking.effort.low': 'Low',
+	'thinking.effort.medium': 'Medium',
+	'thinking.effort.high': 'High',
+	'thinking.effort.max': 'Max',
 
 	'git.badge.new': 'New',
 	'git.badge.modified': 'Modified',
@@ -201,6 +214,10 @@ export const messagesEn: Record<string, string> = {
 	'settings.paradigm.openai-compatible': 'OpenAI-compatible API',
 	'settings.paradigm.anthropic': 'Anthropic (Claude)',
 	'settings.paradigm.gemini': 'Google Gemini',
+
+	'agent.streamTool.title': 'Building tool call',
+	'agent.streamTool.path': 'Path',
+	'agent.streamTool.streaming': 'Live preview',
 
 	'agent.files.count': '{{count}} files',
 	'agent.keepAll': 'Keep all',

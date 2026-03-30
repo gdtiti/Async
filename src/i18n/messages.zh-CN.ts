@@ -126,9 +126,22 @@ export const messagesZhCN: Record<string, string> = {
 	'modelPicker.selectAria': '选择模型',
 	'modelPicker.edit': '编辑',
 	'modelPicker.addModels': '添加模型',
+	'modelPicker.manageInSettings': '在设置中管理模型与密钥…',
 	'modelPicker.speed.fast': '快',
 	'modelPicker.speed.medium': '中',
 	'modelPicker.speed.high': '高',
+
+	// thinking（模型选择器右栏，参考 Cursor）
+	'thinking.panelAria': '模型与思考选项',
+	'thinking.collapsePanel': '返回模型列表',
+	'thinking.panelHint': '扩展思考：Anthropic 为 thinking 预算；OpenAI 兼容为 reasoning_effort。部分模型/网关不支持或会忽略。Gemini 等可能无效。',
+	'thinking.section.options': '选项',
+	'thinking.section.effort': '强度',
+	'thinking.toggleLabel': '思考',
+	'thinking.effort.low': '低',
+	'thinking.effort.medium': '中',
+	'thinking.effort.high': '高',
+	'thinking.effort.max': '最高',
 
 	// git badges
 	'git.badge.new': '新建',
@@ -211,6 +224,10 @@ export const messagesZhCN: Record<string, string> = {
 	'settings.paradigm.gemini': 'Google Gemini',
 
 	// agent file panel
+	'agent.streamTool.title': '正在生成工具调用',
+	'agent.streamTool.path': '路径',
+	'agent.streamTool.streaming': '实时预览',
+
 	'agent.files.count': '{{count}} 个文件',
 	'agent.keepAll': '全部保留',
 	'agent.revertAll': '全部撤销',

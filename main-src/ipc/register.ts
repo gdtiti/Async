@@ -34,6 +34,7 @@ import {
 	formatAgentApplyIncremental,
 } from '../agent/applyAgentDiffs.js';
 import { runAgentLoop } from '../agent/agentLoop.js';
+import { normalizeThinkingLevel } from '../llm/thinkingLevel.js';
 import { prepareUserTurnForChat } from '../llm/agentMessagePrep.js';
 import { summarizeThreadForSidebar, isTimestampToday } from '../threadListSummary.js';
 
@@ -60,6 +61,7 @@ function runChatStream(
 	void (async () => {
 		try {
 			const settings = getSettings();
+			const thinkingLevel = normalizeThinkingLevel(settings.thinkingLevel);
 			const resolved = resolveChatModel(settings, modelSelection);
 			if (!resolved) {
 				send({
@@ -79,6 +81,7 @@ function runChatStream(
 						requestModelId: resolved.requestModelId,
 						paradigm: resolved.paradigm,
 						signal: ac.signal,
+						thinkingLevel,
 						toolHooks: {
 							beforeWrite: ({ path, previousContent }) => {
 								const snapshots = agentRevertSnapshotsByThread.get(threadId);
@@ -92,6 +95,9 @@ function runChatStream(
 					},
 					{
 						onTextDelta: (piece) => send({ threadId, type: 'delta', text: piece }),
+						onToolInputDelta: (p) =>
+							send({ threadId, type: 'tool_input_delta', name: p.name, partialJson: p.partialJson, index: p.index }),
+						onThinkingDelta: (text) => send({ threadId, type: 'thinking_delta', text }),
 						onToolCall: (name, args) => send({ threadId, type: 'tool_call', name, args: JSON.stringify(args) }),
 						onToolResult: (name, result, success) => send({ threadId, type: 'tool_result', name, result, success }),
 						onDone: (full) => {
@@ -112,10 +118,12 @@ function runChatStream(
 					signal: ac.signal,
 					requestModelId: resolved.requestModelId,
 					paradigm: resolved.paradigm,
+					thinkingLevel,
 					...(agentSystemAppend?.trim() ? { agentSystemAppend: agentSystemAppend.trim() } : {}),
 				},
 				{
 					onDelta: (piece) => send({ threadId, type: 'delta', text: piece }),
+					onThinkingDelta: (text) => send({ threadId, type: 'thinking_delta', text }),
 					onDone: (full) => {
 						updateLastAssistant(threadId, full);
 						if (mode === 'agent') {
