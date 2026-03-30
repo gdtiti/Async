@@ -589,9 +589,9 @@ body {
 }
 
 .ref-menubar {
-	display: flex;
+	display: grid;
+	grid-template-columns: 1fr auto 1fr;
 	align-items: center;
-	gap: 4px;
 	height: 44px;
 	padding: 0 14px 0 10px;
 	/* 隐藏系统标题栏后：顶栏可拖动窗口；右侧为 Windows 标题栏按钮区留白（Electron titleBarOverlay + CSS env） */
@@ -606,6 +606,110 @@ body {
 	-webkit-backdrop-filter: blur(16px);
 	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 40px rgba(0, 0, 0, 0.25);
 	flex-shrink: 0;
+}
+
+.ref-menubar-left {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 6px;
+}
+
+.ref-menubar-center {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.ref-menubar-right {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 6px;
+}
+
+.ref-brand-block-simple {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px;
+	margin-right: 4px;
+}
+
+.ref-global-search-btn {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 6px;
+	padding: 4px 12px 4px 8px;
+	width: 400px;
+	height: 28px;
+	color: var(--void-fg-2);
+	font-size: 12px;
+	cursor: pointer;
+	transition: background 0.2s, border-color 0.2s;
+}
+
+.ref-global-search-btn:hover {
+	background: rgba(255, 255, 255, 0.08);
+	border-color: rgba(255, 255, 255, 0.12);
+	color: var(--void-fg-1);
+}
+
+.ref-global-search-icon {
+	width: 14px;
+	height: 14px;
+	opacity: 0.7;
+}
+
+.ref-global-search-text {
+	flex: 1;
+	text-align: left;
+}
+
+.ref-global-search-kbd {
+	font-size: 10px;
+	padding: 2px 6px;
+	border-radius: 4px;
+	background: rgba(0, 0, 0, 0.2);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	color: var(--void-fg-3);
+	font-family: ui-monospace, monospace;
+}
+
+.ref-layout-toggle-btns {
+	display: flex;
+	align-items: center;
+	background: rgba(255, 255, 255, 0.03);
+	border: 1px solid rgba(255, 255, 255, 0.06);
+	border-radius: 6px;
+	padding: 2px;
+	gap: 2px;
+}
+
+.ref-layout-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border: none;
+	background: transparent;
+	color: var(--void-fg-3);
+	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.ref-layout-btn:hover {
+	color: var(--void-fg-1);
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.ref-layout-btn.is-active {
+	color: var(--void-fg-0);
+	background: rgba(255, 255, 255, 0.1);
 }
 
 .ref-menubar button,

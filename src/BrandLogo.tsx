@@ -28,44 +28,21 @@ export function BrandLogo({
 			aria-label={ariaLabel}
 		>
 			<defs>
-				<linearGradient id={outerGradientId} x1="3.2" y1="17.8" x2="22.4" y2="7.1" gradientUnits="userSpaceOnUse">
-					<stop offset="0" stopColor="#5C6570" />
-					<stop offset="1" stopColor="#CDD4DC" />
+				<linearGradient id={outerGradientId} x1="0" y1="24" x2="24" y2="0" gradientUnits="userSpaceOnUse">
+					<stop offset="0" stopColor="#E2E8F0" />
+					<stop offset="0.5" stopColor="#FFFFFF" />
+					<stop offset="1" stopColor="#F1F5F9" />
 				</linearGradient>
-				<linearGradient id={innerGradientId} x1="5.5" y1="16.9" x2="21.8" y2="9.9" gradientUnits="userSpaceOnUse">
-					<stop offset="0" stopColor="#8A929B" />
-					<stop offset="1" stopColor="#EEF2F6" />
+				<linearGradient id={innerGradientId} x1="0" y1="24" x2="24" y2="0" gradientUnits="userSpaceOnUse">
+					<stop offset="0" stopColor="#94A3B8" />
+					<stop offset="1" stopColor="#CBD5E1" />
 				</linearGradient>
 			</defs>
 			<path
-				d="M4.1 18.2Q3.2 17.3 3.2 16.1Q3.2 15.1 3.8 14.2L9 5.7Q10.1 4 11.8 4Q13.5 4 14.6 5.8L17.4 10.2L16 11.7L13.7 7.8Q13 6.6 11.8 6.6Q10.6 6.6 9.9 7.7L5.4 14.9Q4.7 15.9 4.7 16.6Q4.7 17.3 5.2 17.9Q5.8 18.5 6.7 18.5Q7.6 18.5 8.3 17.8Q9.3 16.9 10.4 16.2Q11.6 15.6 13 15.3Q14.7 15 16.3 14.3Q17.9 13.7 19.2 12.3Q20.5 10.9 21.9 10H23"
-				stroke={`url(#${outerGradientId})`}
-				strokeWidth="1.9"
-				strokeLinecap="round"
-				strokeLinejoin="round"
+				d="M12 3L3.5 18.5H8.5L12 12L15.5 18.5H20.5L12 3Z"
+				fill={`url(#${outerGradientId})`}
 			/>
-			<path
-				d="M5.5 17.1L10.1 7.6Q10.7 6.3 11.8 6.3Q12.9 6.3 13.5 7.5L15.7 11.6"
-				stroke={`url(#${innerGradientId})`}
-				strokeWidth="1.5"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			/>
-			<path
-				d="M14.9 14.5L16.3 17"
-				stroke={`url(#${innerGradientId})`}
-				strokeWidth="1.5"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			/>
-			<path
-				d="M16.5 14.5L18 17Q18.6 18 19.7 18Q20.6 18 21.2 17.4Q21.8 16.8 21.8 15.9Q21.8 15 21.2 14.4Q20.6 13.8 20.6 12.9Q20.6 11.9 21.4 11L22.5 11"
-				stroke={`url(#${innerGradientId})`}
-				strokeWidth="1.5"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			/>
-			<circle cx="11.9" cy="12.3" r="0.7" fill="#B8C0C8" />
+			<circle cx="12" cy="16" r="2" fill={`url(#${innerGradientId})`} />
 		</svg>
 	);
 }

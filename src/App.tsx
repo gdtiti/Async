@@ -389,6 +389,33 @@ function IconCheckCircle({ className }: { className?: string }) {
 	);
 }
 
+function IconSettings({ className }: { className?: string }) {
+	return (
+		<svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+			<circle cx="12" cy="12" r="3"></circle>
+			<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+		</svg>
+	);
+}
+
+function IconSidebarLeft({ className }: { className?: string }) {
+	return (
+		<svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+			<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+			<line x1="9" y1="3" x2="9" y2="21"></line>
+		</svg>
+	);
+}
+
+function IconSidebarRight({ className }: { className?: string }) {
+	return (
+		<svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+			<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+			<line x1="15" y1="3" x2="15" y2="21"></line>
+		</svg>
+	);
+}
+
 function normalizeThreadRow(t: ThreadInfo): ThreadInfo {
 	return {
 		...t,
@@ -2774,55 +2801,63 @@ export default function App() {
 	return (
 		<div className="ref-shell">
 			<header className="ref-menubar">
-				<button
-					type="button"
-					className="ref-brand-block"
-					onClick={() => openSettingsPage('models')}
-					title={t('app.settings')}
-					aria-label={t('app.settingsAria')}
-				>
-					<BrandLogo className="ref-brand-logo" size={22} />
-					<span className="ref-brand-wordmark">Async</span>
-				</button>
-				<nav className="ref-menu-nav" aria-label={t('app.menu')}>
-					{(
-						[
-							['File', t('app.menuFile')],
-							['Edit', t('app.menuEdit')],
-							['View', t('app.menuView')],
-							['Help', t('app.menuHelp')],
-						] as const
-					).map(([key, label]) => (
-						<button key={key} type="button" className="ref-menu-item">
-							{label}
-						</button>
-					))}
-				</nav>
-				<button type="button" className="ref-icon-tile" aria-label={t('app.searchAria')}>
-					<IconSearch />
-				</button>
-				<button type="button" className="ref-btn-new-agent" onClick={() => void onNewThread()}>
-					{t('app.newAgent')}
-					<kbd className="ref-kbd">Ctrl+N</kbd>
-				</button>
-				<button type="button" className="ref-link-ghost">
-					{t('app.marketplace')}
-				</button>
-				<div className="ref-menubar-spacer" />
-				<div className="ref-layout-toggle">
-					<button
-						type="button"
-						className={`ref-layout-toggle-btn ${layoutMode === 'agent' ? 'is-active' : ''}`}
-						onClick={() => setLayoutMode('agent')}
-					>
-						Agent
+				<div className="ref-menubar-left">
+					<div className="ref-brand-block-simple">
+						<BrandLogo className="ref-brand-logo" size={22} />
+					</div>
+					<nav className="ref-menu-nav" aria-label={t('app.menu')}>
+						{(
+							[
+								['File', t('app.menuFile')],
+								['Edit', t('app.menuEdit')],
+								['View', t('app.menuView')],
+								['Help', t('app.menuHelp')],
+							] as const
+						).map(([key, label]) => (
+							<button key={key} type="button" className="ref-menu-item">
+								{label}
+							</button>
+						))}
+					</nav>
+				</div>
+				<div className="ref-menubar-center">
+					<button type="button" className="ref-global-search-btn" aria-label="Search workspace">
+						<IconSearch className="ref-global-search-icon" />
+						<span className="ref-global-search-text">Search files, content, and symbols...</span>
+						<kbd className="ref-global-search-kbd">Ctrl+P</kbd>
 					</button>
+				</div>
+				<div className="ref-menubar-right">
+					<button type="button" className="ref-btn-new-agent" onClick={() => void onNewThread()} style={{marginRight: '8px'}}>
+						{t('app.newAgent')}
+						<kbd className="ref-kbd">Ctrl+N</kbd>
+					</button>
+					<div className="ref-layout-toggle-btns">
+						<button
+							type="button"
+							className={`ref-layout-btn ${layoutMode === 'agent' ? 'is-active' : ''}`}
+							onClick={() => setLayoutMode('agent')}
+							title="Agent Layout"
+						>
+							<IconSidebarLeft />
+						</button>
+						<button
+							type="button"
+							className={`ref-layout-btn ${layoutMode === 'editor' ? 'is-active' : ''}`}
+							onClick={() => setLayoutMode('editor')}
+							title="Editor Layout"
+						>
+							<IconSidebarRight />
+						</button>
+					</div>
 					<button
 						type="button"
-						className={`ref-layout-toggle-btn ${layoutMode === 'editor' ? 'is-active' : ''}`}
-						onClick={() => setLayoutMode('editor')}
+						className="ref-icon-tile ref-settings-btn"
+						onClick={() => openSettingsPage('models')}
+						title={t('app.settings')}
+						aria-label={t('app.settingsAria')}
 					>
-						Editor
+						<IconSettings />
 					</button>
 				</div>
 			</header>
