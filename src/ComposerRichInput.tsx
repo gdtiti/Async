@@ -7,7 +7,7 @@ import {
 } from './composerSegments';
 import {
 	type FileChipDomHandlers,
-	placeCaretAtEndOfRichRoot,
+	placeCaretAfterFirstSlashChipElseEnd,
 	readSegmentsFromRoot,
 	writeSegmentsToRoot,
 } from './composerRichDom';
@@ -100,11 +100,12 @@ export function ComposerRichInput({
 			}
 			writeSegmentsToRoot(el, segments, domHandlers);
 			lastEmittedRef.current = wire;
-			placeCaretAtEndOfRichRoot(el);
+			placeCaretAfterFirstSlashChipElseEnd(el);
 			return;
 		}
 		writeSegmentsToRoot(el, segments, domHandlers);
 		lastEmittedRef.current = wire;
+		placeCaretAfterFirstSlashChipElseEnd(el);
 	}, [segments, innerRef, domHandlers]);
 
 	const handleInput = () => {

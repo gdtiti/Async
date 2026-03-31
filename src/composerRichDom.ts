@@ -379,6 +379,38 @@ export function placeCaretAtEndOfRichRoot(root: HTMLElement): void {
 	sel.addRange(r);
 }
 
+/**
+ * 将光标放在首个 `/create-skill` chip 之后（便于在 chip 后输入）。
+ * contenteditable 下 `selectNodeContents` + `collapse(false)` 在仅有 `contentEditable=false` 的 chip 时，
+ * 部分浏览器会把选区落在 chip 之前。
+ */
+export function placeCaretAfterFirstSlashChipElseEnd(root: HTMLElement): void {
+	const sel = window.getSelection();
+	if (!sel) {
+		return;
+	}
+	let chip: HTMLElement | null = null;
+	for (let n = root.firstChild; n; n = n.nextSibling) {
+		if (n.nodeType === Node.ELEMENT_NODE) {
+			const el = n as HTMLElement;
+			if (el.classList.contains(SLASH_CMD_CLASS)) {
+				chip = el;
+				break;
+			}
+		}
+	}
+	const r = document.createRange();
+	if (chip) {
+		r.setStartAfter(chip);
+		r.collapse(true);
+	} else {
+		r.selectNodeContents(root);
+		r.collapse(false);
+	}
+	sel.removeAllRanges();
+	sel.addRange(r);
+}
+
 export function writeSegmentsToRoot(
 	root: HTMLElement,
 	segments: import('./composerSegments').ComposerSegment[],

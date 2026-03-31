@@ -2002,7 +2002,6 @@ export default function App() {
 		if (!shell) {
 			return;
 		}
-		setLayoutMode('agent');
 		const r = (await shell.invoke('threads:create')) as { id: string };
 		const threadId = r.id;
 		await refreshThreads();
