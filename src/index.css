@@ -1906,6 +1906,18 @@ body {
 
 .ref-msg-slot--user {
 	align-self: center;
+	animation: ref-msg-user-enter 0.24s ease-out both;
+}
+
+@keyframes ref-msg-user-enter {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 
 /* 最后一条用户问题：在 .ref-messages 内滚动时钉在顶部，下方助手内容从底下滑过 */
@@ -2000,6 +2012,7 @@ body {
 
 .ref-msg-slot--assistant {
 	align-self: center;
+	animation: ref-msg-assistant-enter 0.32s ease-out both;
 }
 
 .ref-msg-slot--assistant .ref-thought-block + .ref-msg-assistant-body {
@@ -2139,36 +2152,48 @@ body {
 .ref-bubble-pending {
 	display: inline-flex;
 	align-items: center;
-	gap: 5px;
-	padding: 4px 0;
+	gap: 6px;
+	padding: 6px 0;
 }
 
 .ref-bubble-pending-dot {
-	width: 6px;
-	height: 6px;
+	width: 5px;
+	height: 5px;
 	border-radius: 50%;
 	background: var(--void-fg-3);
-	opacity: 0.45;
-	animation: ref-pulse-dot 1.2s ease-in-out infinite;
+	opacity: 0.3;
+	animation: ref-pulse-dot 1.4s ease-in-out infinite;
 }
 
 .ref-bubble-pending-dot:nth-child(2) {
-	animation-delay: 0.2s;
+	animation-delay: 0.18s;
 }
 
 .ref-bubble-pending-dot:nth-child(3) {
-	animation-delay: 0.4s;
+	animation-delay: 0.36s;
 }
 
 @keyframes ref-pulse-dot {
 	0%,
+	80%,
 	100% {
-		opacity: 0.35;
-		transform: scale(0.92);
+		opacity: 0.25;
+		transform: translateY(0);
 	}
-	50% {
-		opacity: 0.95;
-		transform: scale(1);
+	40% {
+		opacity: 1;
+		transform: translateY(-3px);
+	}
+}
+
+@keyframes ref-msg-assistant-enter {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
 	}
 }
 
@@ -2349,6 +2374,39 @@ body {
 	gap: 10px;
 }
 
+/* ─── Segment 入场动画：activity / edit card / activity group 渐入 ─── */
+@keyframes ref-seg-enter {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.ref-md-root--agent-chat > .ref-agent-activity,
+.ref-md-root--agent-chat > .ref-edit-card,
+.ref-md-root--agent-chat > .ref-activity-group {
+	animation: ref-seg-enter 0.28s ease-out both;
+}
+
+/* ─── 通用可折叠容器：CSS grid 平滑高度过渡 ─── */
+.ref-collapse-grid {
+	display: grid;
+	grid-template-rows: 0fr;
+	transition: grid-template-rows 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ref-collapse-grid.is-open {
+	grid-template-rows: 1fr;
+}
+
+.ref-collapse-grid > .ref-collapse-inner {
+	overflow: hidden;
+}
+
 .ref-agent-activity {
 	display: flex;
 	flex-direction: column;
@@ -2451,25 +2509,31 @@ body {
 
 .ref-agent-activity--pending {
 	color: var(--void-fg-2);
+	background: linear-gradient(90deg, transparent 0%, rgba(250, 204, 21, 0.03) 50%, transparent 100%);
+	background-size: 200% 100%;
+	animation: ref-activity-shimmer 2.4s ease-in-out infinite;
+}
+
+@keyframes ref-activity-shimmer {
+	0% { background-position: 200% 0; }
+	100% { background-position: -200% 0; }
 }
 
 .ref-agent-activity--pending .ref-agent-activity-dot {
 	background: rgba(250, 204, 21, 0.95);
-	animation: ref-agent-activity-pulse 1.1s ease-in-out infinite;
+	animation: ref-agent-activity-pulse 1.6s ease-in-out infinite;
 }
 
 @keyframes ref-agent-activity-pulse {
-	0% {
-		transform: scale(0.8);
-		opacity: 0.55;
+	0%, 100% {
+		transform: scale(0.75);
+		opacity: 0.4;
+		box-shadow: 0 0 0 0 rgba(250, 204, 21, 0);
 	}
 	50% {
 		transform: scale(1);
 		opacity: 1;
-	}
-	100% {
-		transform: scale(0.8);
-		opacity: 0.55;
+		box-shadow: 0 0 6px 1px rgba(250, 204, 21, 0.25);
 	}
 }
 
@@ -2482,6 +2546,11 @@ body {
 	overflow: hidden;
 	background: rgba(255, 255, 255, 0.025);
 	border: 1px solid rgba(255, 255, 255, 0.055);
+	transition: border-color 0.2s ease;
+}
+
+.ref-activity-group.is-pending {
+	border-color: rgba(250, 204, 21, 0.12);
 }
 
 /* 摘要行（始终可见的 header 按钮） */
@@ -2545,16 +2614,36 @@ body {
 	align-items: center;
 	color: var(--void-fg-3);
 	opacity: 0.55;
+	transition: transform 0.22s ease;
 }
 
-/* 详情区 */
+.ref-activity-group-header[aria-expanded="true"] .ref-activity-group-chevron {
+	transform: rotate(180deg);
+}
+
+/* 详情区：用 CSS grid 实现平滑展开/折叠 */
+.ref-activity-group-collapse {
+	display: grid;
+	grid-template-rows: 0fr;
+	transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ref-activity-group-collapse.is-open {
+	grid-template-rows: 1fr;
+}
+
 .ref-activity-group-body {
 	display: flex;
 	flex-direction: column;
+	overflow: hidden;
+	scrollbar-width: none;
+	min-height: 0;
+}
+
+.ref-activity-group-collapse.is-open > .ref-activity-group-body {
 	border-top: 1px solid rgba(255, 255, 255, 0.05);
 	padding: 4px 0 6px;
 	overflow-y: auto;
-	scrollbar-width: none;
 }
 
 .ref-activity-group-body::-webkit-scrollbar {
@@ -2575,13 +2664,14 @@ body {
 	font-size: 12px;
 	line-height: 1.6;
 	color: var(--void-fg-3);
+	animation: ref-seg-enter 0.22s ease-out both;
 }
 
 .ref-activity-group-row-dot {
 	flex-shrink: 0;
-	margin-top: 6px;
-	width: 6px;
-	height: 6px;
+	margin-top: 7px;
+	width: 5px;
+	height: 5px;
 	border-radius: 999px;
 	background: rgba(148, 163, 184, 0.45);
 }
@@ -2594,9 +2684,15 @@ body {
 	background: rgba(248, 113, 113, 0.85);
 }
 
+.ref-activity-group-row--pending {
+	background: linear-gradient(90deg, transparent 0%, rgba(250, 204, 21, 0.025) 50%, transparent 100%);
+	background-size: 200% 100%;
+	animation: ref-activity-shimmer 2.4s ease-in-out infinite;
+}
+
 .ref-activity-group-row--pending .ref-activity-group-row-dot {
 	background: rgba(250, 204, 21, 0.9);
-	animation: ref-agent-activity-pulse 1.1s ease-in-out infinite;
+	animation: ref-agent-activity-pulse 1.6s ease-in-out infinite;
 }
 
 .ref-activity-group-row-content {
@@ -2664,11 +2760,14 @@ body {
 .ref-result-card-body--preview {
 	position: relative;
 	overflow: hidden;
+	max-height: 200px;
+	transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ref-result-card-body--expanded {
 	max-height: min(60vh, 480px);
 	overflow-y: auto;
+	transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* 删除旧的字符级打字光标（已不再使用） */

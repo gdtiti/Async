@@ -91,14 +91,15 @@ export function ChatMarkdown({
 								onOpenFile={onOpenAgentFile}
 							/>
 						);
-					case 'activity_group':
-						return (
-							<AgentActivityGroup
-								key={i}
-								group={seg}
-								onOpenFile={onOpenAgentFile}
-							/>
-						);
+				case 'activity_group':
+					return (
+						<AgentActivityGroup
+							key={i}
+							group={seg}
+							onOpenFile={onOpenAgentFile}
+							liveTurn={showAgentWorking}
+						/>
+					);
 					case 'file_changes':
 						return null;
 					case 'activity': {

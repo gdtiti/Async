@@ -101,16 +101,18 @@ export function ComposerThoughtBlock({
 					</svg>
 				</span>
 			</button>
-			{open ? (
-				<div id={panelId} role="region" aria-labelledby={headId} className="ref-thought-panel">
-					{streamingThinking.trim() ? (
-						<div className="ref-thought-reasoning-wrap">
-							<pre className="ref-thought-reasoning-pre">{streamingThinking}</pre>
-						</div>
-					) : null}
-					<pre className="ref-thought-panel-pre">{detailText}</pre>
+			<div className={`ref-collapse-grid ${open ? 'is-open' : ''}`}>
+				<div className="ref-collapse-inner">
+					<div id={panelId} role="region" aria-labelledby={headId} className="ref-thought-panel">
+						{streamingThinking.trim() ? (
+							<div className="ref-thought-reasoning-wrap">
+								<pre className="ref-thought-reasoning-pre">{streamingThinking}</pre>
+							</div>
+						) : null}
+						<pre className="ref-thought-panel-pre">{detailText}</pre>
+					</div>
 				</div>
-			) : null}
+			</div>
 		</div>
 	);
 }
