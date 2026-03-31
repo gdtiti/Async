@@ -82,9 +82,20 @@ type Props = {
 	/** read_file：用于选择 Monaco 语言 */
 	readSourcePath?: string;
 	onOpenFile?: (relPath: string, revealLine?: number) => void;
+	/**
+	 * 仅在本轮 Agent 实时生成（最后一条助手且 awaiting）时为 true。
+	 * 历史消息 / 重开应用后为 false，避免依赖进程内 Set 导致整段结果再次逐行「流式」播放。
+	 */
+	animateLineReveal?: boolean;
 };
 
-export function AgentResultCard({ lines, kind, readSourcePath, onOpenFile }: Props) {
+export function AgentResultCard({
+	lines,
+	kind,
+	readSourcePath,
+	onOpenFile,
+	animateLineReveal = false,
+}: Props) {
 	const [expanded, setExpanded] = useState(false);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const streamBodyRef = useRef<HTMLDivElement>(null);
@@ -93,7 +104,8 @@ export function AgentResultCard({ lines, kind, readSourcePath, onOpenFile }: Pro
 	const linesSignature = useMemo(() => stableLinesSignature(lines), [lines]);
 
 	const alreadySeen = completedResultAnimSignatures.has(linesSignature);
-	const skipAnim = alreadySeen || prefersReducedMotion() || lines.length === 0;
+	const skipAnim =
+		!animateLineReveal || alreadySeen || prefersReducedMotion() || lines.length === 0;
 
 	const [revealedCount, setRevealedCount] = useState<number>(() => (skipAnim ? lines.length : 0));
 	const [streaming, setStreaming] = useState<boolean>(() => !skipAnim && lines.length > 0);
@@ -103,7 +115,11 @@ export function AgentResultCard({ lines, kind, readSourcePath, onOpenFile }: Pro
 	const prevSigRef = useRef<string>(linesSignature);
 	if (prevSigRef.current !== linesSignature) {
 		prevSigRef.current = linesSignature;
-		const skip = completedResultAnimSignatures.has(linesSignature) || prefersReducedMotion() || lines.length === 0;
+		const skip =
+			!animateLineReveal ||
+			completedResultAnimSignatures.has(linesSignature) ||
+			prefersReducedMotion() ||
+			lines.length === 0;
 		setRevealedCount(skip ? lines.length : 0);
 		setStreaming(!skip && lines.length > 0);
 		setHighlightedLines(null);

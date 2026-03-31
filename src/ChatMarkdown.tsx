@@ -109,6 +109,7 @@ export function ChatMarkdown({
 							group={seg}
 							onOpenFile={onOpenAgentFile}
 							liveTurn={showAgentWorking}
+							animateLineReveal={showAgentWorking}
 						/>
 					);
 					case 'file_changes':
@@ -155,6 +156,7 @@ export function ChatMarkdown({
 										kind={seg.resultKind}
 										readSourcePath={seg.agentReadLink?.path}
 										onOpenFile={onOpenAgentFile}
+										animateLineReveal={showAgentWorking}
 									/>
 								) : null}
 							</div>

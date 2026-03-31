@@ -343,15 +343,17 @@ function McpServerEditForm({ config, onChange, onSave, onCancel, onDelete, isNew
 			<div className="ref-mcp-edit-row">
 				<label className="ref-mcp-edit-field">
 					<span>{t('mcp.form.timeout')}</span>
-					<input
-						type="number"
-						value={config.timeout ?? 30000}
-						onChange={(e) => onChange({ ...config, timeout: Number(e.target.value) || 30000 })}
-						min={5000}
-						max={300000}
-						step={1000}
-					/>
-					<span className="ref-mcp-edit-unit">ms</span>
+					<span className="ref-mcp-edit-inline-value">
+						<input
+							type="number"
+							value={config.timeout ?? 30000}
+							onChange={(e) => onChange({ ...config, timeout: Number(e.target.value) || 30000 })}
+							min={5000}
+							max={300000}
+							step={1000}
+						/>
+						<span className="ref-mcp-edit-unit">ms</span>
+					</span>
 				</label>
 			</div>
 			

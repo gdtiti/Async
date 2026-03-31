@@ -14,9 +14,16 @@ type Props = {
 	onOpenFile?: (relPath: string, revealLine?: number, revealEndLine?: number) => void;
 	/** Agent 回合是否仍在进行中（awaitingReply && isLastMessage） */
 	liveTurn?: boolean;
+	/** 与 liveTurn 一致：仅实时生成时允许 AgentResultCard 逐行揭示 */
+	animateLineReveal?: boolean;
 };
 
-export function AgentActivityGroup({ group, onOpenFile, liveTurn = false }: Props) {
+export function AgentActivityGroup({
+	group,
+	onOpenFile,
+	liveTurn = false,
+	animateLineReveal = false,
+}: Props) {
 	const [expanded, setExpanded] = useState(group.pending || liveTurn);
 	const userToggledRef = useRef(false);
 	const prevLiveTurnRef = useRef(liveTurn);
@@ -95,7 +102,12 @@ export function AgentActivityGroup({ group, onOpenFile, liveTurn = false }: Prop
 					onScroll={onBodyScroll}
 				>
 					{group.items.map((item, i) => (
-						<ActivityRow key={i} item={item} onOpenFile={onOpenFile} />
+						<ActivityRow
+							key={i}
+							item={item}
+							onOpenFile={onOpenFile}
+							animateLineReveal={animateLineReveal}
+						/>
 					))}
 				</div>
 			</div>
@@ -106,9 +118,11 @@ export function AgentActivityGroup({ group, onOpenFile, liveTurn = false }: Prop
 function ActivityRow({
 	item,
 	onOpenFile,
+	animateLineReveal,
 }: {
 	item: ActivitySegment;
 	onOpenFile?: (relPath: string, revealLine?: number, revealEndLine?: number) => void;
+	animateLineReveal: boolean;
 }) {
 	const readLink = item.agentReadLink;
 	return (
@@ -145,6 +159,7 @@ function ActivityRow({
 							kind={item.resultKind}
 							readSourcePath={item.agentReadLink?.path}
 							onOpenFile={onOpenFile}
+							animateLineReveal={animateLineReveal}
 						/>
 					) : null}
 				</div>

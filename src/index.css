@@ -9643,10 +9643,10 @@ body {
 
 .ref-settings-mcp-edit-wrap {
 	margin-bottom: 16px;
-	padding: 16px;
-	border-radius: 12px;
-	border: 1px solid rgba(129, 140, 248, 0.2);
-	background: rgba(129, 140, 248, 0.04);
+	padding: 14px 16px;
+	border-radius: var(--void-radius-lg);
+	border: 1px solid var(--void-border-soft);
+	background: var(--void-bg-1);
 }
 
 .ref-settings-mcp-edit-title {
@@ -9900,21 +9900,26 @@ body {
 }
 
 .ref-mcp-edit-field > span:first-child {
-	font-size: 11px;
+	font-size: 12px;
 	font-weight: 500;
-	color: var(--void-fg-3);
+	color: var(--void-fg-2);
 }
 
-.ref-mcp-edit-field input[type= text],
-.ref-mcp-edit-field input[type=password],
-.ref-mcp-edit-field input[type=number],
+/* Match .ref-settings-field inputs; include implicit type=text and fix invalid [type= text] selector */
+.ref-mcp-edit-field input:not([type]),
+.ref-mcp-edit-field input[type='text'],
+.ref-mcp-edit-field input[type='password'],
+.ref-mcp-edit-field input[type='number'],
 .ref-mcp-edit-field select {
-	padding: 8px 10px;
-	border-radius: 6px;
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 100%;
+	padding: 10px 12px;
+	border-radius: 10px;
 	border: 1px solid var(--void-border);
-	background: var(--void-bg-0);
+	background: var(--void-bg-1);
 	color: var(--void-fg-0);
-	font-size: 12px;
+	font-size: 13px;
 	font-family: inherit;
 	outline: none;
 	transition: border-color 0.12s;
@@ -9922,7 +9927,8 @@ body {
 
 .ref-mcp-edit-field input:focus,
 .ref-mcp-edit-field select:focus {
-	border-color: var(--void-ring);
+	outline: none;
+	border-color: var(--void-fg-3);
 }
 
 .ref-mcp-edit-field input[type=checkbox] {
@@ -9931,10 +9937,25 @@ body {
 	accent-color: var(--void-ring);
 }
 
+.ref-mcp-edit-inline-value {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	min-width: 0;
+}
+
+.ref-mcp-edit-field .ref-mcp-edit-inline-value input {
+	flex: 1;
+	min-width: 0;
+	width: auto;
+	max-width: none;
+}
+
 .ref-mcp-edit-unit {
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--void-fg-3);
-	margin-left: 4px;
+	flex-shrink: 0;
 }
 
 .ref-mcp-edit-expand {
@@ -10006,13 +10027,20 @@ body {
 .ref-mcp-edit-env-row input {
 	flex: 1;
 	min-width: 0;
-	padding: 6px 8px;
-	border-radius: 5px;
+	box-sizing: border-box;
+	padding: 8px 10px;
+	border-radius: 10px;
 	border: 1px solid var(--void-border);
-	background: var(--void-bg-0);
+	background: var(--void-bg-1);
 	color: var(--void-fg-0);
-	font-size: 11px;
+	font-size: 12px;
 	font-family: ui-monospace, monospace;
+	outline: none;
+	transition: border-color 0.12s;
+}
+
+.ref-mcp-edit-env-row input:focus {
+	border-color: var(--void-fg-3);
 }
 
 .ref-mcp-edit-env-remove {
