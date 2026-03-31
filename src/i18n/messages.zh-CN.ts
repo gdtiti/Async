@@ -172,6 +172,11 @@ export const messagesZhCN: Record<string, string> = {
 	'app.errorPrefix': '错误：{{message}}',
 	'app.readFileFailed': '// 读取失败：{{detail}}',
 
+	// token usage
+	'usage.tokens': '↑{{input}} ↓{{output}} tokens',
+	'usage.tokensShort': '{{input}}↑ {{output}}↓',
+	'usage.totalTokens': '本会话累计：↑{{input}} ↓{{output}}',
+
 	// composer / placeholders
 	'composer.placeholder.ask': '提问或阅读代码，不会在未要求时改动仓库…',
 	'composer.placeholder.plan': '先规划与设计，再动手实现…',

@@ -14,6 +14,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam, ContentBlockParam, ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages';
 import type { ChatMessage } from '../threadStore.js';
 import type { ShellSettings, ModelRequestParadigm, ThinkingLevel } from '../settingsStore.js';
+import type { TurnTokenUsage } from '../llm/types.js';
 import { composeSystem, temperatureForMode } from '../llm/modePrompts.js';
 import {
 	anthropicEffectiveMaxTokens,
@@ -39,6 +40,11 @@ export type BeforeExecuteToolResult = { proceed: true } | { proceed: false; reje
 const MAX_ROUNDS = 25;
 const DEFAULT_MAX_CONSECUTIVE_MISTAKES = 5;
 
+/** 单轮流式 chunk 最长静默时间（ms）；超时后自动 abort 并报错 */
+const CHUNK_SILENCE_TIMEOUT_MS = 90_000;
+/** 单轮 LLM 调用总时长上限（ms）；防止极端长输出永不结束 */
+const ROUND_HARD_TIMEOUT_MS = 300_000;
+
 export type ToolInputDeltaPayload = { name: string; partialJson: string; index: number };
 
 export type AgentLoopHandlers = {
@@ -49,7 +55,7 @@ export type AgentLoopHandlers = {
 	onThinkingDelta?: (text: string) => void;
 	onToolCall: (name: string, args: Record<string, unknown>) => void;
 	onToolResult: (name: string, result: string, success: boolean) => void;
-	onDone: (fullContent: string) => void;
+	onDone: (fullContent: string, usage?: TurnTokenUsage) => void;
 	onError: (message: string) => void;
 };
 
@@ -182,6 +188,7 @@ async function runOpenAILoop(
 	const conversation: OAIMsg[] = threadToOpenAI(threadMessages, systemContent);
 	let fullContent = '';
 	const effort = openAIReasoningEffort(options.thinkingLevel ?? 'off');
+	let accUsage: TurnTokenUsage | undefined;
 
 	const mistakeLimitEnabled = options.mistakeLimitEnabled !== false;
 	const threshold = options.maxConsecutiveMistakes ?? DEFAULT_MAX_CONSECUTIVE_MISTAKES;
@@ -299,6 +306,19 @@ async function runOpenAILoop(
 		let turnText = '';
 		const turnToolCalls: TurnTc[] = [];
 
+		// 每轮创建独立 AbortController，叠加在外部 signal 之上，用于超时自动中止
+		const roundAc = new AbortController();
+		const roundSignal = roundAc.signal;
+		options.signal.addEventListener('abort', () => roundAc.abort(), { once: true });
+
+		let lastChunkAt = Date.now();
+		const silenceTimer = setInterval(() => {
+			if (Date.now() - lastChunkAt > CHUNK_SILENCE_TIMEOUT_MS) {
+				roundAc.abort();
+			}
+		}, 5_000);
+		const hardTimer = setTimeout(() => roundAc.abort(), ROUND_HARD_TIMEOUT_MS);
+
 		try {
 			const stream = await client.chat.completions.create(
 				{
@@ -306,15 +326,24 @@ async function runOpenAILoop(
 					messages: conversation,
 					tools,
 					stream: true,
+					stream_options: { include_usage: true },
 					temperature,
 					max_completion_tokens: options.maxOutputTokens,
 					...(effort ? { reasoning_effort: effort } : {}),
 				},
-				{ signal: options.signal }
+				{ signal: roundSignal }
 			);
 
 			for await (const chunk of stream) {
-				if (options.signal.aborted) break;
+				if (roundSignal.aborted) break;
+				lastChunkAt = Date.now();
+
+				if (chunk.usage) {
+					accUsage = {
+						inputTokens: (accUsage?.inputTokens ?? 0) + (chunk.usage.prompt_tokens ?? 0),
+						outputTokens: (accUsage?.outputTokens ?? 0) + (chunk.usage.completion_tokens ?? 0),
+					};
+				}
 
 				const delta = chunk.choices[0]?.delta;
 				if (!delta) continue;
@@ -343,10 +372,20 @@ async function runOpenAILoop(
 				}
 			}
 		} catch (e: unknown) {
+			clearInterval(silenceTimer);
+			clearTimeout(hardTimer);
 			if (options.signal.aborted) break;
+			if (roundSignal.aborted && !options.signal.aborted) {
+				handlers.onError('连接超时：LLM 响应过慢，已自动中止。请重试或检查网络。');
+				return;
+			}
 			handlers.onError(e instanceof Error ? e.message : String(e));
 			return;
 		}
+		clearInterval(silenceTimer);
+		clearTimeout(hardTimer);
+
+		if (options.signal.aborted || roundSignal.aborted) break;
 
 		turnText = unwrapAssistantContentEnvelope(turnText);
 		fullContent += turnText;
@@ -372,7 +411,7 @@ async function runOpenAILoop(
 		await flushOpenAIToolsInOrder(turnToolCalls);
 	}
 
-	handlers.onDone(fullContent);
+	handlers.onDone(fullContent, accUsage);
 }
 
 // ─── Anthropic agent loop ───────────────────────────────────────────────────
@@ -420,6 +459,7 @@ async function runAnthropicLoop(
 	const tools = toAnthropicTools(agentToolsForComposerMode(toolMode));
 	let fullContent = '';
 	const thinkBudget = anthropicThinkingBudget(options.thinkingLevel ?? 'off');
+	let accUsage: TurnTokenUsage | undefined;
 
 	const mistakeLimitEnabled = options.mistakeLimitEnabled !== false;
 	const threshold = options.maxConsecutiveMistakes ?? DEFAULT_MAX_CONSECUTIVE_MISTAKES;
@@ -550,6 +590,18 @@ async function runAnthropicLoop(
 				? ({ type: 'enabled' as const, budget_tokens: thinkBudget })
 				: undefined;
 
+		const roundAcA = new AbortController();
+		const roundSignalA = roundAcA.signal;
+		options.signal.addEventListener('abort', () => roundAcA.abort(), { once: true });
+
+		let lastChunkAtA = Date.now();
+		const silenceTimerA = setInterval(() => {
+			if (Date.now() - lastChunkAtA > CHUNK_SILENCE_TIMEOUT_MS) {
+				roundAcA.abort();
+			}
+		}, 5_000);
+		const hardTimerA = setTimeout(() => roundAcA.abort(), ROUND_HARD_TIMEOUT_MS);
+
 		try {
 			const stream = client.messages.stream(
 				{
@@ -561,13 +613,26 @@ async function runAnthropicLoop(
 					temperature,
 					...(thinkingParam ? { thinking: thinkingParam } : {}),
 				},
-				{ signal: options.signal }
+				{ signal: roundSignalA }
 			);
 
 			for await (const ev of stream) {
-				if (options.signal.aborted) break;
+				if (roundSignalA.aborted) break;
+				lastChunkAtA = Date.now();
 
-				if (ev.type === 'content_block_start') {
+				if (ev.type === 'message_start' && ev.message.usage) {
+					accUsage = {
+						inputTokens: (accUsage?.inputTokens ?? 0) + (ev.message.usage.input_tokens ?? 0),
+						outputTokens: (accUsage?.outputTokens ?? 0) + (ev.message.usage.output_tokens ?? 0),
+						cacheReadTokens: (accUsage?.cacheReadTokens ?? 0) + (((ev.message.usage as any).cache_read_input_tokens) ?? 0),
+						cacheWriteTokens: (accUsage?.cacheWriteTokens ?? 0) + (((ev.message.usage as any).cache_creation_input_tokens) ?? 0),
+					};
+				} else if (ev.type === 'message_delta' && ev.usage) {
+					accUsage = {
+						...(accUsage ?? {}),
+						outputTokens: (accUsage?.outputTokens ?? 0) + (ev.usage.output_tokens ?? 0),
+					};
+				} else if (ev.type === 'content_block_start') {
 					if (ev.content_block.type === 'text') {
 						currentBlockType = 'text';
 					} else if (ev.content_block.type === 'tool_use') {
@@ -602,15 +667,25 @@ async function runAnthropicLoop(
 							});
 						}
 					}
-				} else if (ev.type === 'content_block_stop') {
-					currentBlockType = null;
-				}
+			} else if (ev.type === 'content_block_stop') {
+				currentBlockType = null;
 			}
+		}
 		} catch (e: unknown) {
+			clearInterval(silenceTimerA);
+			clearTimeout(hardTimerA);
 			if (options.signal.aborted) break;
+			if (roundSignalA.aborted && !options.signal.aborted) {
+				handlers.onError('连接超时：LLM 响应过慢，已自动中止。请重试或检查网络。');
+				return;
+			}
 			handlers.onError(e instanceof Error ? e.message : String(e));
 			return;
 		}
+		clearInterval(silenceTimerA);
+		clearTimeout(hardTimerA);
+
+		if (options.signal.aborted || roundSignalA.aborted) break;
 
 		turnText = unwrapAssistantContentEnvelope(turnText);
 		fullContent += turnText;
@@ -643,5 +718,5 @@ async function runAnthropicLoop(
 		conversation.push({ role: 'user', content: toolResults });
 	}
 
-	handlers.onDone(fullContent);
+	handlers.onDone(fullContent, accUsage);
 }

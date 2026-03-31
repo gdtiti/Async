@@ -10,6 +10,19 @@ import { pathToFileURL } from 'node:url';
 import { app } from 'electron';
 import { createMessageConnection, StreamMessageReader, StreamMessageWriter } from 'vscode-jsonrpc/node.js';
 
+export type LspDiagnosticSeverity = 1 | 2 | 3 | 4; // error | warning | info | hint
+
+export type LspDiagnostic = {
+	range: {
+		start: { line: number; character: number };
+		end: { line: number; character: number };
+	};
+	severity?: LspDiagnosticSeverity;
+	code?: string | number;
+	source?: string;
+	message: string;
+};
+
 function findTslsCli(): string | null {
 	const candidates = [
 		...(typeof app?.getAppPath === 'function'
@@ -85,6 +98,7 @@ export class TsLspSession {
 			capabilities: {
 				textDocument: {
 					definition: { linkSupport: true },
+					diagnostic: { dynamicRegistration: false, relatedDocumentSupport: false },
 				},
 				workspace: {},
 			},
@@ -125,6 +139,33 @@ export class TsLspSession {
 			position: { line: Math.max(0, line - 1), character: Math.max(0, column - 1) },
 		} as never);
 		return result;
+	}
+
+	/**
+	 * 拉取文件诊断（错误/警告）。
+	 * 使用 LSP 3.17 pull diagnostics（textDocument/diagnostic）。
+	 * 若服务器不支持，返回 null 作为降级信号。
+	 */
+	async diagnostics(uri: string, text: string): Promise<LspDiagnostic[] | null> {
+		if (!this.connection) {
+			throw new Error('LSP 未启动');
+		}
+		await this.syncDocument(uri, text);
+		// 等待 tsls 处理文档（pull diagnostics 需要服务器完成类型检查）
+		await new Promise<void>((r) => setTimeout(r, 800));
+		try {
+			const result = await this.connection.sendRequest('textDocument/diagnostic' as never, {
+				textDocument: { uri },
+			} as never) as { kind: string; items: LspDiagnostic[] } | null;
+			return result?.items ?? [];
+		} catch (e: unknown) {
+			// 服务器不支持 pull diagnostics 时降级
+			const msg = e instanceof Error ? e.message : String(e);
+			if (msg.includes('not supported') || msg.includes('MethodNotFound') || msg.includes('-32601')) {
+				return null;
+			}
+			throw e;
+		}
 	}
 
 	async dispose(): Promise<void> {

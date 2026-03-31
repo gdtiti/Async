@@ -1,5 +1,13 @@
 import type { ComposerMode } from './ComposerPlusMenu';
 
+/** 与 main-src/llm/types.ts TurnTokenUsage 保持一致（渲染端独立定义，避免跨进程 import） */
+export type TurnTokenUsage = {
+	inputTokens?: number;
+	outputTokens?: number;
+	cacheReadTokens?: number;
+	cacheWriteTokens?: number;
+};
+
 /** 与 main-src/settingsStore 一致 */
 export type ThinkingLevel = 'off' | 'low' | 'medium' | 'high' | 'max';
 
@@ -33,7 +41,7 @@ export type AgentPendingPatch = {
 
 export type ChatStreamPayload =
 	| { threadId: string; type: 'delta'; text: string }
-	| { threadId: string; type: 'done'; text: string; pendingAgentPatches?: AgentPendingPatch[] }
+	| { threadId: string; type: 'done'; text: string; pendingAgentPatches?: AgentPendingPatch[]; usage?: TurnTokenUsage }
 	| { threadId: string; type: 'error'; message: string }
 	| { threadId: string; type: 'tool_call'; name: string; args: string }
 	| { threadId: string; type: 'tool_result'; name: string; result: string; success: boolean }

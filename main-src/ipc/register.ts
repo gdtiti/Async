@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { createAppWindow } from '../appWindow.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { setWorkspaceRoot, getWorkspaceRoot, resolveWorkspacePath, isPathInsideRoot } from '../workspace.js';
@@ -24,8 +25,14 @@ import {
 	setThreadTitle,
 	updateLastAssistant,
 	appendToLastAssistant,
+	accumulateTokenUsage,
+	touchFileInThread,
+	saveSummary,
+	savePlan,
 	type ChatMessage,
+	type ThreadPlan,
 } from '../threadStore.js';
+import { compressForSend } from '../agent/conversationCompress.js';
 import * as gitService from '../gitService.js';
 import { parseComposerMode } from '../llm/composerMode.js';
 import { resolveModelRequest, resolveThinkingLevelForSelection } from '../llm/modelResolve.js';
@@ -49,6 +56,7 @@ import { prepareUserTurnForChat } from '../llm/agentMessagePrep.js';
 import { summarizeThreadForSidebar, isTimestampToday } from '../threadListSummary.js';
 import { registerTerminalPtyIpc } from '../terminalPty.js';
 import { TsLspSession } from '../lsp/tsLspSession.js';
+import { setToolLspSession, setDelegateContext } from '../agent/toolExecutor.js';
 import {
 	searchWorkspaceSymbols,
 	clearWorkspaceSymbolIndex,
@@ -65,6 +73,7 @@ import {
 const execFileAsync = promisify(execFile);
 
 const tsLspSession = new TsLspSession();
+setToolLspSession(tsLspSession);
 
 const abortByThread = new Map<string, AbortController>();
 const agentRevertSnapshotsByThread = new Map<string, Map<string, string | null>>();
@@ -98,6 +107,30 @@ function runChatStream(
 				return;
 			}
 
+			// 发送端压缩：超长线程仅压缩发给 LLM 的副本，磁盘保留完整历史
+			const thread = getThread(threadId);
+			const compressOptions = {
+				mode: mode as import('../llm/composerMode.js').ComposerMode,
+				signal: ac.signal,
+				requestModelId: resolved.requestModelId,
+				paradigm: resolved.paradigm,
+				requestApiKey: resolved.apiKey,
+				requestBaseURL: resolved.baseURL,
+				maxOutputTokens: resolved.maxOutputTokens,
+				thinkingLevel,
+			};
+			const compressResult = await compressForSend(
+				messages,
+				settings,
+				compressOptions,
+				thread?.summary,
+				thread?.summaryCoversMessageCount
+			);
+			const sendMessages = compressResult.messages;
+			if (compressResult.newSummary && compressResult.newSummaryCoversCount !== undefined) {
+				saveSummary(threadId, compressResult.newSummary, compressResult.newSummaryCoversCount);
+			}
+
 			if ((mode === 'agent' || mode === 'plan') && resolved.paradigm !== 'gemini') {
 				const beforeExecuteTool = createToolApprovalBeforeExecute(
 					send,
@@ -113,31 +146,53 @@ function runChatStream(
 					mistakeLimitWaiters
 				);
 				const ag = getSettings().agent;
-				await runAgentLoop(
-					settings,
-					messages,
-					{
-						requestModelId: resolved.requestModelId,
-						paradigm: resolved.paradigm,
-						requestApiKey: resolved.apiKey,
-						requestBaseURL: resolved.baseURL,
-						maxOutputTokens: resolved.maxOutputTokens,
-						signal: ac.signal,
-						composerMode: mode,
-						thinkingLevel,
-						beforeExecuteTool,
-						maxConsecutiveMistakes: ag?.maxConsecutiveMistakes,
-						mistakeLimitEnabled: ag?.mistakeLimitEnabled,
-						onMistakeLimitReached,
-						toolHooks: {
-							beforeWrite: ({ path, previousContent }) => {
-								const snapshots = agentRevertSnapshotsByThread.get(threadId);
-								if (!snapshots || snapshots.has(path)) {
-									return;
-								}
-								snapshots.set(path, previousContent);
-							},
+			const agentOptions = {
+					requestModelId: resolved.requestModelId,
+					paradigm: resolved.paradigm,
+					requestApiKey: resolved.apiKey,
+					requestBaseURL: resolved.baseURL,
+					maxOutputTokens: resolved.maxOutputTokens,
+					signal: ac.signal,
+					composerMode: mode,
+					thinkingLevel,
+					beforeExecuteTool,
+					maxConsecutiveMistakes: ag?.maxConsecutiveMistakes,
+					mistakeLimitEnabled: ag?.mistakeLimitEnabled,
+					onMistakeLimitReached,
+				};
+			setDelegateContext(settings, agentOptions, 0);
+			await runAgentLoop(
+				settings,
+				sendMessages,
+				{
+					requestModelId: resolved.requestModelId,
+					paradigm: resolved.paradigm,
+					requestApiKey: resolved.apiKey,
+					requestBaseURL: resolved.baseURL,
+					maxOutputTokens: resolved.maxOutputTokens,
+					signal: ac.signal,
+					composerMode: mode,
+					thinkingLevel,
+					beforeExecuteTool,
+					maxConsecutiveMistakes: ag?.maxConsecutiveMistakes,
+					mistakeLimitEnabled: ag?.mistakeLimitEnabled,
+					onMistakeLimitReached,
+					toolHooks: {
+						beforeWrite: ({ path, previousContent }) => {
+							const snapshots = agentRevertSnapshotsByThread.get(threadId);
+							if (!snapshots || snapshots.has(path)) {
+								touchFileInThread(threadId, path, 'modified', false);
+								return;
+							}
+							snapshots.set(path, previousContent);
+							touchFileInThread(
+								threadId,
+								path,
+								previousContent === null ? 'created' : 'modified',
+								previousContent === null
+							);
 						},
+					},
 						...(agentSystemAppend?.trim() ? { agentSystemAppend: agentSystemAppend.trim() } : {}),
 					},
 					{
@@ -147,56 +202,59 @@ function runChatStream(
 						onThinkingDelta: (text) => send({ threadId, type: 'thinking_delta', text }),
 						onToolCall: (name, args) => send({ threadId, type: 'tool_call', name, args: JSON.stringify(args) }),
 						onToolResult: (name, result, success) => send({ threadId, type: 'tool_result', name, result, success }),
-						onDone: (full) => {
-							updateLastAssistant(threadId, full);
-							send({ threadId, type: 'done', text: full });
-						},
-						onError: (message) => send({ threadId, type: 'error', message }),
-					}
-				);
-				return;
-			}
-
-			await streamChatUnified(
-				settings,
-				messages,
-				{
-					mode,
-					signal: ac.signal,
-					requestModelId: resolved.requestModelId,
-					paradigm: resolved.paradigm,
-					requestApiKey: resolved.apiKey,
-					requestBaseURL: resolved.baseURL,
-					maxOutputTokens: resolved.maxOutputTokens,
-					thinkingLevel,
-					...(agentSystemAppend?.trim() ? { agentSystemAppend: agentSystemAppend.trim() } : {}),
-				},
-				{
-					onDelta: (piece) => send({ threadId, type: 'delta', text: piece }),
-					onThinkingDelta: (text) => send({ threadId, type: 'thinking_delta', text }),
-					onDone: (full) => {
+					onDone: (full, usage) => {
 						updateLastAssistant(threadId, full);
-						if (mode === 'agent') {
-							const listed = listAgentDiffChunks(full);
-							if (listed.length > 0) {
-								send({
-									threadId,
-									type: 'done',
-									text: full,
-									pendingAgentPatches: listed.map((p, i) => ({
-										id: `p-${i}`,
-										relPath: p.relPath,
-										chunk: p.chunk,
-									})),
-								});
-								return;
-							}
-						}
-						send({ threadId, type: 'done', text: full });
+						accumulateTokenUsage(threadId, usage?.inputTokens, usage?.outputTokens);
+						send({ threadId, type: 'done', text: full, usage });
 					},
 					onError: (message) => send({ threadId, type: 'error', message }),
 				}
 			);
+			return;
+		}
+
+		await streamChatUnified(
+			settings,
+			sendMessages,
+			{
+				mode,
+				signal: ac.signal,
+				requestModelId: resolved.requestModelId,
+				paradigm: resolved.paradigm,
+				requestApiKey: resolved.apiKey,
+				requestBaseURL: resolved.baseURL,
+				maxOutputTokens: resolved.maxOutputTokens,
+				thinkingLevel,
+				...(agentSystemAppend?.trim() ? { agentSystemAppend: agentSystemAppend.trim() } : {}),
+			},
+			{
+				onDelta: (piece) => send({ threadId, type: 'delta', text: piece }),
+				onThinkingDelta: (text) => send({ threadId, type: 'thinking_delta', text }),
+				onDone: (full, usage) => {
+					updateLastAssistant(threadId, full);
+					accumulateTokenUsage(threadId, usage?.inputTokens, usage?.outputTokens);
+					if (mode === 'agent') {
+						const listed = listAgentDiffChunks(full);
+						if (listed.length > 0) {
+							send({
+								threadId,
+								type: 'done',
+								text: full,
+								usage,
+								pendingAgentPatches: listed.map((p, i) => ({
+									id: `p-${i}`,
+									relPath: p.relPath,
+									chunk: p.chunk,
+								})),
+							});
+							return;
+						}
+					}
+					send({ threadId, type: 'done', text: full, usage });
+				},
+				onError: (message) => send({ threadId, type: 'error', message }),
+			}
+		);
 		} catch (e) {
 			try {
 				send({ threadId, type: 'error', message: e instanceof Error ? e.message : String(e) });
@@ -301,6 +359,33 @@ export function registerIpc(): void {
 		try {
 			const result = await tsLspSession.definition(uri, line, column, text);
 			return { ok: true as const, result };
+		} catch (e) {
+			return { ok: false as const, error: String(e) };
+		}
+	});
+
+	ipcMain.handle('lsp:ts:diagnostics', async (_e, payload: unknown) => {
+		const p = payload as { relPath?: string };
+		const relPath = typeof p?.relPath === 'string' ? p.relPath : '';
+		if (!relPath) {
+			return { ok: false as const, error: 'bad-args' as const };
+		}
+		const root = getWorkspaceRoot();
+		if (!root) {
+			return { ok: false as const, error: 'no-workspace' as const };
+		}
+		const absPath = path.join(root, relPath);
+		if (!fs.existsSync(absPath)) {
+			return { ok: false as const, error: 'file-not-found' as const };
+		}
+		const text = fs.readFileSync(absPath, 'utf-8');
+		const uri = pathToFileURL(absPath).href;
+		try {
+			const items = await tsLspSession.diagnostics(uri, text);
+			if (items === null) {
+				return { ok: false as const, error: 'not-supported' as const };
+			}
+			return { ok: true as const, diagnostics: items };
 		} catch (e) {
 			return { ok: false as const, error: String(e) };
 		}
@@ -443,11 +528,21 @@ export function registerIpc(): void {
 					createdAt: t.createdAt,
 					previewCount: t.messages.filter((m) => m.role !== 'system').length,
 					isToday: isTimestampToday(t.updatedAt, now),
+					tokenUsage: t.tokenUsage,
+					fileStateCount: t.fileStates ? Object.keys(t.fileStates).length : 0,
 					...sum,
 				};
 			}),
 			currentId: getCurrentThreadId(),
 		};
+	});
+
+	ipcMain.handle('threads:fileStates', (_e, threadId: string) => {
+		const t = getThread(threadId);
+		if (!t) {
+			return { ok: false as const };
+		}
+		return { ok: true as const, fileStates: t.fileStates ?? {} };
 	});
 
 	ipcMain.handle('threads:messages', (_e, threadId: string) => {
@@ -557,15 +652,16 @@ export function registerIpc(): void {
 				}
 			}
 
-			if (modeExpandsWorkspaceFileContext(mode) && userText.trim().length > 8) {
-				const sem = buildSemanticContextBlock(userText, 6);
-				if (sem) {
-					finalSystemAppend = finalSystemAppend ? `${finalSystemAppend}\n\n---\n${sem}` : sem;
-				}
+		if (modeExpandsWorkspaceFileContext(mode) && userText.trim().length > 8) {
+			const recentPaths = Object.keys(getThread(threadId)?.fileStates ?? {});
+			const sem = buildSemanticContextBlock(userText, 6, recentPaths);
+			if (sem) {
+				finalSystemAppend = finalSystemAppend ? `${finalSystemAppend}\n\n---\n${sem}` : sem;
 			}
+		}
 
-			const t = appendMessage(threadId, { role: 'user', content: userText });
-			runChatStream(win, threadId, t.messages, mode, modelSelection, finalSystemAppend);
+		const t = appendMessage(threadId, { role: 'user', content: userText });
+		runChatStream(win, threadId, t.messages, mode, modelSelection, finalSystemAppend);
 
 			return { ok: true as const };
 		}
@@ -614,14 +710,15 @@ export function registerIpc(): void {
 					}
 				}
 
-				if (modeExpandsWorkspaceFileContext(mode) && userText.trim().length > 8) {
-					const sem = buildSemanticContextBlock(userText, 6);
-					if (sem) {
-						finalSystemAppend = finalSystemAppend ? `${finalSystemAppend}\n\n---\n${sem}` : sem;
-					}
+			if (modeExpandsWorkspaceFileContext(mode) && userText.trim().length > 8) {
+				const recentPaths = Object.keys(getThread(threadId)?.fileStates ?? {});
+				const sem = buildSemanticContextBlock(userText, 6, recentPaths);
+				if (sem) {
+					finalSystemAppend = finalSystemAppend ? `${finalSystemAppend}\n\n---\n${sem}` : sem;
 				}
+			}
 
-				const t = replaceFromUserVisibleIndex(threadId, visibleIndex, userText);
+			const t = replaceFromUserVisibleIndex(threadId, visibleIndex, userText);
 				runChatStream(win, threadId, t.messages, mode, modelSelection, finalSystemAppend);
 				return { ok: true as const };
 			} catch {
@@ -866,6 +963,23 @@ export function registerIpc(): void {
 			}
 		}
 	);
+
+	ipcMain.handle('plan:saveStructured', (_e, payload: { threadId: string; plan: import('../threadStore.js').ThreadPlan }) => {
+		try {
+			savePlan(payload.threadId, payload.plan);
+			return { ok: true as const };
+		} catch (e) {
+			return { ok: false as const, error: String(e) };
+		}
+	});
+
+	ipcMain.handle('threads:getPlan', (_e, threadId: string) => {
+		const t = getThread(threadId);
+		if (!t) {
+			return { ok: false as const };
+		}
+		return { ok: true as const, plan: t.plan ?? null };
+	});
 
 	ipcMain.handle('terminal:execLine', async (_e, line: string) => {
 		const root = getWorkspaceRoot();

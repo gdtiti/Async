@@ -171,6 +171,11 @@ export const messagesEn: Record<string, string> = {
 	'app.errorPrefix': 'Error: {{message}}',
 	'app.readFileFailed': '// Read failed: {{detail}}',
 
+	// token usage
+	'usage.tokens': '↑{{input}} ↓{{output}} tokens',
+	'usage.tokensShort': '{{input}}↑ {{output}}↓',
+	'usage.totalTokens': 'Session total: ↑{{input}} ↓{{output}}',
+
 	'composer.placeholder.ask': 'Ask or read code—won’t change the repo unless you ask…',
 	'composer.placeholder.plan': 'Plan and design before implementation…',
 	'composer.placeholder.debug': 'Describe symptoms, errors, and repro steps…',

@@ -3,7 +3,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import type { ChatMessage } from '../threadStore.js';
 import type { ShellSettings } from '../settingsStore.js';
 import { composeSystem, temperatureForMode } from './modePrompts.js';
-import type { StreamHandlers, UnifiedChatOptions } from './types.js';
+import type { StreamHandlers, TurnTokenUsage, UnifiedChatOptions } from './types.js';
 import { openAIReasoningEffort } from './thinkingLevel.js';
 
 export async function streamOpenAICompatible(
@@ -52,9 +52,21 @@ export async function streamOpenAICompatible(
 	const temperature = temperatureForMode(options.mode);
 	const effort = openAIReasoningEffort(options.thinkingLevel ?? 'off');
 
+	const CHUNK_SILENCE_MS = 90_000;
+	const ROUND_HARD_MS = 300_000;
+
 	let full = '';
 	let buffer = '';
 	let inThinking = false;
+	let usage: TurnTokenUsage | undefined;
+
+	const timeoutAc = new AbortController();
+	options.signal.addEventListener('abort', () => timeoutAc.abort(), { once: true });
+	let lastChunkAt = Date.now();
+	const silenceTimer = setInterval(() => {
+		if (Date.now() - lastChunkAt > CHUNK_SILENCE_MS) timeoutAc.abort();
+	}, 5_000);
+	const hardTimer = setTimeout(() => timeoutAc.abort(), ROUND_HARD_MS);
 
 	try {
 		const stream = await client.chat.completions.create(
@@ -62,16 +74,26 @@ export async function streamOpenAICompatible(
 				model,
 				messages: [{ role: 'system' as const, content: systemContent }, ...apiMessages],
 				stream: true,
+				stream_options: { include_usage: true },
 				temperature,
 				max_tokens: options.maxOutputTokens,
 				...(effort ? { reasoning_effort: effort } : {}),
 			},
-			{ signal: options.signal }
+			{ signal: timeoutAc.signal }
 		);
 
 		for await (const chunk of stream) {
-			if (options.signal.aborted) {
+			if (timeoutAc.signal.aborted) {
 				break;
+			}
+			lastChunkAt = Date.now();
+
+			// 提取 usage（通常在最后一个 chunk，choices 为空时携带）
+			if (chunk.usage) {
+				usage = {
+					inputTokens: chunk.usage.prompt_tokens,
+					outputTokens: chunk.usage.completion_tokens,
+				};
 			}
 
 			// 1. natively supported reasoning_content (e.g. DeepSeek API)
@@ -151,10 +173,18 @@ export async function streamOpenAICompatible(
 			}
 		}
 
-		handlers.onDone(full);
+		clearInterval(silenceTimer);
+		clearTimeout(hardTimer);
+		handlers.onDone(full, usage);
 	} catch (e: unknown) {
+		clearInterval(silenceTimer);
+		clearTimeout(hardTimer);
 		if (options.signal.aborted) {
-			handlers.onDone(full);
+			handlers.onDone(full, usage);
+			return;
+		}
+		if (timeoutAc.signal.aborted) {
+			handlers.onError('连接超时：LLM 响应过慢，已自动中止。请重试或检查网络。');
 			return;
 		}
 		const msg = e instanceof Error ? e.message : String(e);

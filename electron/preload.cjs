@@ -13,12 +13,14 @@ const INVOKE_CHANNELS = new Set([
 	'lsp:ts:start',
 	'lsp:ts:stop',
 	'lsp:ts:definition',
+	'lsp:ts:diagnostics',
 	'workspace:indexing:stats',
 	'workspace:indexing:rebuild',
 	'settings:get',
 	'settings:set',
 	'threads:list',
 	'threads:messages',
+	'threads:fileStates',
 	'threads:create',
 	'threads:select',
 	'threads:delete',
@@ -48,6 +50,8 @@ const INVOKE_CHANNELS = new Set([
 	'agent:toolApprovalRespond',
 	'agent:mistakeLimitRespond',
 	'plan:save',
+	'plan:saveStructured',
+	'threads:getPlan',
 ]);
 
 const chatHandlers = new Map();

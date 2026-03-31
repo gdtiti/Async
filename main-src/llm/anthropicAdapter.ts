@@ -3,7 +3,7 @@ import type { MessageParam } from '@anthropic-ai/sdk/resources/messages';
 import type { ChatMessage } from '../threadStore.js';
 import type { ShellSettings } from '../settingsStore.js';
 import { composeSystem, temperatureForMode } from './modePrompts.js';
-import type { StreamHandlers, UnifiedChatOptions } from './types.js';
+import type { StreamHandlers, TurnTokenUsage, UnifiedChatOptions } from './types.js';
 import { anthropicEffectiveMaxTokens, anthropicThinkingBudget } from './thinkingLevel.js';
 
 function toAnthropicMessages(messages: ChatMessage[]): MessageParam[] {
@@ -68,7 +68,20 @@ export async function streamAnthropic(
 		return;
 	}
 
+	const CHUNK_SILENCE_MS = 90_000;
+	const ROUND_HARD_MS = 300_000;
+
 	let full = '';
+	let usage: TurnTokenUsage | undefined;
+
+	const timeoutAc = new AbortController();
+	options.signal.addEventListener('abort', () => timeoutAc.abort(), { once: true });
+	let lastChunkAt = Date.now();
+	const silenceTimer = setInterval(() => {
+		if (Date.now() - lastChunkAt > CHUNK_SILENCE_MS) timeoutAc.abort();
+	}, 5_000);
+	const hardTimer = setTimeout(() => timeoutAc.abort(), ROUND_HARD_MS);
+
 	try {
 		const stream = client.messages.stream(
 			{
@@ -79,14 +92,27 @@ export async function streamAnthropic(
 				temperature,
 				...(thinkingParam ? { thinking: thinkingParam } : {}),
 			},
-			{ signal: options.signal }
+			{ signal: timeoutAc.signal }
 		);
 
 		for await (const ev of stream) {
-			if (options.signal.aborted) {
+			if (timeoutAc.signal.aborted) {
 				break;
 			}
-			if (ev.type === 'content_block_delta') {
+			lastChunkAt = Date.now();
+			if (ev.type === 'message_start' && ev.message.usage) {
+				usage = {
+					inputTokens: ev.message.usage.input_tokens,
+					outputTokens: ev.message.usage.output_tokens,
+					cacheReadTokens: (ev.message.usage as any).cache_read_input_tokens,
+					cacheWriteTokens: (ev.message.usage as any).cache_creation_input_tokens,
+				};
+			} else if (ev.type === 'message_delta' && ev.usage) {
+				usage = {
+					...(usage ?? {}),
+					outputTokens: ev.usage.output_tokens,
+				};
+			} else if (ev.type === 'content_block_delta') {
 				if (ev.delta.type === 'text_delta') {
 					const piece = ev.delta.text;
 					if (piece) {
@@ -101,10 +127,18 @@ export async function streamAnthropic(
 				}
 			}
 		}
-		handlers.onDone(full);
+		clearInterval(silenceTimer);
+		clearTimeout(hardTimer);
+		handlers.onDone(full, usage);
 	} catch (e: unknown) {
+		clearInterval(silenceTimer);
+		clearTimeout(hardTimer);
 		if (options.signal.aborted) {
-			handlers.onDone(full);
+			handlers.onDone(full, usage);
+			return;
+		}
+		if (timeoutAc.signal.aborted) {
+			handlers.onError('连接超时：LLM 响应过慢，已自动中止。请重试或检查网络。');
 			return;
 		}
 		const msg = e instanceof Error ? e.message : String(e);

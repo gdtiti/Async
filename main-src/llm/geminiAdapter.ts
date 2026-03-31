@@ -3,7 +3,7 @@ import type { Content } from '@google/generative-ai';
 import type { ChatMessage } from '../threadStore.js';
 import type { ShellSettings } from '../settingsStore.js';
 import { composeSystem, temperatureForMode } from './modePrompts.js';
-import type { StreamHandlers, UnifiedChatOptions } from './types.js';
+import type { StreamHandlers, TurnTokenUsage, UnifiedChatOptions } from './types.js';
 
 function toGeminiContents(messages: ChatMessage[]): Content[] {
 	const nonSystem = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
@@ -58,6 +58,7 @@ export async function streamGemini(
 	}
 
 	let full = '';
+	let usage: TurnTokenUsage | undefined;
 	try {
 		const streamResult = await model.generateContentStream(
 			{ contents },
@@ -73,11 +74,17 @@ export async function streamGemini(
 				full += text;
 				handlers.onDelta(text);
 			}
+			if (chunk.usageMetadata) {
+				usage = {
+					inputTokens: chunk.usageMetadata.promptTokenCount,
+					outputTokens: chunk.usageMetadata.candidatesTokenCount,
+				};
+			}
 		}
-		handlers.onDone(full);
+		handlers.onDone(full, usage);
 	} catch (e: unknown) {
 		if (options.signal.aborted) {
-			handlers.onDone(full);
+			handlers.onDone(full, usage);
 			return;
 		}
 		const msg = e instanceof Error ? e.message : String(e);

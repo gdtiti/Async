@@ -21,6 +21,7 @@ import {
 	type ChatStreamPayload,
 	coerceThinkingByModelId,
 	type ThinkingLevel,
+	type TurnTokenUsage,
 } from './ipcTypes';
 import { AgentReviewPanel } from './AgentReviewPanel';
 import { AgentFileChangesPanel } from './AgentFileChanges';
@@ -98,6 +99,8 @@ type ThreadInfo = {
 	filePaths?: string[];
 	fileCount?: number;
 	subtitleFallback?: string;
+	tokenUsage?: { totalInput: number; totalOutput: number };
+	fileStateCount?: number;
 };
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 type EditorPtySession = { id: string; title: string };
@@ -525,6 +528,8 @@ function normalizeThreadRow(t: ThreadInfo): ThreadInfo {
 		filePaths: t.filePaths ?? [],
 		fileCount: t.fileCount ?? 0,
 		subtitleFallback: t.subtitleFallback ?? '',
+		tokenUsage: t.tokenUsage,
+		fileStateCount: t.fileStateCount ?? 0,
 	};
 }
 
@@ -643,6 +648,7 @@ export default function App() {
 	const [treeEpoch, setTreeEpoch] = useState(0);
 	const [commitMsg, setCommitMsg] = useState('');
 	const [workedSeconds, setWorkedSeconds] = useState<number | null>(null);
+	const [lastTurnUsage, setLastTurnUsage] = useState<TurnTokenUsage | null>(null);
 	const [settingsPageOpen, setSettingsPageOpen] = useState(false);
 	const [settingsMountKey, setSettingsMountKey] = useState(0);
 	const [settingsInitialNav, setSettingsInitialNav] = useState<SettingsNavId>('general');
@@ -1198,6 +1204,9 @@ export default function App() {
 							? Math.max(0.1, (end - start) / 1000)
 							: 0.5;
 				setThoughtSecondsByThread((prev) => ({ ...prev, [payload.threadId]: thinkSec }));
+				if (payload.usage) {
+					setLastTurnUsage(payload.usage);
+				}
 				streamStartedAtRef.current = null;
 				firstTokenAtRef.current = null;
 				setAwaitingReply(false);
@@ -1238,6 +1247,21 @@ export default function App() {
 							if (r.ok) {
 								setPlanFilePath(r.path);
 							}
+							// 同时保存结构化 plan 到 threadStore
+							const structuredPlan = {
+								title: plan.name,
+								steps: plan.todos.map((t) => ({
+									id: t.id,
+									title: t.content.split(':')[0]?.trim() ?? t.content,
+									description: t.content,
+									status: 'pending' as const,
+								})),
+								updatedAt: Date.now(),
+							};
+							await shell.invoke('plan:saveStructured', {
+								threadId: payload.threadId,
+								plan: structuredPlan,
+							});
 						})();
 					}
 				}
@@ -1445,6 +1469,7 @@ export default function App() {
 		await refreshThreads();
 		setCurrentId(r.id);
 		setWorkedSeconds(null);
+		setLastTurnUsage(null);
 		setAwaitingReply(false);
 		setStreaming('');
 		setStreamingThinking('');
@@ -1684,10 +1709,19 @@ export default function App() {
 	const onPlanBuild = useCallback(() => {
 		if (!parsedPlan) return;
 		planBuildContentRef.current = parsedPlan.body;
+
+		// 构建结构化步骤注入文本
+		const stepLines = parsedPlan.todos.length > 0
+			? parsedPlan.todos.map((s, i) => `${i + 1}. ${s.content}`).join('\n')
+			: '';
+		const structuredContext = stepLines
+			? `\n\n[Structured Plan — execute these steps in order]\n${stepLines}`
+			: '';
+
 		setParsedPlan(null);
 		setPlanQuestion(null);
 		setComposerModePersist('agent');
-		const buildPrompt = `请根据以下计划执行所有步骤，逐个修改文件：\n\n${parsedPlan.body}`;
+		const buildPrompt = `请根据以下计划执行所有步骤，逐个修改文件：\n\n${parsedPlan.body}${structuredContext}`;
 		setComposerSegments(userMessageToSegments(buildPrompt, workspaceFileList));
 		setTimeout(() => {
 			const ref = hasConversation ? composerRichBottomRef.current : composerRichHeroRef.current;
@@ -3083,6 +3117,7 @@ export default function App() {
 						elapsedSeconds={frozenSec}
 						totalStreamSeconds={workedSeconds}
 						mode={composerMode}
+						tokenUsage={isLast ? lastTurnUsage : undefined}
 					/>
 				);
 			}
@@ -3649,12 +3684,29 @@ export default function App() {
 								<IconCheckCircle className="ref-thread-row-lead-svg" />
 							)}
 						</span>
-						<span className="ref-thread-row-stack">
-							<span className="ref-thread-row-title">{threadRowTitle(t, th)}</span>
-							<span className={`ref-thread-row-meta ${isActive ? 'is-active-meta' : ''}`}>
-								{formatThreadRowSubtitle(t, th, isActive)}
-							</span>
+					<span className="ref-thread-row-stack">
+						<span className="ref-thread-row-title">{threadRowTitle(t, th)}</span>
+						<span className={`ref-thread-row-meta ${isActive ? 'is-active-meta' : ''}`}>
+							{formatThreadRowSubtitle(t, th, isActive)}
 						</span>
+						{(th.fileStateCount && th.fileStateCount > 0) || th.tokenUsage ? (
+							<span className="ref-thread-row-stats">
+								{th.fileStateCount && th.fileStateCount > 0 ? (
+									<span className="ref-thread-stat ref-thread-stat--files" title={t('agent.files.count', { count: th.fileStateCount })}>
+										<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+											<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+										</svg>
+										{th.fileStateCount}
+									</span>
+								) : null}
+								{th.tokenUsage ? (
+									<span className="ref-thread-stat ref-thread-stat--tokens" title={t('usage.totalTokens', { input: th.tokenUsage.totalInput.toLocaleString(), output: th.tokenUsage.totalOutput.toLocaleString() })}>
+										{t('usage.tokensShort', { input: th.tokenUsage.totalInput > 999 ? `${Math.round(th.tokenUsage.totalInput / 1000)}k` : String(th.tokenUsage.totalInput), output: th.tokenUsage.totalOutput > 999 ? `${Math.round(th.tokenUsage.totalOutput / 1000)}k` : String(th.tokenUsage.totalOutput) })}
+									</span>
+								) : null}
+							</span>
+						) : null}
+					</span>
 					</button>
 				)}
 				<div className="ref-thread-row-actions">

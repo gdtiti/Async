@@ -147,6 +147,40 @@ export const AGENT_TOOLS: AgentToolDef[] = [
 			required: ['command'],
 		},
 	},
+	{
+		name: 'get_diagnostics',
+		description:
+			'Get TypeScript/JavaScript compiler diagnostics (errors and warnings) for a file in the workspace using the language server. Use this after editing a TypeScript or JavaScript file to verify there are no type errors or syntax issues. Returns a list of diagnostics with line numbers, severity, and messages. If the language server is not running or the file type is not supported, returns an appropriate message.',
+		parameters: {
+			type: 'object',
+			properties: {
+				path: {
+					type: 'string',
+					description: 'Relative path to the TypeScript or JavaScript file from workspace root',
+				},
+			},
+			required: ['path'],
+		},
+	},
+	{
+		name: 'delegate_task',
+		description:
+			'Delegate a focused sub-task to a nested agent loop. Use this for well-scoped, independent tasks that can be completed autonomously (e.g. "refactor this single file", "write tests for this module"). The sub-agent has access to all the same tools. Returns the sub-agent\'s final output as a string. Maximum nesting depth is 1 — do not call delegate_task from within a delegated task.',
+		parameters: {
+			type: 'object',
+			properties: {
+				task: {
+					type: 'string',
+					description: 'A clear, self-contained description of the task for the sub-agent to execute',
+				},
+				context: {
+					type: 'string',
+					description: 'Optional additional context, file paths, or constraints for the sub-agent',
+				},
+			},
+			required: ['task'],
+		},
+	},
 ];
 
 export function toOpenAITools(defs: AgentToolDef[]) {

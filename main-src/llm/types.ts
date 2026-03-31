@@ -1,9 +1,19 @@
 import type { ComposerMode } from './composerMode.js';
 import type { ModelRequestParadigm, ThinkingLevel } from '../settingsStore.js';
 
+/** 单回合 token 用量（各字段均为可选，网关不返回时省略）。 */
+export type TurnTokenUsage = {
+	inputTokens?: number;
+	outputTokens?: number;
+	/** Anthropic prompt caching：命中缓存读取的 token 数 */
+	cacheReadTokens?: number;
+	/** Anthropic prompt caching：写入缓存的 token 数 */
+	cacheWriteTokens?: number;
+};
+
 export type StreamHandlers = {
 	onDelta: (text: string) => void;
-	onDone: (fullText: string) => void;
+	onDone: (fullText: string, usage?: TurnTokenUsage) => void;
 	onError: (message: string) => void;
 	/** Anthropic extended thinking：不进入持久化 assistant 正文 */
 	onThinkingDelta?: (text: string) => void;

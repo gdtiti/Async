@@ -8,12 +8,51 @@ export type ChatMessage = {
 	content: string;
 };
 
+export type ThreadTokenUsage = {
+	totalInput: number;
+	totalOutput: number;
+};
+
+export type FileStateAction = 'created' | 'modified' | 'deleted';
+
+export type FileState = {
+	action: FileStateAction;
+	firstTouchedAt: number;
+	touchCount: number;
+};
+
 export type ThreadRecord = {
 	id: string;
 	title: string;
 	createdAt: number;
 	updatedAt: number;
 	messages: ChatMessage[];
+	/** 本会话累计 token 用量（各回合叠加） */
+	tokenUsage?: ThreadTokenUsage;
+	/** Agent 本会话触碰过的文件（相对路径 → 状态） */
+	fileStates?: Record<string, FileState>;
+	/** 已压缩的历史摘要（仅影响发送给 LLM 的副本，磁盘仍存完整消息） */
+	summary?: string;
+	/** 摘要覆盖的消息数量（从第 0 条起算，不含 system） */
+	summaryCoversMessageCount?: number;
+	/** 结构化计划（从 Plan 模式输出解析而来） */
+	plan?: ThreadPlan;
+};
+
+export type PlanStepStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+
+export type PlanStep = {
+	id: string;
+	title: string;
+	description: string;
+	targetFiles?: string[];
+	status: PlanStepStatus;
+};
+
+export type ThreadPlan = {
+	title: string;
+	steps: PlanStep[];
+	updatedAt: number;
 };
 
 type StoreFile = {
@@ -177,6 +216,25 @@ export function appendToLastAssistant(threadId: string, suffix: string): void {
 	}
 }
 
+/** 累加本回合 token 用量到线程统计（无 usage 时跳过）。 */
+export function accumulateTokenUsage(
+	threadId: string,
+	input: number | undefined,
+	output: number | undefined
+): void {
+	const t = data.threads[threadId];
+	if (!t || (!input && !output)) {
+		return;
+	}
+	const prev = t.tokenUsage ?? { totalInput: 0, totalOutput: 0 };
+	t.tokenUsage = {
+		totalInput: prev.totalInput + (input ?? 0),
+		totalOutput: prev.totalOutput + (output ?? 0),
+	};
+	t.updatedAt = Date.now();
+	save();
+}
+
 /**
  * 从「非 system 消息列表」中的第 visibleIndex 条用户消息起截断（含该条），再追加新的用户消息。
  * visibleIndex 与 IPC threads:messages 返回顺序一致。
@@ -207,4 +265,70 @@ export function replaceFromUserVisibleIndex(
 	}
 	save();
 	return t;
+}
+
+/** 保存结构化计划到线程记录。 */
+export function savePlan(threadId: string, plan: ThreadPlan): void {
+	const t = data.threads[threadId];
+	if (!t) {
+		return;
+	}
+	t.plan = plan;
+	save();
+}
+
+/** 更新计划步骤状态。 */
+export function updatePlanStepStatus(threadId: string, stepId: string, status: PlanStepStatus): void {
+	const t = data.threads[threadId];
+	if (!t?.plan) {
+		return;
+	}
+	const step = t.plan.steps.find((s) => s.id === stepId);
+	if (step) {
+		step.status = status;
+		t.plan.updatedAt = Date.now();
+		save();
+	}
+}
+
+/** 保存摘要到线程记录（不修改 messages）。 */
+export function saveSummary(threadId: string, summary: string, coversCount: number): void {
+	const t = data.threads[threadId];
+	if (!t) {
+		return;
+	}
+	t.summary = summary;
+	t.summaryCoversMessageCount = coversCount;
+	save();
+}
+
+/** 记录 Agent 触碰文件（写入/创建/删除）；持久化到 fileStates。 */
+export function touchFileInThread(
+	threadId: string,
+	relPath: string,
+	action: FileStateAction,
+	isNew: boolean
+): void {
+	const t = data.threads[threadId];
+	if (!t) {
+		return;
+	}
+	if (!t.fileStates) {
+		t.fileStates = {};
+	}
+	const prev = t.fileStates[relPath];
+	if (prev) {
+		t.fileStates[relPath] = {
+			action,
+			firstTouchedAt: prev.firstTouchedAt,
+			touchCount: prev.touchCount + 1,
+		};
+	} else {
+		t.fileStates[relPath] = {
+			action: isNew ? 'created' : action,
+			firstTouchedAt: Date.now(),
+			touchCount: 1,
+		};
+	}
+	save();
 }

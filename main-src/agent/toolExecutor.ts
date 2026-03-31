@@ -4,11 +4,37 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { getWorkspaceRoot, resolveWorkspacePath, isPathInsideRoot } from '../workspace.js';
 import { formatSymbolSearchResults, searchWorkspaceSymbols } from '../workspaceSymbolIndex.js';
 import type { ToolCall, ToolResult } from './agentTools.js';
+import { TsLspSession } from '../lsp/tsLspSession.js';
+import type { AgentLoopOptions, AgentLoopHandlers } from './agentLoop.js';
+import type { ShellSettings } from '../settingsStore.js';
+
+/** 工具执行器持有的 LSP 会话引用（由 register.ts 通过 setToolLspSession 注入）。 */
+let _lspSession: TsLspSession | null = null;
+
+export function setToolLspSession(session: TsLspSession): void {
+	_lspSession = session;
+}
+
+/** delegate_task 用于嵌套子 Agent 的上下文（由 register.ts 注入）。 */
+let _delegateContext: {
+	settings: ShellSettings;
+	options: Omit<AgentLoopOptions, 'signal'>;
+	depth: number;
+} | null = null;
+
+export function setDelegateContext(
+	settings: ShellSettings,
+	options: Omit<AgentLoopOptions, 'signal'>,
+	depth: number
+): void {
+	_delegateContext = { settings, options, depth };
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -37,10 +63,14 @@ export async function executeTool(call: ToolCall, hooks: ToolExecutionHooks = {}
 				return executeListDir(call);
 			case 'search_files':
 				return await executeSearchFiles(call);
-			case 'execute_command':
-				return await executeCommand(call);
-			default:
-				return { toolCallId: call.id, name: call.name, content: `Unknown tool: ${call.name}`, isError: true };
+		case 'execute_command':
+			return await executeCommand(call);
+		case 'get_diagnostics':
+			return await executeGetDiagnostics(call);
+		case 'delegate_task':
+			return await executeDelegateTask(call);
+		default:
+			return { toolCallId: call.id, name: call.name, content: `Unknown tool: ${call.name}`, isError: true };
 		}
 	} catch (e) {
 		return { toolCallId: call.id, name: call.name, content: `Error: ${e instanceof Error ? e.message : String(e)}`, isError: true };
@@ -363,5 +393,128 @@ async function executeCommand(call: ToolCall): Promise<ToolResult> {
 			output = output.slice(0, MAX_READ_SIZE) + '\n... (truncated)';
 		}
 		return { toolCallId: call.id, name: call.name, content: `Exit code ${err.code ?? 'unknown'}\n${output}`, isError: true };
+	}
+}
+
+const SEVERITY_LABEL: Record<number, string> = { 1: 'error', 2: 'warning', 3: 'info', 4: 'hint' };
+
+async function executeDelegateTask(call: ToolCall): Promise<ToolResult> {
+	const task = String(call.arguments.task ?? '').trim();
+	const context = String(call.arguments.context ?? '').trim();
+	if (!task) {
+		return { toolCallId: call.id, name: call.name, content: 'Error: task is required', isError: true };
+	}
+
+	if (!_delegateContext) {
+		return {
+			toolCallId: call.id,
+			name: call.name,
+			content: 'delegate_task is not available in this context.',
+			isError: true,
+		};
+	}
+
+	if (_delegateContext.depth >= 1) {
+		return {
+			toolCallId: call.id,
+			name: call.name,
+			content: 'delegate_task cannot be called from within a delegated task (max nesting depth: 1).',
+			isError: true,
+		};
+	}
+
+	const { runAgentLoop } = await import('./agentLoop.js');
+	const subMessages: import('../threadStore.js').ChatMessage[] = [
+		{ role: 'user', content: context ? `${task}\n\nContext:\n${context}` : task },
+	];
+
+	const subAc = new AbortController();
+
+	let output = '';
+	let errorMsg = '';
+
+	await new Promise<void>((resolve) => {
+		const handlers: AgentLoopHandlers = {
+			onTextDelta: (text) => { output += text; },
+			onToolCall: () => {},
+			onToolResult: () => {},
+			onThinkingDelta: () => {},
+			onDone: () => resolve(),
+			onError: (msg) => { errorMsg = msg; resolve(); },
+		};
+
+		// 子 Agent 使用相同的模型配置，但嵌套深度 +1
+		const prevCtx = _delegateContext!;
+		setDelegateContext(prevCtx.settings, prevCtx.options, prevCtx.depth + 1);
+
+		void runAgentLoop(
+			prevCtx.settings,
+			subMessages,
+			{ ...prevCtx.options, signal: subAc.signal },
+			handlers
+		).then(() => resolve()).catch((e) => { errorMsg = String(e); resolve(); });
+	});
+
+	if (errorMsg) {
+		return { toolCallId: call.id, name: call.name, content: `Sub-agent error: ${errorMsg}`, isError: true };
+	}
+	return { toolCallId: call.id, name: call.name, content: output || '(sub-agent completed with no output)', isError: false };
+}
+
+async function executeGetDiagnostics(call: ToolCall): Promise<ToolResult> {
+	const relPath = String(call.arguments.path ?? '').trim();
+	if (!relPath) {
+		return { toolCallId: call.id, name: call.name, content: 'Error: path is required', isError: true };
+	}
+
+	const ext = path.extname(relPath).toLowerCase();
+	if (!['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'].includes(ext)) {
+		return {
+			toolCallId: call.id,
+			name: call.name,
+			content: `Diagnostics are only supported for TypeScript/JavaScript files. Got: ${ext || '(no extension)'}`,
+			isError: true,
+		};
+	}
+
+	if (!_lspSession?.isRunning) {
+		return {
+			toolCallId: call.id,
+			name: call.name,
+			content: 'TypeScript language server is not running. Open a workspace with TypeScript files to start it.',
+			isError: true,
+		};
+	}
+
+	const full = safePath(relPath);
+	if (!fs.existsSync(full)) {
+		return { toolCallId: call.id, name: call.name, content: `File not found: ${relPath}`, isError: true };
+	}
+
+	const text = fs.readFileSync(full, 'utf-8');
+	const uri = pathToFileURL(full).href;
+
+	try {
+		const items = await _lspSession!.diagnostics(uri, text);
+		if (items === null) {
+			return {
+				toolCallId: call.id,
+				name: call.name,
+				content: 'Pull diagnostics not supported by the current language server. Try running tsc manually.',
+				isError: false,
+			};
+		}
+		if (items.length === 0) {
+			return { toolCallId: call.id, name: call.name, content: `No diagnostics found in ${relPath}. The file looks clean.`, isError: false };
+		}
+		const lines = items.map((d) => {
+			const sev = SEVERITY_LABEL[d.severity ?? 1] ?? 'error';
+			const line = (d.range.start.line ?? 0) + 1;
+			const col = (d.range.start.character ?? 0) + 1;
+			return `[${sev}] ${relPath}:${line}:${col} — ${d.message}`;
+		});
+		return { toolCallId: call.id, name: call.name, content: lines.join('\n'), isError: false };
+	} catch (e) {
+		return { toolCallId: call.id, name: call.name, content: `Diagnostics error: ${e instanceof Error ? e.message : String(e)}`, isError: true };
 	}
 }

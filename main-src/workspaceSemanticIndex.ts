@@ -290,15 +290,32 @@ export function semanticSearchChunks(query: string, topK: number): Chunk[] {
 
 /**
  * 注入到 system append 的 Markdown 块（同步；索引未就绪时返回空串）。
+ * recentPaths：最近触碰的文件相对路径列表（来自 fileStates），用于 boosting。
  */
-export function buildSemanticContextBlock(query: string, maxChunks: number): string {
+export function buildSemanticContextBlock(
+	query: string,
+	maxChunks: number,
+	recentPaths?: string[]
+): string {
 	if (getSettings().indexing?.semanticIndexEnabled === false) {
 		return '';
 	}
-	const hits = semanticSearchChunks(query, maxChunks);
-	if (hits.length === 0) {
+	const rawHits = semanticSearchChunks(query, maxChunks * 2);
+	if (rawHits.length === 0) {
 		return '';
 	}
+
+	let hits = rawHits;
+	if (recentPaths && recentPaths.length > 0) {
+		const recentSet = new Set(recentPaths.map((p) => p.replace(/\\/g, '/')));
+		// 最近触碰文件的 chunk 提升到前面，其余按原顺序
+		const boosted = rawHits.filter((c) => recentSet.has(c.relPath.replace(/\\/g, '/')));
+		const rest = rawHits.filter((c) => !recentSet.has(c.relPath.replace(/\\/g, '/')));
+		hits = [...boosted, ...rest].slice(0, maxChunks);
+	} else {
+		hits = rawHits.slice(0, maxChunks);
+	}
+
 	const body = hits
 		.map(
 			(h, i) =>

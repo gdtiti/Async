@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { ComposerMode } from './ComposerPlusMenu';
+import type { TurnTokenUsage } from './ipcTypes';
 import { useI18n } from './i18n';
 
 type Phase = 'thinking' | 'streaming' | 'done';
@@ -15,6 +16,8 @@ type Props = {
 	defaultOpen?: boolean;
 	/** 扩展思考流式正文（Anthropic 等）；不写入历史气泡 */
 	streamingThinking?: string;
+	/** 本回合 token 用量（done 阶段展示） */
+	tokenUsage?: TurnTokenUsage | null;
 };
 
 export function ComposerThoughtBlock({
@@ -24,6 +27,7 @@ export function ComposerThoughtBlock({
 	mode,
 	defaultOpen = false,
 	streamingThinking = '',
+	tokenUsage,
 }: Props) {
 	const { t } = useI18n();
 	const [open, setOpen] = useState(defaultOpen);
@@ -110,6 +114,14 @@ export function ComposerThoughtBlock({
 							</div>
 						) : null}
 						<pre className="ref-thought-panel-pre">{detailText}</pre>
+						{phase === 'done' && tokenUsage && (tokenUsage.inputTokens || tokenUsage.outputTokens) ? (
+							<div className="ref-thought-usage">
+								{t('usage.tokens', {
+									input: (tokenUsage.inputTokens ?? 0).toLocaleString(),
+									output: (tokenUsage.outputTokens ?? 0).toLocaleString(),
+								})}
+							</div>
+						) : null}
 					</div>
 				</div>
 			</div>
