@@ -8189,6 +8189,25 @@ body {
 	flex-shrink: 0;
 }
 
+/* Editor 布局右侧：Plan 问答 / 审查与 .ref-messages 同级，无其 padding，用宽度与居中与消息区左右 16px 对齐 */
+.ref-right--editor-chat .ref-plan-q {
+	width: calc(100% - 32px);
+	max-width: 720px;
+	margin-left: auto;
+	margin-right: auto;
+	margin-bottom: 12px;
+	box-sizing: border-box;
+}
+
+.ref-right--editor-chat .ref-plan-review {
+	width: calc(100% - 32px);
+	max-width: 720px;
+	margin-left: auto;
+	margin-right: auto;
+	margin-bottom: 16px;
+	box-sizing: border-box;
+}
+
 /* Editor 布局右侧：消息与输入区左右留白一致（避免气泡贴侧栏边缘） */
 .ref-right--editor-chat .ref-messages {
 	padding-left: 16px;
