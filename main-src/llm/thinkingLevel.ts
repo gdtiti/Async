@@ -38,6 +38,19 @@ export function anthropicMaxTokensWithThinking(budget: number): number {
 	return Math.min(64_000, Math.max(budget + 16_384, 24_576));
 }
 
+/**
+ * 在用户配置的输出上限与 Anthropic thinking 约束之间取合法 `max_tokens`。
+ * 若用户上限过小导致 ≤ budget，则抬到 budget+1024（仍不超过 64k），以满足 API 要求。
+ */
+export function anthropicEffectiveMaxTokens(thinkBudget: number | null, userCap: number): number {
+	const computed = thinkBudget !== null ? anthropicMaxTokensWithThinking(thinkBudget) : userCap;
+	let maxTokens = Math.min(computed, userCap);
+	if (thinkBudget !== null && maxTokens <= thinkBudget) {
+		maxTokens = Math.min(64_000, thinkBudget + 1024);
+	}
+	return maxTokens;
+}
+
 /** OpenAI Chat Completions reasoning_effort（非推理模型会忽略或报错由网关决定） */
 export function openAIReasoningEffort(level: ThinkingLevel): 'low' | 'medium' | 'high' | undefined {
 	switch (level) {

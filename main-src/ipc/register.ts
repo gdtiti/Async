@@ -28,7 +28,7 @@ import {
 } from '../threadStore.js';
 import * as gitService from '../gitService.js';
 import { parseComposerMode } from '../llm/composerMode.js';
-import { resolveChatModel, resolveThinkingLevelForSelection } from '../llm/modelResolve.js';
+import { resolveModelRequest, resolveThinkingLevelForSelection } from '../llm/modelResolve.js';
 import { streamChatUnified } from '../llm/llmRouter.js';
 import { buildWorkspaceTreeSummary, modeExpandsWorkspaceFileContext } from '../llm/workspaceContextExpand.js';
 import {
@@ -92,14 +92,9 @@ function runChatStream(
 		try {
 			const settings = getSettings();
 			const thinkingLevel = resolveThinkingLevelForSelection(settings, modelSelection);
-			const resolved = resolveChatModel(settings, modelSelection);
-			if (!resolved) {
-				send({
-					threadId,
-					type: 'error',
-					message:
-						'无法解析当前模型：请在 Models 中至少添加并启用一条模型，填写「请求名称」并选择请求范式；若选 Auto，请确保已启用列表中有可用项。',
-				});
+			const resolved = resolveModelRequest(settings, modelSelection);
+			if (!resolved.ok) {
+				send({ threadId, type: 'error', message: resolved.message });
 				return;
 			}
 
@@ -124,6 +119,9 @@ function runChatStream(
 					{
 						requestModelId: resolved.requestModelId,
 						paradigm: resolved.paradigm,
+						requestApiKey: resolved.apiKey,
+						requestBaseURL: resolved.baseURL,
+						maxOutputTokens: resolved.maxOutputTokens,
 						signal: ac.signal,
 						composerMode: mode,
 						thinkingLevel,
@@ -167,6 +165,9 @@ function runChatStream(
 					signal: ac.signal,
 					requestModelId: resolved.requestModelId,
 					paradigm: resolved.paradigm,
+					requestApiKey: resolved.apiKey,
+					requestBaseURL: resolved.baseURL,
+					maxOutputTokens: resolved.maxOutputTokens,
 					thinkingLevel,
 					...(agentSystemAppend?.trim() ? { agentSystemAppend: agentSystemAppend.trim() } : {}),
 				},

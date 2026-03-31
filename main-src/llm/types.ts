@@ -14,6 +14,12 @@ export type UnifiedChatOptions = {
 	signal: AbortSignal;
 	requestModelId: string;
 	paradigm: ModelRequestParadigm;
+	/** 本条请求实际使用的密钥（已由 modelResolve 合并全局/独立端点） */
+	requestApiKey: string;
+	/** OpenAI 兼容 / Anthropic 可选；Gemini 忽略 */
+	requestBaseURL?: string;
+	/** 单次补全输出 token 上限（已钳制） */
+	maxOutputTokens: number;
 	/** 本回合注入系统提示（Rules / Skills / Subagents / 导入规则） */
 	agentSystemAppend?: string;
 	/** 扩展思考 / reasoning 强度，默认 off */

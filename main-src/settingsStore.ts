@@ -17,6 +17,15 @@ export type UserModelEntry = {
 	/** 发给 API 的模型名 */
 	requestName: string;
 	paradigm: ModelRequestParadigm;
+	/**
+	 * 单次补全最大输出 token 上限（各范式各自映射到 API 参数）。
+	 * 未设置时在解析层使用默认（当前为 16384）；若网关上限更低请在模型高级选项中调小。
+	 */
+	maxOutputTokens?: number;
+	/** 为 true 时本条使用 customBaseURL / customApiKey，否则用全局对应范式的密钥与地址 */
+	useCustomConnection?: boolean;
+	customBaseURL?: string;
+	customApiKey?: string;
 };
 
 export type LLMProviderId = ModelRequestParadigm;

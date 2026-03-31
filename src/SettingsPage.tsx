@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
 	AUTO_MODEL_ID,
 	createEmptyUserModel,
+	DEFAULT_MODEL_MAX_OUTPUT_TOKENS,
 	type UserModelEntry,
 } from './modelCatalog';
 import { LLM_PROVIDER_OPTIONS, type ModelRequestParadigm } from './llmProvider';
@@ -199,7 +200,6 @@ export function SettingsPage({
 	const navItems = useMemo(() => navItemsForT(t), [t]);
 	const [nav, setNav] = useState<SettingsNavId>(initialNav);
 	const [search, setSearch] = useState('');
-	const [apiKeysOpen, setApiKeysOpen] = useState(true);
 	const [sidebarWidth, setSidebarWidth] = useState(() => readSettingsSidebarWidth());
 
 	const beginResizeSidebar = useCallback((e: React.MouseEvent) => {
@@ -402,17 +402,17 @@ export function SettingsPage({
 							<div className="ref-settings-panel ref-settings-panel--models">
 								<p className="ref-settings-models-hint">{t('settings.modelsHint')}</p>
 
-								<div className={`ref-settings-api-keys ${apiKeysOpen ? 'is-open' : ''}`}>
-									<button type="button" className="ref-settings-api-keys-head" onClick={() => setApiKeysOpen((o) => !o)}>
-										<span>{t('settings.apiKeys')}</span>
-										<span className="ref-settings-api-keys-chev" aria-hidden>
-											›
-										</span>
-									</button>
-									{apiKeysOpen ? (
-										<div className="ref-settings-api-keys-body">
-											<p className="ref-settings-proxy-hint">{t('settings.openaiKeyHint')}</p>
-											<label className="ref-settings-field">
+								<section className="ref-settings-global-creds" aria-labelledby="ref-settings-global-creds-title">
+									<div className="ref-settings-global-creds-head">
+										<h2 id="ref-settings-global-creds-title" className="ref-settings-global-creds-title">
+											{t('settings.modelsGlobalCredsTitle')}
+										</h2>
+										<p className="ref-settings-global-creds-lead">{t('settings.modelsGlobalCredsLead')}</p>
+									</div>
+									<div className="ref-settings-global-creds-body">
+										<div className="ref-settings-global-creds-block">
+											<p className="ref-settings-global-creds-block-hint">{t('settings.openaiKeyHint')}</p>
+											<label className="ref-settings-field ref-settings-field--compact">
 												<span>{t('settings.openaiKey')}</span>
 												<input
 													value={apiKey}
@@ -422,7 +422,7 @@ export function SettingsPage({
 													placeholder="sk-…"
 												/>
 											</label>
-											<label className="ref-settings-field">
+											<label className="ref-settings-field ref-settings-field--compact">
 												<span>{t('settings.openaiBase')}</span>
 												<input
 													value={baseURL}
@@ -430,9 +430,10 @@ export function SettingsPage({
 													placeholder={t('settings.placeholder.openaiBase')}
 												/>
 											</label>
-
-											<p className="ref-settings-proxy-hint ref-settings-api-keys-gap">{t('settings.anthropicKeyHint')}</p>
-											<label className="ref-settings-field">
+										</div>
+										<div className="ref-settings-global-creds-block">
+											<p className="ref-settings-global-creds-block-hint">{t('settings.anthropicKeyHint')}</p>
+											<label className="ref-settings-field ref-settings-field--compact">
 												<span>{t('settings.anthropicKey')}</span>
 												<input
 													value={anthropicApiKey}
@@ -442,7 +443,7 @@ export function SettingsPage({
 													placeholder="sk-ant-…"
 												/>
 											</label>
-											<label className="ref-settings-field">
+											<label className="ref-settings-field ref-settings-field--compact">
 												<span>{t('settings.anthropicBase')}</span>
 												<input
 													value={anthropicBaseURL}
@@ -450,9 +451,10 @@ export function SettingsPage({
 													placeholder={t('settings.placeholder.anthropicBase')}
 												/>
 											</label>
-
-											<p className="ref-settings-proxy-hint ref-settings-api-keys-gap">{t('settings.geminiKeyHint')}</p>
-											<label className="ref-settings-field">
+										</div>
+										<div className="ref-settings-global-creds-block">
+											<p className="ref-settings-global-creds-block-hint">{t('settings.geminiKeyHint')}</p>
+											<label className="ref-settings-field ref-settings-field--compact">
 												<span>{t('settings.geminiKey')}</span>
 												<input
 													value={geminiApiKey}
@@ -462,9 +464,10 @@ export function SettingsPage({
 													placeholder="AIza…"
 												/>
 											</label>
-
-											<p className="ref-settings-proxy-hint ref-settings-api-keys-gap">{t('settings.proxyHint')}</p>
-											<label className="ref-settings-field">
+										</div>
+										<div className="ref-settings-global-creds-block ref-settings-global-creds-block--proxy">
+											<p className="ref-settings-global-creds-block-hint">{t('settings.proxyHint')}</p>
+											<label className="ref-settings-field ref-settings-field--compact">
 												<span>{t('settings.proxy')}</span>
 												<input
 													value={proxyUrl}
@@ -474,10 +477,10 @@ export function SettingsPage({
 												/>
 											</label>
 										</div>
-									) : null}
-								</div>
+									</div>
+								</section>
 
-								<h2 className="ref-settings-subhead">{t('settings.modelCatalog')}</h2>
+								<h2 className="ref-settings-subhead ref-settings-subhead--models-catalog">{t('settings.modelCatalog')}</h2>
 								<div className="ref-settings-models-toolbar">
 									<div className="ref-settings-models-search-wrap ref-settings-models-search-wrap--grow">
 										<IconSearch className="ref-settings-models-search-ico" />
@@ -511,20 +514,31 @@ export function SettingsPage({
 									</li>
 									{filteredEntries.map((m) => {
 										const on = enabledSet.has(m.id);
+										const maxOut = m.maxOutputTokens ?? DEFAULT_MODEL_MAX_OUTPUT_TOKENS;
+										const customOn = m.useCustomConnection === true;
 										return (
-											<li key={m.id} className="ref-settings-user-model-card">
-												<div className="ref-settings-user-model-card-head">
-													<button
-														type="button"
-														className={`ref-settings-toggle ${on ? 'is-on' : ''}`}
-														role="switch"
-														aria-checked={on}
-														onClick={() => onToggleEnabled(m.id, !on)}
-														title={on ? t('settings.enabled') : t('settings.disabled')}
-													>
-														<span className="ref-settings-toggle-knob" />
-													</button>
-													<div className="ref-settings-user-model-card-actions">
+											<li key={m.id} className="ref-settings-user-model-card ref-settings-user-model-card--v2">
+												<div className="ref-settings-model-v2-head">
+													<label className="ref-settings-field ref-settings-field--compact ref-settings-model-v2-name">
+														<span>{t('settings.displayName')}</span>
+														<input
+															value={m.displayName}
+															onChange={(e) => patchEntry(m.id, { displayName: e.target.value })}
+															placeholder={t('settings.displayNamePh')}
+														/>
+													</label>
+													<div className="ref-settings-model-v2-actions">
+														<span className="ref-settings-model-v2-enable-label">{t('settings.inPicker')}</span>
+														<button
+															type="button"
+															className={`ref-settings-toggle ${on ? 'is-on' : ''}`}
+															role="switch"
+															aria-checked={on}
+															onClick={() => onToggleEnabled(m.id, !on)}
+															title={on ? t('settings.enabled') : t('settings.disabled')}
+														>
+															<span className="ref-settings-toggle-knob" />
+														</button>
 														{on ? (
 															defaultModel === m.id ? (
 																<span className="ref-settings-default-pill">{t('settings.defaultChat')}</span>
@@ -534,41 +548,106 @@ export function SettingsPage({
 																</button>
 															)
 														) : null}
-														<button type="button" className="ref-settings-remove-model" onClick={() => removeEntry(m.id)} title={t('settings.removeModel')}>
+														<button
+															type="button"
+															className="ref-settings-remove-model"
+															onClick={() => removeEntry(m.id)}
+															title={t('settings.removeModel')}
+														>
 															{t('settings.removeModel')}
 														</button>
 													</div>
 												</div>
-												<label className="ref-settings-field ref-settings-field--compact">
-													<span>{t('settings.displayName')}</span>
-													<input
-														value={m.displayName}
-														onChange={(e) => patchEntry(m.id, { displayName: e.target.value })}
-														placeholder={t('settings.displayNamePh')}
-													/>
-												</label>
-												<label className="ref-settings-field ref-settings-field--compact">
-													<span>{t('settings.requestName')}</span>
-													<input
-														value={m.requestName}
-														onChange={(e) => patchEntry(m.id, { requestName: e.target.value })}
-														placeholder={t('settings.requestNamePh')}
-													/>
-												</label>
-												<label className="ref-settings-field ref-settings-field--compact">
-													<span>{t('settings.requestParadigm')}</span>
-													<select
-														value={m.paradigm}
-														onChange={(e) => patchEntry(m.id, { paradigm: e.target.value as ModelRequestParadigm })}
-														aria-label={t('settings.paradigmAria')}
-													>
-														{LLM_PROVIDER_OPTIONS.map((o) => (
-															<option key={o.id} value={o.id}>
-																{t(`settings.paradigm.${o.id}`)}
-															</option>
-														))}
-													</select>
-												</label>
+												<div className="ref-settings-model-v2-grid">
+													<label className="ref-settings-field ref-settings-field--compact">
+														<span>{t('settings.requestName')}</span>
+														<input
+															value={m.requestName}
+															onChange={(e) => patchEntry(m.id, { requestName: e.target.value })}
+															placeholder={t('settings.requestNamePh')}
+														/>
+													</label>
+													<label className="ref-settings-field ref-settings-field--compact">
+														<span>{t('settings.requestParadigm')}</span>
+														<select
+															value={m.paradigm}
+															onChange={(e) => patchEntry(m.id, { paradigm: e.target.value as ModelRequestParadigm })}
+															aria-label={t('settings.paradigmAria')}
+														>
+															{LLM_PROVIDER_OPTIONS.map((o) => (
+																<option key={o.id} value={o.id}>
+																	{t(`settings.paradigm.${o.id}`)}
+																</option>
+															))}
+														</select>
+													</label>
+												</div>
+												<details className="ref-settings-model-advanced">
+													<summary className="ref-settings-model-advanced-summary">{t('settings.modelAdvanced')}</summary>
+													<div className="ref-settings-model-advanced-body">
+														<label className="ref-settings-field ref-settings-field--compact">
+															<span>{t('settings.maxOutputTokens')}</span>
+															<input
+																type="number"
+																min={1}
+																max={128000}
+																value={maxOut}
+																onChange={(e) => {
+																	const v = Number.parseInt(e.target.value, 10);
+																	patchEntry(m.id, {
+																		maxOutputTokens: Number.isNaN(v) ? undefined : v,
+																	});
+																}}
+															/>
+															<p className="ref-settings-proxy-hint ref-settings-field-footnote">{t('settings.maxOutputTokensHint')}</p>
+														</label>
+														<div className="ref-settings-custom-endpoint-row">
+															<div className="ref-settings-custom-endpoint-label">
+																<span className="ref-settings-custom-endpoint-title">{t('settings.useCustomConnection')}</span>
+																<p className="ref-settings-proxy-hint ref-settings-custom-endpoint-desc">{t('settings.useCustomConnectionHint')}</p>
+															</div>
+															<button
+																type="button"
+																className={`ref-settings-toggle ${customOn ? 'is-on' : ''}`}
+																role="switch"
+																aria-checked={customOn}
+																onClick={() => patchEntry(m.id, { useCustomConnection: !customOn })}
+																title={customOn ? t('settings.customOn') : t('settings.customOff')}
+															>
+																<span className="ref-settings-toggle-knob" />
+															</button>
+														</div>
+														{customOn ? (
+															<div className="ref-settings-custom-endpoint-fields">
+																{m.paradigm !== 'gemini' ? (
+																	<label className="ref-settings-field ref-settings-field--compact">
+																		<span>{t('settings.customBaseUrl')}</span>
+																		<input
+																			value={m.customBaseURL ?? ''}
+																			onChange={(e) => patchEntry(m.id, { customBaseURL: e.target.value })}
+																			placeholder={
+																				m.paradigm === 'anthropic'
+																					? t('settings.placeholder.anthropicBase')
+																					: t('settings.placeholder.openaiBase')
+																			}
+																			autoComplete="off"
+																		/>
+																	</label>
+																) : null}
+																<label className="ref-settings-field ref-settings-field--compact">
+																	<span>{t('settings.customApiKey')}</span>
+																	<input
+																		value={m.customApiKey ?? ''}
+																		onChange={(e) => patchEntry(m.id, { customApiKey: e.target.value })}
+																		type="password"
+																		autoComplete="off"
+																		placeholder={t('settings.customApiKeyPh')}
+																	/>
+																</label>
+															</div>
+														) : null}
+													</div>
+												</details>
 											</li>
 										);
 									})}

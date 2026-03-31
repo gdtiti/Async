@@ -12,13 +12,13 @@ export async function streamOpenAICompatible(
 	options: UnifiedChatOptions,
 	handlers: StreamHandlers
 ): Promise<void> {
-	const key = settings.openAI?.apiKey?.trim();
+	const key = options.requestApiKey.trim();
 	if (!key) {
-		handlers.onError('未配置 OpenAI 兼容 API Key。请在设置 → Models → API Keys 中填写。');
+		handlers.onError('未配置 OpenAI 兼容 API Key。请在设置 → 模型中填写全局密钥或该模型的独立密钥。');
 		return;
 	}
 
-	const baseURL = settings.openAI?.baseURL?.trim() || undefined;
+	const baseURL = options.requestBaseURL?.trim() || undefined;
 	const model = options.requestModelId.trim();
 	if (!model) {
 		handlers.onError('模型请求名称为空。请在 Models 中编辑该模型的「请求名称」。');
@@ -63,6 +63,7 @@ export async function streamOpenAICompatible(
 				messages: [{ role: 'system' as const, content: systemContent }, ...apiMessages],
 				stream: true,
 				temperature,
+				max_tokens: options.maxOutputTokens,
 				...(effort ? { reasoning_effort: effort } : {}),
 			},
 			{ signal: options.signal }

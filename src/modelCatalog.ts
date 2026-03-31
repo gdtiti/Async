@@ -3,11 +3,17 @@ import type { ModelRequestParadigm } from './llmProvider';
 export const AUTO_MODEL_ID = 'auto';
 
 /** 与主进程 `UserModelEntry` 对齐 */
+export const DEFAULT_MODEL_MAX_OUTPUT_TOKENS = 16384;
+
 export type UserModelEntry = {
 	id: string;
 	displayName: string;
 	requestName: string;
 	paradigm: ModelRequestParadigm;
+	maxOutputTokens?: number;
+	useCustomConnection?: boolean;
+	customBaseURL?: string;
+	customApiKey?: string;
 };
 
 export function createEmptyUserModel(): UserModelEntry {
@@ -20,6 +26,7 @@ export function createEmptyUserModel(): UserModelEntry {
 		displayName: '',
 		requestName: '',
 		paradigm: 'openai-compatible',
+		maxOutputTokens: DEFAULT_MODEL_MAX_OUTPUT_TOKENS,
 	};
 }
 

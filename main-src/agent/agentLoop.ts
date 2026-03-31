@@ -16,29 +16,27 @@ import type { ChatMessage } from '../threadStore.js';
 import type { ShellSettings, ModelRequestParadigm, ThinkingLevel } from '../settingsStore.js';
 import { composeSystem, temperatureForMode } from '../llm/modePrompts.js';
 import {
-	anthropicMaxTokensWithThinking,
+	anthropicEffectiveMaxTokens,
 	anthropicThinkingBudget,
 	openAIReasoningEffort,
 } from '../llm/thinkingLevel.js';
 import type { ComposerMode } from '../llm/composerMode.js';
 import {
-	AGENT_TOOLS,
 	agentToolsForComposerMode,
 	isReadOnlyAgentTool,
 	toOpenAITools,
 	toAnthropicTools,
 	type ToolCall,
 } from './agentTools.js';
-
-/** 执行工具前闸门；返回 proceed:false 时不调用 executeTool，结果写入对话为失败 tool_result */
-export type BeforeExecuteToolResult = { proceed: true } | { proceed: false; rejectionMessage: string };
 import { executeTool, type ToolExecutionHooks } from './toolExecutor.js';
 import type { MistakeLimitContext, MistakeLimitDecision } from './mistakeLimitGate.js';
 
 export type { MistakeLimitContext, MistakeLimitDecision } from './mistakeLimitGate.js';
 
+/** 执行工具前闸门；返回 proceed:false 时不调用 executeTool，结果写入对话为失败 tool_result */
+export type BeforeExecuteToolResult = { proceed: true } | { proceed: false; rejectionMessage: string };
+
 const MAX_ROUNDS = 25;
-const AGENT_MAX_TOKENS = 16384;
 const DEFAULT_MAX_CONSECUTIVE_MISTAKES = 5;
 
 export type ToolInputDeltaPayload = { name: string; partialJson: string; index: number };
@@ -58,6 +56,10 @@ export type AgentLoopHandlers = {
 export type AgentLoopOptions = {
 	requestModelId: string;
 	paradigm: ModelRequestParadigm;
+	/** 与 UnifiedChatOptions 一致：已由 modelResolve 解析 */
+	requestApiKey: string;
+	requestBaseURL?: string;
+	maxOutputTokens: number;
 	signal: AbortSignal;
 	/** 与主界面 Composer 模式一致；Plan 仅注册只读工具 */
 	composerMode: ComposerMode;
@@ -154,10 +156,10 @@ async function runOpenAILoop(
 	options: AgentLoopOptions,
 	handlers: AgentLoopHandlers
 ): Promise<void> {
-	const key = settings.openAI?.apiKey?.trim();
-	if (!key) { handlers.onError('未配置 OpenAI 兼容 API Key。请在设置 → Models → API Keys 中填写。'); return; }
+	const key = options.requestApiKey.trim();
+	if (!key) { handlers.onError('未配置 OpenAI 兼容 API Key。请在设置 → 模型中填写。'); return; }
 
-	const baseURL = settings.openAI?.baseURL?.trim() || undefined;
+	const baseURL = options.requestBaseURL?.trim() || undefined;
 	const model = options.requestModelId.trim();
 	if (!model) { handlers.onError('模型请求名称为空。请在 Models 中编辑该模型的「请求名称」。'); return; }
 
@@ -305,7 +307,7 @@ async function runOpenAILoop(
 					tools,
 					stream: true,
 					temperature,
-					max_tokens: AGENT_MAX_TOKENS,
+					max_tokens: options.maxOutputTokens,
 					...(effort ? { reasoning_effort: effort } : {}),
 				},
 				{ signal: options.signal }
@@ -400,10 +402,10 @@ async function runAnthropicLoop(
 	options: AgentLoopOptions,
 	handlers: AgentLoopHandlers
 ): Promise<void> {
-	const key = settings.anthropic?.apiKey?.trim();
-	if (!key) { handlers.onError('未配置 Anthropic API Key。请在设置 → Models → API Keys 中填写。'); return; }
+	const key = options.requestApiKey.trim();
+	if (!key) { handlers.onError('未配置 Anthropic API Key。请在设置 → 模型中填写。'); return; }
 
-	const baseURL = settings.anthropic?.baseURL?.trim() || undefined;
+	const baseURL = options.requestBaseURL?.trim() || undefined;
 	const client = new Anthropic({ apiKey: key, baseURL: baseURL || undefined });
 	const storedSystem = threadMessages.find((m) => m.role === 'system');
 	const system = composeSystem(storedSystem?.content, options.composerMode, options.agentSystemAppend);
@@ -542,8 +544,7 @@ async function runAnthropicLoop(
 		let currentBlockType: 'text' | 'tool_use' | 'thinking' | null = null;
 		let currentBlockIdx = -1;
 
-		const maxTokens =
-			thinkBudget !== null ? anthropicMaxTokensWithThinking(thinkBudget) : AGENT_MAX_TOKENS;
+		const maxTokens = anthropicEffectiveMaxTokens(thinkBudget, options.maxOutputTokens);
 		const thinkingParam =
 			thinkBudget !== null
 				? ({ type: 'enabled' as const, budget_tokens: thinkBudget })

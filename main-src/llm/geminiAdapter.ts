@@ -29,9 +29,9 @@ export async function streamGemini(
 	options: UnifiedChatOptions,
 	handlers: StreamHandlers
 ): Promise<void> {
-	const key = settings.gemini?.apiKey?.trim();
+	const key = options.requestApiKey.trim();
 	if (!key) {
-		handlers.onError('未配置 Google Gemini API Key。请在设置 → Models → API Keys 中填写。');
+		handlers.onError('未配置 Google Gemini API Key。请在设置 → 模型中填写全局密钥或该模型的独立密钥。');
 		return;
 	}
 
@@ -48,7 +48,7 @@ export async function streamGemini(
 	const model = genAI.getGenerativeModel({
 		model: modelId,
 		systemInstruction,
-		generationConfig: { temperature },
+		generationConfig: { temperature, maxOutputTokens: options.maxOutputTokens },
 	});
 
 	const contents = toGeminiContents(messages);

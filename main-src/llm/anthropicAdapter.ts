@@ -4,10 +4,7 @@ import type { ChatMessage } from '../threadStore.js';
 import type { ShellSettings } from '../settingsStore.js';
 import { composeSystem, temperatureForMode } from './modePrompts.js';
 import type { StreamHandlers, UnifiedChatOptions } from './types.js';
-import {
-	anthropicMaxTokensWithThinking,
-	anthropicThinkingBudget,
-} from './thinkingLevel.js';
+import { anthropicEffectiveMaxTokens, anthropicThinkingBudget } from './thinkingLevel.js';
 
 function toAnthropicMessages(messages: ChatMessage[]): MessageParam[] {
 	const nonSystem = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
@@ -38,13 +35,13 @@ export async function streamAnthropic(
 	options: UnifiedChatOptions,
 	handlers: StreamHandlers
 ): Promise<void> {
-	const key = settings.anthropic?.apiKey?.trim();
+	const key = options.requestApiKey.trim();
 	if (!key) {
-		handlers.onError('未配置 Anthropic API Key。请在设置 → Models → API Keys 中填写。');
+		handlers.onError('未配置 Anthropic API Key。请在设置 → 模型中填写全局密钥或该模型的独立密钥。');
 		return;
 	}
 
-	const baseURL = settings.anthropic?.baseURL?.trim() || undefined;
+	const baseURL = options.requestBaseURL?.trim() || undefined;
 	const client = new Anthropic({
 		apiKey: key,
 		baseURL: baseURL || undefined,
@@ -60,8 +57,7 @@ export async function streamAnthropic(
 	}
 	const temperature = temperatureForMode(options.mode);
 	const thinkBudget = anthropicThinkingBudget(options.thinkingLevel ?? 'off');
-	const maxTokens =
-		thinkBudget !== null ? anthropicMaxTokensWithThinking(thinkBudget) : 8192;
+	const maxTokens = anthropicEffectiveMaxTokens(thinkBudget, options.maxOutputTokens);
 	const thinkingParam =
 		thinkBudget !== null
 			? ({ type: 'enabled' as const, budget_tokens: thinkBudget })
