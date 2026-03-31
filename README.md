@@ -54,22 +54,24 @@ Async Shell is an open-source, AI-native desktop application: the main surface b
 
 ## Screenshots
 
+Committed as SVG so they always render on GitHub. To use real PNG captures instead, drop `async-editor-screenshot.png`, `async-agent-screenshot.png`, and `async-model-settings.png` into `docs/assets/` and point the `<img>` tags below at those filenames.
+
 ### Editor Mode
 
 <p align="center">
-  <img src="docs/assets/async-editor-screenshot.png" width="1024" alt="Async Editor Mode" />
+  <img src="docs/assets/async-editor-screenshot.svg" width="1024" alt="Async Editor Mode" />
 </p>
 
 ### Agent Mode
 
 <p align="center">
-  <img src="docs/assets/async-agent-screenshot.png" width="1024" alt="Async Agent Mode" />
+  <img src="docs/assets/async-agent-screenshot.svg" width="1024" alt="Async Agent Mode" />
 </p>
 
 ### Model Settings
 
 <p align="center">
-  <img src="docs/assets/async-model-settings.png" width="720" alt="Async Model Settings" />
+  <img src="docs/assets/async-model-settings.svg" width="720" alt="Async Model Settings" />
 </p>
 
 ---

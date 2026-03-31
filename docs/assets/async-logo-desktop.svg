@@ -19,7 +19,7 @@
 
   <!--
     Original paths are on a 24x24 grid.
-    Logo occupies roughly x=[3.5,20.5] y=[3,18.5] ? 17x15.5 units.
+    Logo occupies roughly x=[3.5,20.5] y=[3,18.5], span 17 x 15.5 units.
     We scale to 86% of 120px = 103.2px, then center.
     scale = 103.2/24 = 4.3
     offset = (120 - 24*4.3)/2 = (120 - 103.2)/2 = 8.4

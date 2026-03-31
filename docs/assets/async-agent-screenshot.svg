@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" role="img" aria-label="Async Agent mode preview">
+  <defs>
+    <linearGradient id="ag-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0a0c"/>
+      <stop offset="1" stop-color="#12121a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#ag-bg)"/>
+  <rect x="0" y="0" width="1280" height="40" fill="#0c0c0e"/>
+  <rect x="0" y="40" width="280" height="680" fill="#0e0e12" stroke="#1f2937" stroke-width="1"/>
+  <rect x="280" y="40" width="720" height="680" fill="#0b0b0f" stroke="#1f2937" stroke-width="1"/>
+  <rect x="1000" y="40" width="280" height="680" fill="#0e0e12" stroke="#1f2937" stroke-width="1"/>
+  <rect x="300" y="60" width="680" height="200" fill="#14141a" rx="8" stroke="#3b2f5c"/>
+  <rect x="316" y="280" width="648" height="12" fill="#252530" rx="2"/>
+  <rect x="316" y="304" width="600" height="8" fill="#1a1a22" rx="2"/>
+  <rect x="316" y="320" width="620" height="8" fill="#1a1a22" rx="2"/>
+  <rect x="16" y="56" width="240" height="10" fill="#252530" rx="2"/>
+  <rect x="16" y="76" width="220" height="8" fill="#1a1a22" rx="2"/>
+  <rect x="1016" y="56" width="248" height="400" fill="#111116" rx="4" stroke="#252530"/>
+  <text x="640" y="26" fill="#94a3b8" font-family="system-ui,Segoe UI,sans-serif" font-size="13" text-anchor="middle">Async  Agent</text>
+</svg>

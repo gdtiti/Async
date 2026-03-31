@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" width="960" height="640" role="img" aria-label="Async model settings preview">
+  <defs>
+    <linearGradient id="ms-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0a0c"/>
+      <stop offset="1" stop-color="#12121a"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="640" fill="url(#ms-bg)"/>
+  <rect x="0" y="0" width="960" height="40" fill="#0c0c0e"/>
+  <rect x="0" y="40" width="220" height="600" fill="#0e0e12" stroke="#1f2937" stroke-width="1"/>
+  <rect x="220" y="40" width="740" height="600" fill="#0b0b0f" stroke="#1f2937" stroke-width="1"/>
+  <rect x="240" y="60" width="680" height="36" fill="#16161c" rx="6"/>
+  <rect x="240" y="112" width="680" height="120" fill="#14141a" rx="8" stroke="#3b2f5c"/>
+  <rect x="240" y="248" width="680" height="120" fill="#14141a" rx="8" stroke="#252530"/>
+  <rect x="240" y="384" width="680" height="120" fill="#14141a" rx="8" stroke="#252530"/>
+  <rect x="16" y="60" width="180" height="10" fill="#3b2f5c" rx="2"/>
+  <rect x="16" y="88" width="160" height="8" fill="#1a1a22" rx="2"/>
+  <rect x="16" y="108" width="170" height="8" fill="#1a1a22" rx="2"/>
+  <text x="480" y="26" fill="#94a3b8" font-family="system-ui,Segoe UI,sans-serif" font-size="13" text-anchor="middle">Async  Models</text>
+</svg>
