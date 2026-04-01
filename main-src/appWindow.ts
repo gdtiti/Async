@@ -1,5 +1,6 @@
 import { BrowserWindow, app, screen } from 'electron';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const isDev = !app.isPackaged;
 const devUrl = process.env.VITE_DEV_SERVER_URL ?? 'http://127.0.0.1:5173';
@@ -14,7 +15,7 @@ export function configureAppWindowIcon(icon: string | undefined): void {
 	appIconPath = icon;
 }
 
-export function createAppWindow(): void {
+export function createAppWindow(opts?: { blank?: boolean }): void {
 	const preloadPath = path.join(__dirname, 'preload.cjs');
 	const primary = screen.getPrimaryDisplay();
 	const wa = primary.workArea;
@@ -72,11 +73,16 @@ export function createAppWindow(): void {
 	const useViteDevServer = isDev && !loadDistFlag;
 
 	if (useViteDevServer) {
-		void win.loadURL(devUrl);
+		// 开发模式：通过 URL 参数传递 blank 标志
+		const blankParam = opts?.blank ? '?blank=1' : '';
+		void win.loadURL(devUrl + blankParam);
 		if (openDevTools) {
 			win.webContents.openDevTools({ mode: 'detach' });
 		}
 	} else {
-		void win.loadFile(htmlPath);
+		// 生产模式：通过 URL 参数传递 blank 标志
+		const blankParam = opts?.blank ? '?blank=1' : '';
+		const fileUrl = pathToFileURL(htmlPath).href + blankParam;
+		void win.loadURL(fileUrl);
 	}
 }

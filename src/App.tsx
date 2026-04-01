@@ -27,7 +27,7 @@ import { AgentReviewPanel } from './AgentReviewPanel';
 import { AgentFileChangesPanel } from './AgentFileChanges';
 import {
 	assistantMessageUsesAgentToolProtocol,
-	segmentAssistantContent,
+	segmentAssistantContentUnified,
 	collectFileChanges,
 } from './agentChatSegments';
 import {
@@ -1246,8 +1246,14 @@ export default function App() {
 			try {
 				const p = (await shell.invoke('async-shell:ping')) as { ok: boolean; message: string };
 				setIpcOk(p.ok ? t('app.ipcReady', { message: p.message }) : t('app.ipcError'));
-				const w = (await shell.invoke('workspace:get')) as { root: string | null };
-				setWorkspace(w.root);
+				// 检查是否是空白窗口（新建窗口不恢复工作区）
+				const isBlankWindow =
+					typeof window !== 'undefined' &&
+					(window.location.search.includes('blank=1') || window.location.hash.includes('blank'));
+				if (!isBlankWindow) {
+					const w = (await shell.invoke('workspace:get')) as { root: string | null };
+					setWorkspace(w.root);
+				}
 				const paths = (await shell.invoke('app:getPaths')) as { home?: string };
 				if (paths.home) {
 					setHomePath(paths.home);
@@ -1482,6 +1488,18 @@ export default function App() {
 				}
 
 				const fullText = payload.text ?? '';
+				/**
+				 * 避免「先关掉 awaiting/streaming、再等 loadMessages」的一帧空窗：
+				 * 那时 displayMessages 只用 messages，而库里的助手消息尚未写入，列表会瞬间变短，
+				 * 滚动容器 scrollHeight 骤降，浏览器把 scrollTop 钳到 0，表现为跳到顶部。
+				 */
+				if (payload.threadId === currentIdRef.current) {
+					setMessages((m) => {
+						const last = m[m.length - 1];
+						if (last?.role === 'assistant' && last.content === fullText) return m;
+						return [...m, { role: 'assistant', content: fullText }];
+					});
+				}
 				const q = parseQuestions(fullText);
 				if (q) {
 					setPlanQuestion(q);
@@ -2924,7 +2942,7 @@ export default function App() {
 		if (composerMode !== 'agent') return [];
 		const lastAssistant = [...displayMessages].reverse().find((m) => m.role === 'assistant');
 		if (!lastAssistant) return [];
-		const segs = segmentAssistantContent(lastAssistant.content, { t });
+		const segs = segmentAssistantContentUnified(lastAssistant.content, { t });
 		const all = collectFileChanges(segs);
 		const afterDismiss =
 			dismissedFiles.size > 0 ? all.filter((f) => !dismissedFiles.has(f.path)) : all;

@@ -88,7 +88,7 @@ export function segmentsToWireText(segments: ComposerSegment[]): string {
 			} else if (next?.kind === 'file') {
 				out += FILE_REF_BOUNDARY;
 			}
-		} else {
+		} else if (s.kind === 'file') {
 			out += `@${s.path}`;
 			const next = segments[k + 1];
 			if (next?.kind === 'text' && next.text.length > 0 && !/^\s/u.test(next.text)) {
@@ -130,6 +130,18 @@ export function userMessageToSegments(content: string, knownPaths: string[]): Co
 	return wirePlainToSegments(content, knownPaths);
 }
 
+/** 检查字符是否为文件引用的边界字符（路径后应该跟这些字符之一才算有效引用） */
+function isFileRefBoundary(char: string | undefined): boolean {
+	if (!char) return true; // 字符串结尾是有效边界
+	const code = char.charCodeAt(0);
+	// 空白类
+	if (char === ' ' || char === '\t' || char === '\n' || char === '\r') return true;
+	// 标点符号类
+	if (code >= 0x2000 && code <= 0x200f) return true; // 各种空格和不可见字符（包括 ZWNJ \u200c）
+	if ('.,;:!?()[]{}<>\'"「」『』【】（）｛｝。，、；：！？'.includes(char)) return true;
+	return false;
+}
+
 /** 按最长路径匹配内联 `@相对路径` */
 export function wirePlainToSegments(text: string, knownPaths: string[]): ComposerSegment[] {
 	const paths = [...new Set(knownPaths.map((p) => p.replace(/\\/g, '/')))].sort((a, b) => b.length - a.length);
@@ -146,7 +158,8 @@ export function wirePlainToSegments(text: string, knownPaths: string[]): Compose
 		if (text[i] === '@' || text[i] === '\uFF03') {
 			const rest = text.slice(i + 1);
 			const hit = paths.find((p) => rest.startsWith(p));
-			if (hit) {
+			// 只有路径后面是边界字符时才认为是有效的文件引用
+			if (hit && isFileRefBoundary(rest[hit.length])) {
 				flush();
 				out.push({ id: newSegmentId(), kind: 'file', path: hit });
 				i += 1 + hit.length;

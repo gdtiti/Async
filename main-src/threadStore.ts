@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { resolveAsyncDataDir } from './dataDir.js';
+import { appendSuffixToStructuredAssistant, isStructuredAssistantMessage } from '../src/agentStructuredMessage.js';
 
 export type ChatMessage = {
 	role: 'user' | 'assistant' | 'system';
@@ -210,7 +211,9 @@ export function appendToLastAssistant(threadId: string, suffix: string): void {
 	}
 	const last = t.messages[t.messages.length - 1];
 	if (last?.role === 'assistant') {
-		last.content += suffix;
+		last.content = isStructuredAssistantMessage(last.content)
+			? appendSuffixToStructuredAssistant(last.content, suffix)
+			: last.content + suffix;
 		t.updatedAt = Date.now();
 		save();
 	}

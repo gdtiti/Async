@@ -7,7 +7,7 @@ import { AgentEditCard } from './AgentEditCard';
 import { AgentResultCard } from './AgentResultCard';
 import {
 	buildStreamingToolSegments,
-	segmentAssistantContent,
+	segmentAssistantContentUnified,
 	type AssistantSegment,
 	type StreamingToolPreview,
 } from './agentChatSegments';
@@ -51,7 +51,7 @@ export function ChatMarkdown({
 	}
 
 	const parsedSegments = dropParsedStreamingFileEditWhilePreview(
-		segmentAssistantContent(content, { t }),
+		segmentAssistantContentUnified(content, { t }),
 		streamingToolPreview != null
 	);
 	const streamingSegments = buildStreamingToolSegments(streamingToolPreview, { t });

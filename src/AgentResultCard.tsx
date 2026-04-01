@@ -1,7 +1,7 @@
 /**
  * AI 工具调用成功结果的可折叠内联卡片（search_files / read_file / list_dir / execute_command）。
  *
- * 动画：播放时固定高度 + overflow-y:auto（滚动条），逐行追加并自动滚底。
+ * 动画：播放时固定高度 + overflow-y:auto（滚动条），逐行追加并自动滚底（read_file / list_dir 不播放，直接展示全文）。
  * 播完后：read/search/命令输出用 Monaco colorize 做语法高亮（与编辑器主题一致）。
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -96,6 +96,9 @@ export function AgentResultCard({
 	onOpenFile,
 	animateLineReveal = false,
 }: Props) {
+	/** read / list_dir 结果通常行数多，不做「快速逐行列出」动画 */
+	const enableLineRevealAnim = animateLineReveal && kind !== 'read' && kind !== 'dir';
+
 	const [expanded, setExpanded] = useState(false);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const streamBodyRef = useRef<HTMLDivElement>(null);
@@ -105,7 +108,7 @@ export function AgentResultCard({
 
 	const alreadySeen = completedResultAnimSignatures.has(linesSignature);
 	const skipAnim =
-		!animateLineReveal || alreadySeen || prefersReducedMotion() || lines.length === 0;
+		!enableLineRevealAnim || alreadySeen || prefersReducedMotion() || lines.length === 0;
 
 	const [revealedCount, setRevealedCount] = useState<number>(() => (skipAnim ? lines.length : 0));
 	const [streaming, setStreaming] = useState<boolean>(() => !skipAnim && lines.length > 0);
@@ -116,7 +119,7 @@ export function AgentResultCard({
 	if (prevSigRef.current !== linesSignature) {
 		prevSigRef.current = linesSignature;
 		const skip =
-			!animateLineReveal ||
+			!enableLineRevealAnim ||
 			completedResultAnimSignatures.has(linesSignature) ||
 			prefersReducedMotion() ||
 			lines.length === 0;

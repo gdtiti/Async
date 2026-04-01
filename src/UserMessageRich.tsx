@@ -31,7 +31,7 @@ export function UserMessageRich({ segments, onFileClick }: Props) {
 					>
 						<span className="ref-inline-slash-chip-label">{CREATE_SKILL_WIRE}</span>
 					</span>
-				) : (
+				) : s.kind === 'file' ? (
 					<span
 						key={s.id}
 						role="button"
@@ -56,7 +56,7 @@ export function UserMessageRich({ segments, onFileClick }: Props) {
 						</span>
 						<span className="ref-inline-file-chip-name">{fileBasename(s.path)}</span>
 					</span>
-				)
+				) : null
 			)}
 		</span>
 	);

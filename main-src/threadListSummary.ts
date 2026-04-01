@@ -1,5 +1,6 @@
 import type { ChatMessage } from './threadStore.js';
 import { listAgentDiffChunks } from './agent/applyAgentDiffs.js';
+import { flattenAssistantTextPartsForSearch } from '../src/agentStructuredMessage.js';
 
 export type ThreadRowSummary = {
 	/** 末条为用户且其后无助手回复 → 进行中 / 草稿样式 */
@@ -44,14 +45,15 @@ export function summarizeThreadForSidebar(thread: { messages: ChatMessage[] }): 
 
 	const isAwaitingReply = last?.role === 'user';
 
-	let lastAssistantText = '';
+	let lastAssistantRaw = '';
 	for (let i = vis.length - 1; i >= 0; i--) {
 		if (vis[i]!.role === 'assistant') {
-			lastAssistantText = vis[i]!.content;
+			lastAssistantRaw = vis[i]!.content;
 			break;
 		}
 	}
 
+	const lastAssistantText = flattenAssistantTextPartsForSearch(lastAssistantRaw);
 	const chunks = lastAssistantText ? listAgentDiffChunks(lastAssistantText) : [];
 	const paths = [...new Set(chunks.map((c) => c.relPath).filter((p): p is string => !!p?.trim()))];
 
@@ -69,7 +71,7 @@ export function summarizeThreadForSidebar(thread: { messages: ChatMessage[] }): 
 	let subtitleFallback = '';
 	if (isAwaitingReply && last?.role === 'user') {
 		subtitleFallback = firstLine(last.content, 72);
-	} else if (lastAssistantText) {
+	} else if (lastAssistantRaw) {
 		const stripped = lastAssistantText.replace(/```[\s\S]*?```/g, ' ').trim();
 		subtitleFallback = firstLine(stripped, 72);
 	}

@@ -9,6 +9,11 @@
  */
 
 import type { ChatMessage } from '../threadStore.js';
+import {
+	budgetStructuredAssistantToolResults,
+	formatChatMessageForCompactionSummary,
+	isStructuredAssistantMessage,
+} from '../../src/agentStructuredMessage.js';
 import type { ShellSettings } from '../settingsStore.js';
 import type { StreamHandlers, UnifiedChatOptions } from '../llm/types.js';
 import { streamChatUnified } from '../llm/llmRouter.js';
@@ -32,6 +37,10 @@ function estimateTokens(messages: ChatMessage[]): number {
  */
 function budgetToolResults(messages: ChatMessage[], maxChars = MAX_TOOL_RESULT_CHARS): ChatMessage[] {
 	return messages.map((m) => {
+		if (m.role === 'assistant' && isStructuredAssistantMessage(m.content)) {
+			const next = budgetStructuredAssistantToolResults(m.content, maxChars);
+			return next === m.content ? m : { ...m, content: next };
+		}
 		if (!m.content.includes('<tool_result')) return m;
 		// 替换每个 <tool_result ...>...</tool_result> 块中超长的内容
 		const truncated = m.content.replace(
@@ -68,7 +77,7 @@ async function generateSummary(
 	options: UnifiedChatOptions
 ): Promise<string> {
 	const historyText = oldMessages
-		.map((m) => `[${m.role.toUpperCase()}]: ${m.content.slice(0, 4000)}`)
+		.map((m) => formatChatMessageForCompactionSummary(m.role, m.content, { maxChars: 4000, toolSnip: 900 }))
 		.join('\n\n');
 
 	const summaryMessages: ChatMessage[] = [

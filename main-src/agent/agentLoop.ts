@@ -1,6 +1,10 @@
 /**
  * 多轮 Agent 工具循环 — 核心引擎。
  *
+ * 历史中的结构化助手消息经 `structuredAssistantToApi.ts` 展开为 OpenAI/Anthropic 原生 tool 序列；
+ * 随后 `apiConversationRepair.ts` 做跨消息配对修复（孤儿 tool、缺失 tool 响应补全、Anthropic 侧孤儿 tool_result user 等），
+ * 对齐 Claude Code `messages.ts` `ensureToolResultPairing`；无法安全展开时仍回退单条 legacy XML。
+ *
  * 类似 Cursor / Claude Code 的实现方式：
  * 1. 将对话消息 + 工具定义发给 LLM
  * 2. 如果 LLM 返回工具调用 → 执行 → 把结果加入对话 → 再次调用 LLM
@@ -35,6 +39,13 @@ import { executeTool, type ToolExecutionHooks } from './toolExecutor.js';
 import { getMcpManager } from '../mcp/index.js';
 import { getMcpServerConfigs } from '../settingsStore.js';
 import { repairAgentThreadMessagesForApi } from './agentToolProtocolRepair.js';
+import { StructuredAssistantBuilder } from './structuredAssistantBuilder.js';
+import { parseAgentAssistantPayload } from '../../src/agentStructuredMessage.js';
+import { repairAnthropicToolPairing, repairOpenAIToolPairing } from './apiConversationRepair.js';
+import {
+	expandStructuredAssistantPayloadToAnthropic,
+	expandStructuredAssistantPayloadToOpenAI,
+} from './structuredAssistantToApi.js';
 import type { MistakeLimitContext, MistakeLimitDecision } from './mistakeLimitGate.js';
 import { resolveStreamTimeouts, createStreamTimeoutManager } from '../llm/streamTimeouts.js';
 
@@ -156,25 +167,6 @@ export type AgentLoopOptions = {
 	 */
 	delegateExecutionDepth?: number;
 };
-
-/**
- * 在每个工具调用/结果处插入标记以便前端渲染。
- */
-function toolCallMarker(name: string, args: Record<string, unknown>): string {
-	const safeArgs = JSON.stringify(args);
-	return `\n<tool_call tool="${name}">${safeArgs}</tool_call>\n`;
-}
-
-/** 避免正文里出现字面量 `</tool_result>` 时破坏解析（与渲染端 agentChatSegments 一致）。 */
-function escapeToolResultForMarker(raw: string): string {
-	return raw.split('</tool_result>').join('</tool\u200c_result>');
-}
-
-function toolResultMarker(name: string, result: string, success: boolean): string {
-	const truncated = result.length > 3000 ? result.slice(0, 3000) + '\n... (truncated)' : result;
-	const safe = escapeToolResultForMarker(truncated);
-	return `<tool_result tool="${name}" success="${success}">${safe}</tool_result>\n`;
-}
 
 /**
  * Some OpenAI-compatible gateways wrap the final assistant text as:
@@ -371,7 +363,16 @@ function threadToOpenAI(
 	const out: OAIMsg[] = [{ role: 'system', content: systemContent }];
 	for (const m of messages) {
 		if (m.role === 'system') continue;
-		out.push({ role: m.role as 'user' | 'assistant', content: m.content });
+		if (m.role === 'assistant') {
+			const p = parseAgentAssistantPayload(m.content);
+			if (p) {
+				out.push(...expandStructuredAssistantPayloadToOpenAI(p));
+			} else {
+				out.push({ role: 'assistant', content: m.content });
+			}
+		} else {
+			out.push({ role: 'user', content: m.content });
+		}
 	}
 	return out;
 }
@@ -410,8 +411,8 @@ async function runOpenAILoop(
 		agentToolDefsForLoop(options.composerMode, settings, options.toolPoolOverride)
 	);
 
-	const conversation: OAIMsg[] = threadToOpenAI(threadMessages, systemContent);
-	let fullContent = '';
+	const conversation: OAIMsg[] = repairOpenAIToolPairing(threadToOpenAI(threadMessages, systemContent));
+	const structured = new StructuredAssistantBuilder();
 	const effort = openAIReasoningEffort(options.thinkingLevel ?? 'off');
 	let accUsage: TurnTokenUsage | undefined;
 
@@ -436,7 +437,7 @@ async function runOpenAILoop(
 				threshold,
 			});
 			if (d.action === 'stop') {
-				handlers.onDone(fullContent);
+				handlers.onDone(structured.serialize());
 				return true;
 			}
 			if (d.action === 'continue') {
@@ -461,14 +462,13 @@ async function runOpenAILoop(
 		} catch (parseErr) {
 			const msg = `工具参数 JSON 无效：${parseErr instanceof Error ? parseErr.message : String(parseErr)}。请提供合法的 JSON。`;
 			if (mistakeLimitEnabled) consecutiveToolFailures++;
-			fullContent += toolResultMarker(tc.name, msg, false);
+			structured.pushTool(tc.id, tc.name, {}, msg, false);
 			handlers.onToolResult(tc.name, msg, false);
 			return { role: 'tool', tool_call_id: tc.id, content: msg };
 		}
 
 		const toolCall: ToolCall = { id: tc.id, name: tc.name, arguments: args };
 
-		fullContent += toolCallMarker(tc.name, args);
 		handlers.onToolCall(tc.name, args);
 		await new Promise<void>((r) => setTimeout(r, 0));
 
@@ -489,7 +489,7 @@ async function runOpenAILoop(
 		if (!gate.proceed) {
 			const msg = gate.rejectionMessage;
 			if (mistakeLimitEnabled) consecutiveToolFailures++;
-			fullContent += toolResultMarker(tc.name, msg, false);
+			structured.pushTool(tc.id, tc.name, args, msg, false);
 			handlers.onToolResult(tc.name, msg, false);
 			return { role: 'tool', tool_call_id: tc.id, content: msg };
 		}
@@ -508,7 +508,7 @@ async function runOpenAILoop(
 			}
 		}
 
-		fullContent += toolResultMarker(tc.name, result.content, !result.isError);
+		structured.pushTool(tc.id, tc.name, args, result.content, !result.isError);
 		handlers.onToolResult(tc.name, result.content, !result.isError);
 
 		return { role: 'tool', tool_call_id: tc.id, content: result.content };
@@ -640,8 +640,8 @@ async function runOpenAILoop(
 			if (roundSignal.aborted && !options.signal.aborted) {
 				// 超时中止：保留已生成内容，以 onDone 结束而非 onError 丢弃
 				const partialText = unwrapAssistantContentEnvelope(turnText);
-				fullContent += partialText;
-				handlers.onDone(fullContent, accUsage);
+				structured.appendText(partialText);
+				handlers.onDone(structured.serialize(), accUsage);
 				return;
 			}
 			synthesizeMissingOpenAIToolResults(conversation, turnToolCalls, e instanceof Error ? e.message : String(e));
@@ -658,7 +658,7 @@ async function runOpenAILoop(
 		}
 
 		turnText = unwrapAssistantContentEnvelope(turnText);
-		fullContent += turnText;
+		structured.appendText(turnText);
 
 		if (turnToolCalls.length === 0 || turnToolCalls.every((tc) => !tc.name)) {
 			// 检测 max_output_tokens 截断，尝试自动续写
@@ -700,13 +700,14 @@ async function runOpenAILoop(
 
 		if (maxRounds != null && round === maxRounds - 1) {
 			console.warn(`[AgentLoop] max tool rounds (${maxRounds}) exhausted — ending loop`);
-			fullContent += `\n\n---\n⚠ 已达到单次对话最大工具轮次 (${maxRounds})，自动停止。请发送新消息继续。`;
-			handlers.onTextDelta(`\n\n---\n⚠ 已达到单次对话最大工具轮次 (${maxRounds})，自动停止。请发送新消息继续。`);
+			const warn = `\n\n---\n⚠ 已达到单次对话最大工具轮次 (${maxRounds})，自动停止。请发送新消息继续。`;
+			structured.appendText(warn);
+			handlers.onTextDelta(warn);
 		}
 	}
 
 	console.log(`[AgentLoop] OpenAI loop ended — calling onDone`);
-	handlers.onDone(fullContent, accUsage);
+	handlers.onDone(structured.serialize(), accUsage);
 }
 
 // ─── Anthropic agent loop ───────────────────────────────────────────────────
@@ -714,19 +715,38 @@ async function runOpenAILoop(
 function threadToAnthropic(messages: ChatMessage[]): MessageParam[] {
 	const nonSystem = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
 	const out: MessageParam[] = [];
-	let buf = '';
-	let lastRole: 'user' | 'assistant' | null = null;
+	let mergeBuf = '';
+	let mergeRole: 'user' | 'assistant' | null = null;
+
+	const flushMerge = () => {
+		if (mergeRole !== null && mergeBuf !== '') {
+			out.push({ role: mergeRole, content: mergeBuf });
+		}
+		mergeBuf = '';
+		mergeRole = null;
+	};
+
 	for (const m of nonSystem) {
+		if (m.role === 'assistant') {
+			const p = parseAgentAssistantPayload(m.content);
+			if (p) {
+				flushMerge();
+				out.push(...expandStructuredAssistantPayloadToAnthropic(p));
+				continue;
+			}
+		}
+
 		const role = m.role as 'user' | 'assistant';
-		if (lastRole === role) {
-			buf += (buf ? '\n\n' : '') + m.content;
+		const piece = m.content;
+		if (mergeRole === role) {
+			mergeBuf += (mergeBuf ? '\n\n' : '') + piece;
 		} else {
-			if (lastRole && buf) out.push({ role: lastRole, content: buf });
-			buf = m.content;
-			lastRole = role;
+			flushMerge();
+			mergeBuf = piece;
+			mergeRole = role;
 		}
 	}
-	if (lastRole && buf) out.push({ role: lastRole, content: buf });
+	flushMerge();
 	return out;
 }
 
@@ -751,13 +771,13 @@ async function runAnthropicLoop(
 	if (!model) { handlers.onError('模型请求名称为空。'); return; }
 	const temperature = temperatureForMode(options.composerMode);
 
-	const conversation: MessageParam[] = threadToAnthropic(threadMessages);
+	const conversation: MessageParam[] = repairAnthropicToolPairing(threadToAnthropic(threadMessages));
 	if (conversation.length === 0) { handlers.onError('没有可发送的对话消息。'); return; }
 
 	const tools = toAnthropicTools(
 		agentToolDefsForLoop(options.composerMode, settings, options.toolPoolOverride)
 	);
-	let fullContent = '';
+	const structured = new StructuredAssistantBuilder();
 	const thinkBudget = anthropicThinkingBudget(options.thinkingLevel ?? 'off');
 	let accUsage: TurnTokenUsage | undefined;
 
@@ -780,7 +800,7 @@ async function runAnthropicLoop(
 				threshold,
 			});
 			if (d.action === 'stop') {
-				handlers.onDone(fullContent);
+				handlers.onDone(structured.serialize());
 				return true;
 			}
 			if (d.action === 'continue') {
@@ -805,14 +825,13 @@ async function runAnthropicLoop(
 		} catch (parseErr) {
 			const msg = `工具参数 JSON 无效：${parseErr instanceof Error ? parseErr.message : String(parseErr)}。请提供合法的 JSON。`;
 			if (mistakeLimitEnabled) consecutiveToolFailures++;
-			fullContent += toolResultMarker(tu.name, msg, false);
+			structured.pushTool(tu.id, tu.name, {}, msg, false);
 			handlers.onToolResult(tu.name, msg, false);
 			return { type: 'tool_result', tool_use_id: tu.id, content: msg, is_error: true };
 		}
 
 		const toolCall: ToolCall = { id: tu.id, name: tu.name, arguments: args };
 
-		fullContent += toolCallMarker(tu.name, args);
 		handlers.onToolCall(tu.name, args);
 		await new Promise<void>((r) => setTimeout(r, 0));
 
@@ -833,7 +852,7 @@ async function runAnthropicLoop(
 		if (!gate.proceed) {
 			const msg = gate.rejectionMessage;
 			if (mistakeLimitEnabled) consecutiveToolFailures++;
-			fullContent += toolResultMarker(tu.name, msg, false);
+			structured.pushTool(tu.id, tu.name, args, msg, false);
 			handlers.onToolResult(tu.name, msg, false);
 			return { type: 'tool_result', tool_use_id: tu.id, content: msg, is_error: true };
 		}
@@ -852,7 +871,7 @@ async function runAnthropicLoop(
 			}
 		}
 
-		fullContent += toolResultMarker(tu.name, result.content, !result.isError);
+		structured.pushTool(tu.id, tu.name, args, result.content, !result.isError);
 		handlers.onToolResult(tu.name, result.content, !result.isError);
 
 		return {
@@ -1010,8 +1029,8 @@ async function runAnthropicLoop(
 			if (roundSignalA.aborted && !options.signal.aborted) {
 				// 超时中止：保留已生成内容，以 onDone 结束而非 onError 丢弃
 				const partialTextA = unwrapAssistantContentEnvelope(turnText);
-				fullContent += partialTextA;
-				handlers.onDone(fullContent, accUsage);
+				structured.appendText(partialTextA);
+				handlers.onDone(structured.serialize(), accUsage);
 				return;
 			}
 			synthesizeMissingAnthropicToolResults(conversation, turnToolUses, e instanceof Error ? e.message : String(e));
@@ -1028,7 +1047,7 @@ async function runAnthropicLoop(
 		}
 
 		turnText = unwrapAssistantContentEnvelope(turnText);
-		fullContent += turnText;
+		structured.appendText(turnText);
 
 		if (turnToolUses.length === 0) {
 			// 检测 max_tokens 截断，尝试自动续写
@@ -1077,11 +1096,12 @@ async function runAnthropicLoop(
 
 		if (maxRoundsA != null && round === maxRoundsA - 1) {
 			console.warn(`[AgentLoop/A] max tool rounds (${maxRoundsA}) exhausted — ending loop`);
-			fullContent += `\n\n---\n⚠ 已达到单次对话最大工具轮次 (${maxRoundsA})，自动停止。请发送新消息继续。`;
-			handlers.onTextDelta(`\n\n---\n⚠ 已达到单次对话最大工具轮次 (${maxRoundsA})，自动停止。请发送新消息继续。`);
+			const warnA = `\n\n---\n⚠ 已达到单次对话最大工具轮次 (${maxRoundsA})，自动停止。请发送新消息继续。`;
+			structured.appendText(warnA);
+			handlers.onTextDelta(warnA);
 		}
 	}
 
 	console.log(`[AgentLoop/A] Anthropic loop ended — calling onDone`);
-	handlers.onDone(fullContent, accUsage);
+	handlers.onDone(structured.serialize(), accUsage);
 }

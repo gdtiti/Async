@@ -1,13 +1,17 @@
 /**
- * 借鉴 Claude Code `ensureToolResultPairing` 思路：在把对话发给 LLM 之前，
- * 修复助手正文里「孤儿」`<tool_result>`（没有按 FIFO 与前置 `<tool_call>` 配对），
- * 避免模型看到畸形协议或历史损坏内容。
+ * 借鉴 Claude Code `ensureToolResultPairing` 思路：在把对话发给 LLM 之前做磁盘侧修复。
  *
- * 本应用用 XML 片段嵌入 assistant.content，配对规则：按出现顺序，每个 tool_result
- * 必须消费队列中最早一个尚未配对的同名 tool_call（与主进程 flush 工具顺序一致）。
+ * - **Legacy XML**：移除无法按 FIFO 与 `<tool_call>` 配对的孤儿 `<tool_result>`。
+ * - **结构化 JSON**：对重复 `toolUseId` 去重（对齐 CC 对重复 tool_use id 的防御）。
+ *
+ * 消息展开为 OpenAI/Anthropic 原生 tool 序列后的跨消息配对（孤儿 tool、缺结果补全等）
+ * 由 `apiConversationRepair.ts` 在 `agentLoop` 内处理。
+ *
+ * @see D:/WebstormProjects/claude-code/claude-code-2.1.88/src/utils/messages.ts ensureToolResultPairing
  */
 
 import type { ChatMessage } from '../threadStore.js';
+import { dedupeStructuredAssistantToolUseIds, isStructuredAssistantMessage } from '../../src/agentStructuredMessage.js';
 
 const TOOL_CALL_OPEN = '<tool_call tool="';
 const TOOL_RESULT_OPEN = '<tool_result tool="';
@@ -186,6 +190,10 @@ export function stripOrphanToolResultsFromAssistantContent(content: string): str
 export function repairAgentThreadMessagesForApi(messages: ChatMessage[]): ChatMessage[] {
 	return messages.map((m) => {
 		if (m.role !== 'assistant') return m;
+		if (isStructuredAssistantMessage(m.content)) {
+			const deduped = dedupeStructuredAssistantToolUseIds(m.content);
+			return deduped === m.content ? m : { ...m, content: deduped };
+		}
 		const next = stripOrphanToolResultsFromAssistantContent(m.content);
 		return next === m.content ? m : { ...m, content: next };
 	});

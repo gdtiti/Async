@@ -1,4 +1,9 @@
 import { defaultT, type TFunction } from './i18n';
+import {
+	isStructuredAssistantMessage,
+	parseAgentAssistantPayload,
+	structuredToLegacyAgentXml,
+} from './agentStructuredMessage';
 
 /**
  * 将助手消息拆成 Markdown / 活动行 / 内联文件编辑卡片（Cursor 风格）。
@@ -504,6 +509,7 @@ function findAllToolResultBlocks(
 /** 助手气泡是否含本应用序列化的 Agent 工具协议（用于从历史记录恢复时仍渲染工具卡片）。 */
 export function assistantMessageUsesAgentToolProtocol(content: string): boolean {
 	return (
+		isStructuredAssistantMessage(content) ||
 		content.includes(TOOL_CALL_OPEN) ||
 		content.includes('<tool_result tool="') ||
 		content.includes(PLAN_OPEN_1) ||
@@ -1256,6 +1262,28 @@ function segmentAssistantContentCore(content: string, t: TFunction): AssistantSe
 export function segmentAssistantContent(content: string, options?: SegmentAssistantOptions): AssistantSegment[] {
 	const t = options?.t ?? defaultT;
 	return expandSubAgentsInSegments(segmentAssistantContentCore(content, t));
+}
+
+/**
+ * 助手正文：优先解析结构化 JSON（Agent 落盘格式），否则走内嵌 XML 协议解析。
+ * 渲染结果与旧版 XML 路径一致，保持 UI 观感不变。
+ */
+export function segmentAssistantContentUnified(content: string, options?: SegmentAssistantOptions): AssistantSegment[] {
+	const t = options?.t ?? defaultT;
+	const p = parseAgentAssistantPayload(content);
+	if (p) {
+		const merged: AssistantSegment[] = [];
+		for (const part of p.parts) {
+			if (part.type === 'text') {
+				if (part.text) merged.push(...segmentAssistantContentCore(part.text, t));
+			} else {
+				const mini = structuredToLegacyAgentXml({ _asyncAssistant: 1, v: 1, parts: [part] });
+				merged.push(...extractToolSegments(mini, t).segments);
+			}
+		}
+		return expandSubAgentsInSegments(groupActivities(mergeAdjacentMarkdown(merged)));
+	}
+	return segmentAssistantContent(content, options);
 }
 
 function mergeAdjacentMarkdown(segs: AssistantSegment[]): AssistantSegment[] {

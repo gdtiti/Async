@@ -43,6 +43,7 @@ import {
 	type ThreadPlan,
 } from '../threadStore.js';
 import { compressForSend } from '../agent/conversationCompress.js';
+import { flattenAssistantTextPartsForSearch } from '../../src/agentStructuredMessage.js';
 import * as gitService from '../gitService.js';
 import { parseComposerMode } from '../llm/composerMode.js';
 import { resolveModelRequest, resolveThinkingLevelForSelection } from '../llm/modelResolve.js';
@@ -288,7 +289,7 @@ function runChatStream(
 					updateLastAssistant(threadId, full);
 					accumulateTokenUsage(threadId, usage?.inputTokens, usage?.outputTokens);
 					if (mode === 'agent') {
-						const listed = listAgentDiffChunks(full);
+						const listed = listAgentDiffChunks(flattenAssistantTextPartsForSearch(full));
 						if (listed.length > 0) {
 							send({
 								threadId,
@@ -454,7 +455,7 @@ export function registerIpc(): void {
 	});
 
 	ipcMain.handle('app:newWindow', () => {
-		createAppWindow();
+		createAppWindow({ blank: true });
 		return { ok: true as const };
 	});
 
