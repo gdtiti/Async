@@ -14,6 +14,7 @@ import {
 	type StreamingToolPreview,
 } from './agentChatSegments';
 import { useI18n } from './i18n';
+import { liveBlocksToAssistantSegments, type LiveAgentBlocksState } from './liveAgentBlocks';
 
 /** 有 tool_input_delta 预览时，解析层也会生成 isStreaming 的 file_edit，避免与预览重复且保证预览优先显示 */
 function dropParsedStreamingFileEditWhilePreview(
@@ -33,6 +34,8 @@ type Props = {
 	onRunCommand?: (cmd: string) => void;
 	streamingToolPreview?: StreamingToolPreview | null;
 	showAgentWorking?: boolean;
+	/** 实时回合块状态；与 showAgentWorking 同时为真且 blocks 非空时，优先走块渲染，避免整段 content 重解析 */
+	liveAgentBlocksState?: LiveAgentBlocksState | null;
 };
 
 export function ChatMarkdown({
@@ -44,8 +47,15 @@ export function ChatMarkdown({
 	onRunCommand,
 	streamingToolPreview,
 	showAgentWorking = false,
+	liveAgentBlocksState = null,
 }: Props) {
 	const { t } = useI18n();
+
+	const useLiveBlockRender =
+		agentUi &&
+		showAgentWorking &&
+		liveAgentBlocksState != null &&
+		liveAgentBlocksState.blocks.length > 0;
 
 	/**
 	 * 将 content 解析与 streamingToolPreview 拆开：
@@ -55,12 +65,28 @@ export function ChatMarkdown({
 	 *
 	 * 无流式 tool 预览时对正文使用 useDeferredValue，把重解析推迟到浏览器空闲，
 	 * 避免多工具结果同时落盘时连续重算阻塞交互。
+	 *
+	 * Live blocks 主路径下不再对整段 content 做 segmentAssistantContentUnified，也不合并 streamingToolPreview（块内已含）。
 	 */
 	const deferredContent = useDeferredValue(content);
-	const parseInput = streamingToolPreview != null ? content : deferredContent;
+	const parseInput =
+		useLiveBlockRender ? content : streamingToolPreview != null ? content : deferredContent;
 	const parsedSegments = useMemo(() => {
 		if (!agentUi) return [] as AssistantSegment[];
 		const t0 = performance.now();
+		if (useLiveBlockRender && liveAgentBlocksState) {
+			const result = liveBlocksToAssistantSegments(liveAgentBlocksState.blocks, t);
+			if (import.meta.env.DEV) {
+				const elapsed = performance.now() - t0;
+				if (elapsed > 8) {
+					// eslint-disable-next-line no-console
+					console.log(
+						`[ChatMarkdown] parsedSegments (live blocks): ${elapsed.toFixed(1)}ms, blocks=${liveAgentBlocksState.blocks.length}, segs=${result.length}`
+					);
+				}
+			}
+			return result;
+		}
 		const result = segmentAssistantContentUnified(parseInput, { t, planUi });
 		if (import.meta.env.DEV) {
 			const elapsed = performance.now() - t0;
@@ -72,7 +98,7 @@ export function ChatMarkdown({
 			}
 		}
 		return result;
-	}, [agentUi, parseInput, t, planUi]);
+	}, [agentUi, useLiveBlockRender, liveAgentBlocksState, parseInput, t, planUi]);
 
 	const renderSegments = useMemo(() => {
 		if (!agentUi) {
@@ -80,9 +106,11 @@ export function ChatMarkdown({
 		}
 		const filtered = dropParsedStreamingFileEditWhilePreview(
 			parsedSegments,
-			streamingToolPreview != null
+			!useLiveBlockRender && streamingToolPreview != null
 		);
-		const streamingSegments = buildStreamingToolSegments(streamingToolPreview, { t });
+		const streamingSegments = useLiveBlockRender
+			? ([] as AssistantSegment[])
+			: buildStreamingToolSegments(streamingToolPreview, { t });
 		const segs: AssistantSegment[] = [...filtered, ...streamingSegments];
 		const hasPendingTail =
 			segs.some((s) => s.type === 'activity' && s.status === 'pending') ||
@@ -95,7 +123,7 @@ export function ChatMarkdown({
 			});
 		}
 		return segs;
-	}, [agentUi, parsedSegments, t, streamingToolPreview, showAgentWorking]);
+	}, [agentUi, parsedSegments, t, streamingToolPreview, showAgentWorking, useLiveBlockRender]);
 
 	if (!agentUi) {
 		return (

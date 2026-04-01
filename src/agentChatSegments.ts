@@ -1292,6 +1292,30 @@ function extractToolSegments(content: string, t: TFunction): { segments: Assista
 	return { segments: done, hasTools: true };
 }
 
+/** 仅 tool_call、尚无 tool_result：用于「工具执行中」活动行（pending） */
+export function segmentsFromPendingToolCall(name: string, argsJson: string, t: TFunction): AssistantSegment[] {
+	const wire = `\n<tool_call tool="${name}">${argsJson}</tool_call>\n`;
+	return extractToolSegments(wire, t).segments;
+}
+
+/** 单轮已闭合 tool_call + tool_result，与整段协议解析结果一致 */
+export function segmentsFromClosedToolRound(
+	name: string,
+	argsJson: string,
+	result: string,
+	success: boolean,
+	t: TFunction
+): AssistantSegment[] {
+	const safe = result.split('</tool_result>').join('</tool\u200c_result>');
+	const wire = `\n<tool_call tool="${name}">${argsJson}</tool_call>\n<tool_result tool="${name}" success="${success ? 'true' : 'false'}">${safe}</tool_result>\n`;
+	return extractToolSegments(wire, t).segments;
+}
+
+/** 合并相邻 markdown 并折叠 activity_group，供 live blocks 与解析结果共用 */
+export function finalizeAssistantSegmentsForRender(segments: AssistantSegment[]): AssistantSegment[] {
+	return groupActivities(mergeAdjacentMarkdown(segments));
+}
+
 function countLines(s: string): number {
 	if (!s) return 0;
 	return s.split('\n').length;

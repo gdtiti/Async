@@ -23,6 +23,11 @@ import {
 	type ThinkingLevel,
 	type TurnTokenUsage,
 } from './ipcTypes';
+import {
+	applyLiveAgentChatPayload,
+	createEmptyLiveAgentBlocks,
+	type LiveAgentBlocksState,
+} from './liveAgentBlocks';
 import { AgentReviewPanel } from './AgentReviewPanel';
 import { AgentFileChangesPanel } from './AgentFileChanges';
 import {
@@ -718,6 +723,12 @@ export default function App() {
 		index: number;
 	} | null>(null);
 	const streamingToolPreviewClearTimerRef = useRef<number | null>(null);
+	const [liveAssistantBlocks, setLiveAssistantBlocks] = useState<LiveAgentBlocksState>(() =>
+		createEmptyLiveAgentBlocks()
+	);
+	const resetLiveAgentBlocks = useCallback(() => {
+		setLiveAssistantBlocks(createEmptyLiveAgentBlocks());
+	}, []);
 	const [toolApprovalRequest, setToolApprovalRequest] = useState<{
 		approvalId: string;
 		toolName: string;
@@ -1136,6 +1147,7 @@ export default function App() {
 			setStreaming('');
 			setStreamingThinking('');
 			clearStreamingToolPreviewNow();
+			resetLiveAgentBlocks();
 			setWorkedSeconds(null);
 			firstTokenAtRef.current = null;
 			streamStartedAtRef.current = Date.now();
@@ -1171,6 +1183,7 @@ export default function App() {
 			loadMessages,
 			clearAgentReviewForThread,
 			clearStreamingToolPreviewNow,
+			resetLiveAgentBlocks,
 			refreshThreads,
 		]
 	);
@@ -1362,6 +1375,7 @@ export default function App() {
 			if (payload.threadId !== streamThreadRef.current) {
 				return;
 			}
+			const trackLiveBlocks = composerMode === 'agent' || composerMode === 'plan';
 			if (payload.type === 'delta') {
 				setStreaming((s) => {
 					if (payload.parentToolCallId) {
@@ -1375,6 +1389,16 @@ export default function App() {
 					}
 					return s + payload.text;
 				});
+				if (trackLiveBlocks) {
+					setLiveAssistantBlocks((st) =>
+						applyLiveAgentChatPayload(st, {
+							type: 'delta',
+							text: payload.text,
+							parentToolCallId: payload.parentToolCallId,
+							nestingDepth: payload.nestingDepth,
+						})
+					);
+				}
 			} else if (payload.type === 'tool_input_delta') {
 				if (payload.parentToolCallId) {
 					// 嵌套工具参数流式预览易与主线程混淆，仅写入正文标记
@@ -1383,12 +1407,21 @@ export default function App() {
 						window.clearTimeout(streamingToolPreviewClearTimerRef.current);
 						streamingToolPreviewClearTimerRef.current = null;
 					}
-					console.log(`[UI] tool_input_delta: name=${payload.name}, jsonLen=${payload.partialJson.length}`);
 					setStreamingToolPreview({
 						name: payload.name,
 						partialJson: payload.partialJson,
 						index: payload.index,
 					});
+					if (trackLiveBlocks) {
+						setLiveAssistantBlocks((st) =>
+							applyLiveAgentChatPayload(st, {
+								type: 'tool_input_delta',
+								name: payload.name,
+								partialJson: payload.partialJson,
+								index: payload.index,
+							})
+						);
+					}
 				}
 			} else if (payload.type === 'thinking_delta') {
 				const parentToolCallId = payload.parentToolCallId;
@@ -1399,6 +1432,16 @@ export default function App() {
 						const d = payload.nestingDepth ?? 1;
 						return `${s}<sub_agent_thinking parent="${p}" depth="${d}">${inner}</sub_agent_thinking>`;
 					});
+					if (trackLiveBlocks) {
+						setLiveAssistantBlocks((st) =>
+							applyLiveAgentChatPayload(st, {
+								type: 'thinking_delta',
+								text: payload.text,
+								parentToolCallId,
+								nestingDepth: payload.nestingDepth,
+							})
+						);
+					}
 				} else {
 					setStreamingThinking((s) => s + payload.text);
 				}
@@ -1408,7 +1451,6 @@ export default function App() {
 						window.clearTimeout(streamingToolPreviewClearTimerRef.current);
 						streamingToolPreviewClearTimerRef.current = null;
 					}
-					console.log(`[UI] tool_call: name=${payload.name}`);
 					// 不在此处清除 streamingToolPreview：
 					// tool_call 与最后一帧 tool_input_delta 可能被 React 18 自动批量更新合并，
 					// 导致流式预览帧从未渲染（卡片直到 tool_result 后才出现）。
@@ -1421,6 +1463,16 @@ export default function App() {
 						: '';
 				const marker = `\n<tool_call tool="${payload.name}"${nest}>${payload.args}</tool_call>\n`;
 				setStreaming((s) => s + marker);
+				if (trackLiveBlocks && !payload.parentToolCallId) {
+					setLiveAssistantBlocks((st) =>
+						applyLiveAgentChatPayload(st, {
+							type: 'tool_call',
+							name: payload.name,
+							args: payload.args,
+							toolCallId: payload.toolCallId,
+						})
+					);
+				}
 			} else if (payload.type === 'tool_result') {
 				if (!payload.parentToolCallId) {
 					setStreamingToolPreview(null);
@@ -1429,6 +1481,28 @@ export default function App() {
 				const safe = truncated.split('</tool_result>').join('</tool\u200c_result>');
 				const marker = `<tool_result tool="${payload.name}" success="${payload.success}">${safe}</tool_result>\n`;
 				setStreaming((s) => s + marker);
+				if (trackLiveBlocks && !payload.parentToolCallId) {
+					setLiveAssistantBlocks((st) =>
+						applyLiveAgentChatPayload(st, {
+							type: 'tool_result',
+							name: payload.name,
+							result: truncated,
+							success: payload.success,
+							toolCallId: payload.toolCallId,
+						})
+					);
+				}
+			} else if (payload.type === 'tool_progress') {
+				if (trackLiveBlocks && !payload.parentToolCallId) {
+					setLiveAssistantBlocks((st) =>
+						applyLiveAgentChatPayload(st, {
+							type: 'tool_progress',
+							name: payload.name,
+							phase: payload.phase,
+							detail: payload.detail,
+						})
+					);
+				}
 			} else if (payload.type === 'tool_approval_request') {
 				setToolApprovalRequest({
 					approvalId: payload.approvalId,
@@ -1490,6 +1564,7 @@ export default function App() {
 				setMistakeLimitRequest(null);
 				setPlanQuestionRequestId(null);
 				clearStreamingToolPreviewNow();
+				resetLiveAgentBlocks();
 				setFileChangesDismissed(false);
 				setDismissedFiles(new Set());
 				/* 新一轮助手回复落库前，勿让旧 persist 在 loadMessages 空窗期把面板状态粘回去 */
@@ -1581,6 +1656,7 @@ export default function App() {
 				setMistakeLimitRequest(null);
 				setPlanQuestionRequestId(null);
 				clearStreamingToolPreviewNow();
+				resetLiveAgentBlocks();
 				setMessages((m) => [
 					...m,
 					{ role: 'assistant', content: t('app.errorPrefix', { message: translateChatError(payload.message, t) }) },
@@ -1589,7 +1665,7 @@ export default function App() {
 			}
 		});
 		return () => unsub();
-	}, [shell, loadMessages, refreshThreads, clearStreamingToolPreviewNow, t]);
+	}, [shell, loadMessages, refreshThreads, clearStreamingToolPreviewNow, resetLiveAgentBlocks, t, composerMode]);
 
 	useEffect(() => {
 		if (!workspace || !shell) {
@@ -1766,6 +1842,7 @@ export default function App() {
 		setStreaming('');
 		setStreamingThinking('');
 		clearStreamingToolPreviewNow();
+		resetLiveAgentBlocks();
 		streamStartedAtRef.current = null;
 		firstTokenAtRef.current = null;
 		await loadMessages(r.id);
@@ -1800,6 +1877,7 @@ export default function App() {
 		setStreaming('');
 		setStreamingThinking('');
 		clearStreamingToolPreviewNow();
+		resetLiveAgentBlocks();
 		streamStartedAtRef.current = null;
 		firstTokenAtRef.current = null;
 		setResendFromUserIndex(null);
@@ -1855,6 +1933,7 @@ export default function App() {
 				setStreaming('');
 				setStreamingThinking('');
 				clearStreamingToolPreviewNow();
+				resetLiveAgentBlocks();
 				streamStartedAtRef.current = null;
 				firstTokenAtRef.current = null;
 			}
@@ -1863,6 +1942,7 @@ export default function App() {
 				setMessages([]);
 				setMessagesThreadId(null);
 				setStreaming('');
+				resetLiveAgentBlocks();
 				setComposerSegments([]);
 				setInlineResendSegments([]);
 				setResendFromUserIndex(null);
@@ -1872,7 +1952,7 @@ export default function App() {
 			planQuestionDismissedByThreadRef.current.delete(id);
 			await refreshThreads();
 		},
-		[shell, currentId, awaitingReply, refreshThreads, clearStreamingToolPreviewNow]
+		[shell, currentId, awaitingReply, refreshThreads, clearStreamingToolPreviewNow, resetLiveAgentBlocks]
 	);
 
 	const onDeleteThread = useCallback(
@@ -1964,6 +2044,7 @@ export default function App() {
 		setStreaming('');
 		setStreamingThinking('');
 		clearStreamingToolPreviewNow();
+		resetLiveAgentBlocks();
 		setWorkedSeconds(null);
 		firstTokenAtRef.current = null;
 		streamStartedAtRef.current = Date.now();
@@ -2008,6 +2089,7 @@ export default function App() {
 		await shell.invoke('chat:abort', currentId);
 		// Let the 'done' event from backend finalize the state
 		clearStreamingToolPreviewNow();
+		resetLiveAgentBlocks();
 		setAwaitingReply(false);
 	};
 
@@ -3634,15 +3716,24 @@ export default function App() {
 			const stAt = streamStartedAtRef.current;
 			const ftAt = firstTokenAtRef.current;
 			const showLiveThought = isLast && m.role === 'assistant' && awaitingReply;
+			const agentOrPlanStreaming =
+				(composerMode === 'agent' || composerMode === 'plan') && awaitingReply && isLast;
 			const frozenSec =
 				!awaitingReply && isLast && m.role === 'assistant' && currentId
 					? thoughtSecondsByThread[currentId]
 					: undefined;
 
 			let thoughtBlock: ReactNode = null;
+			/** 仅首 token / 工具流式前把思考条放在正文上方；一旦有正文、工具参数流或块状态则移到正文下方，更接近 Cursor 穿插阅读顺序 */
+			let thoughtAfterBody = false;
 			if (showLiveThought && stAt) {
 				void thinkingTick;
-				const phase = streaming.length === 0 ? 'thinking' : 'streaming';
+				const assistantTurnHasOutput =
+					streaming.trim().length > 0 ||
+					streamingToolPreview != null ||
+					(agentOrPlanStreaming && liveAssistantBlocks.blocks.length > 0);
+				const phase = assistantTurnHasOutput ? 'streaming' : 'thinking';
+				thoughtAfterBody = assistantTurnHasOutput;
 				const elapsed =
 					phase === 'thinking'
 						? Math.max(0, (Date.now() - stAt) / 1000)
@@ -3658,6 +3749,7 @@ export default function App() {
 					/>
 				);
 			} else if (frozenSec != null) {
+				thoughtAfterBody = true;
 				thoughtBlock = (
 					<ComposerThoughtBlock
 						phase="done"
@@ -3674,7 +3766,8 @@ export default function App() {
 				m.content.trim() === '' &&
 				awaitingReply &&
 				isLast &&
-				streamingToolPreview == null;
+				streamingToolPreview == null &&
+				!(agentOrPlanStreaming && liveAssistantBlocks.blocks.length > 0);
 
 			const userMessageIndex = i < messages.length && m.role === 'user' ? i : -1;
 			const isEditingThisUser = userMessageIndex >= 0 && resendFromUserIndex === userMessageIndex;
@@ -3741,7 +3834,7 @@ export default function App() {
 
 			return (
 				<div key={`a-${i}`} className="ref-msg-slot ref-msg-slot--assistant">
-					{thoughtBlock}
+					{thoughtBlock && !thoughtAfterBody ? thoughtBlock : null}
 					<div className="ref-msg-assistant-body">
 						{pendingEmptyAssistant ? (
 							<span className="ref-bubble-pending" aria-hidden>
@@ -3764,14 +3857,14 @@ export default function App() {
 									shell?.invoke('terminal:execLine', cmd).catch(console.error);
 								}}
 								streamingToolPreview={
-									composerMode === 'agent' && awaitingReply && isLast
-										? streamingToolPreview
-										: null
+									agentOrPlanStreaming ? streamingToolPreview : null
 								}
-								showAgentWorking={composerMode === 'agent' && isLast && awaitingReply}
+								showAgentWorking={agentOrPlanStreaming}
+								liveAgentBlocksState={agentOrPlanStreaming ? liveAssistantBlocks : null}
 							/>
 						)}
 					</div>
+					{thoughtBlock && thoughtAfterBody ? thoughtBlock : null}
 				</div>
 			);
 		});

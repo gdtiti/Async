@@ -138,14 +138,18 @@ function createToolInputDeltaBatcher(
 	};
 }
 
+export type ToolProgressPayload = { name: string; phase: 'executing' | 'awaiting_approval'; detail?: string };
+
 export type AgentLoopHandlers = {
 	onTextDelta: (text: string) => void;
 	/** 模型边生成工具 JSON 参数时流式回调（便于 UI 实时预览写入内容） */
 	onToolInputDelta?: (payload: ToolInputDeltaPayload) => void;
 	/** Anthropic extended thinking 流式片段（不写入持久化 assistant 正文） */
 	onThinkingDelta?: (text: string) => void;
-	onToolCall: (name: string, args: Record<string, unknown>) => void;
-	onToolResult: (name: string, result: string, success: boolean) => void;
+	/** 工具执行阶段（全过程可见） */
+	onToolProgress?: (payload: ToolProgressPayload) => void;
+	onToolCall: (name: string, args: Record<string, unknown>, toolUseId: string) => void;
+	onToolResult: (name: string, result: string, success: boolean, toolUseId: string) => void;
 	onDone: (fullContent: string, usage?: TurnTokenUsage) => void;
 	onError: (message: string) => void;
 };
@@ -476,13 +480,13 @@ async function runOpenAILoop(
 			const msg = `工具参数 JSON 无效：${parseErr instanceof Error ? parseErr.message : String(parseErr)}。请提供合法的 JSON。`;
 			if (mistakeLimitEnabled) consecutiveToolFailures++;
 			structured.pushTool(tc.id, tc.name, {}, msg, false);
-			handlers.onToolResult(tc.name, msg, false);
+			handlers.onToolResult(tc.name, msg, false, tc.id);
 			return { role: 'tool', tool_call_id: tc.id, content: msg };
 		}
 
 		const toolCall: ToolCall = { id: tc.id, name: tc.name, arguments: args };
 
-		handlers.onToolCall(tc.name, args);
+		handlers.onToolCall(tc.name, args, tc.id);
 		await new Promise<void>((r) => setTimeout(r, 0));
 
 		const gateStart = Date.now();
@@ -503,10 +507,11 @@ async function runOpenAILoop(
 			const msg = gate.rejectionMessage;
 			if (mistakeLimitEnabled) consecutiveToolFailures++;
 			structured.pushTool(tc.id, tc.name, args, msg, false);
-			handlers.onToolResult(tc.name, msg, false);
+			handlers.onToolResult(tc.name, msg, false, tc.id);
 			return { role: 'tool', tool_call_id: tc.id, content: msg };
 		}
 
+		handlers.onToolProgress?.({ name: tc.name, phase: 'executing' });
 		const execStart = Date.now();
 		console.log(`[AgentLoop] tool=${tc.name} — executeTool start`);
 		const result = await executeTool(toolCall, options.toolHooks, {
@@ -522,7 +527,7 @@ async function runOpenAILoop(
 		}
 
 		structured.pushTool(tc.id, tc.name, args, result.content, !result.isError);
-		handlers.onToolResult(tc.name, result.content, !result.isError);
+		handlers.onToolResult(tc.name, result.content, !result.isError, tc.id);
 
 		return { role: 'tool', tool_call_id: tc.id, content: result.content };
 	}
@@ -620,6 +625,13 @@ async function runOpenAILoop(
 				if (delta.content) {
 					turnText += delta.content;
 					handlers.onTextDelta(delta.content);
+				}
+
+				// OpenAI 兼容：部分网关提供 reasoning_content（如 DeepSeek）
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				const reasoningPiece = (delta as any)?.reasoning_content;
+				if (typeof reasoningPiece === 'string' && reasoningPiece) {
+					handlers.onThinkingDelta?.(reasoningPiece);
 				}
 
 				if (delta.tool_calls) {
@@ -842,13 +854,13 @@ async function runAnthropicLoop(
 			const msg = `工具参数 JSON 无效：${parseErr instanceof Error ? parseErr.message : String(parseErr)}。请提供合法的 JSON。`;
 			if (mistakeLimitEnabled) consecutiveToolFailures++;
 			structured.pushTool(tu.id, tu.name, {}, msg, false);
-			handlers.onToolResult(tu.name, msg, false);
+			handlers.onToolResult(tu.name, msg, false, tu.id);
 			return { type: 'tool_result', tool_use_id: tu.id, content: msg, is_error: true };
 		}
 
 		const toolCall: ToolCall = { id: tu.id, name: tu.name, arguments: args };
 
-		handlers.onToolCall(tu.name, args);
+		handlers.onToolCall(tu.name, args, tu.id);
 		await new Promise<void>((r) => setTimeout(r, 0));
 
 		const gateStart = Date.now();
@@ -869,10 +881,11 @@ async function runAnthropicLoop(
 			const msg = gate.rejectionMessage;
 			if (mistakeLimitEnabled) consecutiveToolFailures++;
 			structured.pushTool(tu.id, tu.name, args, msg, false);
-			handlers.onToolResult(tu.name, msg, false);
+			handlers.onToolResult(tu.name, msg, false, tu.id);
 			return { type: 'tool_result', tool_use_id: tu.id, content: msg, is_error: true };
 		}
 
+		handlers.onToolProgress?.({ name: tu.name, phase: 'executing' });
 		const execStart = Date.now();
 		console.log(`[AgentLoop/A] tool=${tu.name} — executeTool start`);
 		const result = await executeTool(toolCall, options.toolHooks, {
@@ -888,7 +901,7 @@ async function runAnthropicLoop(
 		}
 
 		structured.pushTool(tu.id, tu.name, args, result.content, !result.isError);
-		handlers.onToolResult(tu.name, result.content, !result.isError);
+		handlers.onToolResult(tu.name, result.content, !result.isError, tu.id);
 
 		return {
 			type: 'tool_result',

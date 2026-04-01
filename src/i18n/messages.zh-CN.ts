@@ -338,6 +338,8 @@ export const messagesZhCN: Record<string, string> = {
 	'agent.edit.streamingPlaceholder': '正在流式接收补丁…',
 	'agent.working': '正在继续处理本次改动…',
 	'agent.toolPending': '{{name}}…',
+	'agent.toolProgress.executing': '正在执行：{{name}}',
+	'agent.toolProgress.detail': '{{name}}：{{detail}}',
 
 	// agent activity (tool markers)
 	'agent.activity.reading': '正在读取 {{path}}',

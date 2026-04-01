@@ -1,0 +1,361 @@
+/**
+ * Agent 实时回合的块级状态：避免依赖整条 streaming 字符串反复 segmentAssistantContentUnified。
+ */
+import type { TFunction } from './i18n';
+import {
+	buildStreamingToolSegments,
+	finalizeAssistantSegmentsForRender,
+	segmentsFromClosedToolRound,
+	segmentsFromPendingToolCall,
+	type AssistantSegment,
+	type StreamingToolPreview,
+} from './agentChatSegments';
+
+let blockSeq = 0;
+function nextId(prefix: string): string {
+	blockSeq += 1;
+	return `${prefix}-${blockSeq}`;
+}
+
+export type LiveToolPhase = 'streaming_args' | 'running' | 'done';
+
+export type LiveToolBlock = {
+	id: string;
+	type: 'tool';
+	/** OpenAI/Anthropic tool_use id；流式参数阶段可能为空串 */
+	toolUseId: string;
+	streamIndex: number;
+	name: string;
+	partialJson: string;
+	argsJson: string;
+	phase: LiveToolPhase;
+	success?: boolean;
+	resultText?: string;
+};
+
+export type LiveAgentBlock =
+	| { id: string; type: 'text'; text: string }
+	| { id: string; type: 'sub_agent_delta'; parentToolCallId: string; depth: number; text: string }
+	| { id: string; type: 'sub_agent_thinking'; parentToolCallId: string; depth: number; text: string }
+	| LiveToolBlock
+	| { id: string; type: 'tool_progress'; toolName: string; phase: string; detail?: string };
+
+export type LiveAgentBlocksState = {
+	blocks: LiveAgentBlock[];
+};
+
+export function createEmptyLiveAgentBlocks(): LiveAgentBlocksState {
+	return { blocks: [] };
+}
+
+function appendRootText(blocks: LiveAgentBlock[], piece: string): LiveAgentBlock[] {
+	if (!piece) return blocks;
+	const last = blocks[blocks.length - 1];
+	if (last?.type === 'text') {
+		const copy = blocks.slice(0, -1);
+		copy.push({ ...last, text: last.text + piece });
+		return copy;
+	}
+	return [...blocks, { id: nextId('txt'), type: 'text', text: piece }];
+}
+
+function appendSubAgentDelta(
+	blocks: LiveAgentBlock[],
+	parent: string,
+	depth: number,
+	piece: string
+): LiveAgentBlock[] {
+	if (!piece) return blocks;
+	const last = blocks[blocks.length - 1];
+	if (last?.type === 'sub_agent_delta' && last.parentToolCallId === parent && last.depth === depth) {
+		const copy = blocks.slice(0, -1);
+		copy.push({ ...last, text: last.text + piece });
+		return copy;
+	}
+	return [...blocks, { id: nextId('sub'), type: 'sub_agent_delta', parentToolCallId: parent, depth, text: piece }];
+}
+
+function appendSubAgentThinking(
+	blocks: LiveAgentBlock[],
+	parent: string,
+	depth: number,
+	piece: string
+): LiveAgentBlock[] {
+	if (!piece) return blocks;
+	const last = blocks[blocks.length - 1];
+	if (last?.type === 'sub_agent_thinking' && last.parentToolCallId === parent && last.depth === depth) {
+		const copy = blocks.slice(0, -1);
+		copy.push({ ...last, text: last.text + piece });
+		return copy;
+	}
+	return [...blocks, { id: nextId('subt'), type: 'sub_agent_thinking', parentToolCallId: parent, depth, text: piece }];
+}
+
+function upsertToolStreaming(blocks: LiveAgentBlock[], index: number, name: string, partialJson: string): LiveAgentBlock[] {
+	const i = blocks.findIndex(
+		(b): b is LiveToolBlock => b.type === 'tool' && b.streamIndex === index && b.phase === 'streaming_args'
+	);
+	if (i >= 0) {
+		const copy = blocks.slice();
+		const cur = copy[i] as LiveToolBlock;
+		copy[i] = { ...cur, name, partialJson };
+		return copy;
+	}
+	return [
+		...blocks,
+		{
+			id: nextId('tool'),
+			type: 'tool',
+			toolUseId: '',
+			streamIndex: index,
+			name,
+			partialJson,
+			argsJson: '',
+			phase: 'streaming_args' as const,
+		},
+	];
+}
+
+function applyToolCallRoot(
+	blocks: LiveAgentBlock[],
+	name: string,
+	argsJson: string,
+	toolUseId: string
+): LiveAgentBlock[] {
+	let idx = -1;
+	for (let j = blocks.length - 1; j >= 0; j--) {
+		const b = blocks[j];
+		if (b?.type === 'tool' && b.phase === 'streaming_args') {
+			idx = j;
+			break;
+		}
+	}
+	if (idx >= 0) {
+		const cur = blocks[idx] as LiveToolBlock;
+		const copy = blocks.slice();
+		copy[idx] = {
+			...cur,
+			name,
+			argsJson,
+			partialJson: argsJson,
+			phase: 'running',
+			toolUseId: toolUseId || cur.toolUseId,
+		};
+		return copy;
+	}
+	return [
+		...blocks,
+		{
+			id: nextId('tool'),
+			type: 'tool',
+			toolUseId,
+			streamIndex: -1,
+			name,
+			partialJson: argsJson,
+			argsJson,
+			phase: 'running' as const,
+		},
+	];
+}
+
+function applyToolResultRoot(
+	blocks: LiveAgentBlock[],
+	toolUseId: string,
+	name: string,
+	result: string,
+	success: boolean
+): LiveAgentBlock[] {
+	const copy = blocks.slice();
+	let j = -1;
+	if (toolUseId) {
+		j = copy.findIndex(
+			(b): b is LiveToolBlock =>
+				b.type === 'tool' && b.toolUseId === toolUseId && b.phase === 'running'
+		);
+	}
+	if (j < 0) {
+		j = copy.findIndex(
+			(b): b is LiveToolBlock => b.type === 'tool' && b.phase === 'running' && b.name === name
+		);
+	}
+	if (j < 0) {
+		j = copy.findIndex((b): b is LiveToolBlock => b.type === 'tool' && b.phase === 'running');
+	}
+	if (j >= 0) {
+		const cur = copy[j] as LiveToolBlock;
+		copy[j] = {
+			...cur,
+			name: cur.name || name,
+			phase: 'done',
+			success,
+			resultText: result,
+			toolUseId: toolUseId || cur.toolUseId,
+		};
+		return copy;
+	}
+	return [
+		...copy,
+		{
+			id: nextId('tool'),
+			type: 'tool',
+			toolUseId: toolUseId || nextId('orphan'),
+			streamIndex: -2,
+			name,
+			partialJson: '',
+			argsJson: '{}',
+			phase: 'done',
+			success,
+			resultText: result,
+		},
+	];
+}
+
+export type LiveAgentChatPayload =
+	| { type: 'delta'; text: string; parentToolCallId?: string; nestingDepth?: number }
+	| { type: 'thinking_delta'; text: string; parentToolCallId?: string; nestingDepth?: number }
+	| { type: 'tool_input_delta'; name: string; partialJson: string; index: number; parentToolCallId?: string }
+	| { type: 'tool_call'; name: string; args: string; toolCallId: string; parentToolCallId?: string }
+	| {
+			type: 'tool_result';
+			name: string;
+			result: string;
+			success: boolean;
+			toolCallId: string;
+			parentToolCallId?: string;
+	  }
+	| { type: 'tool_progress'; name: string; phase: string; detail?: string; parentToolCallId?: string };
+
+/** 将 IPC 流事件折叠进块列表（根线程；嵌套工具仅 sub_agent 文本进块） */
+export function applyLiveAgentChatPayload(
+	state: LiveAgentBlocksState,
+	payload: LiveAgentChatPayload
+): LiveAgentBlocksState {
+	let { blocks } = state;
+
+	if (payload.type === 'delta') {
+		if (payload.parentToolCallId) {
+			blocks = appendSubAgentDelta(blocks, payload.parentToolCallId, payload.nestingDepth ?? 1, payload.text);
+		} else {
+			blocks = appendRootText(blocks, payload.text);
+		}
+		return { blocks };
+	}
+
+	if (payload.type === 'thinking_delta') {
+		if (!payload.parentToolCallId) return state;
+		blocks = appendSubAgentThinking(
+			blocks,
+			payload.parentToolCallId,
+			payload.nestingDepth ?? 1,
+			payload.text
+		);
+		return { blocks };
+	}
+
+	if (payload.type === 'tool_input_delta') {
+		if (payload.parentToolCallId) return state;
+		blocks = upsertToolStreaming(blocks, payload.index, payload.name, payload.partialJson);
+		return { blocks };
+	}
+
+	if (payload.type === 'tool_call') {
+		if (payload.parentToolCallId) return state;
+		blocks = applyToolCallRoot(blocks, payload.name, payload.args, payload.toolCallId);
+		return { blocks };
+	}
+
+	if (payload.type === 'tool_result') {
+		if (payload.parentToolCallId) return state;
+		blocks = applyToolResultRoot(blocks, payload.toolCallId, payload.name, payload.result, payload.success);
+		return { blocks };
+	}
+
+	if (payload.type === 'tool_progress') {
+		if (payload.parentToolCallId) return state;
+		blocks = [
+			...blocks,
+			{
+				id: nextId('prog'),
+				type: 'tool_progress',
+				toolName: payload.name,
+				phase: payload.phase,
+				detail: payload.detail,
+			},
+		];
+		return { blocks };
+	}
+
+	return state;
+}
+
+export function getActiveStreamingToolPreviewFromBlocks(blocks: LiveAgentBlock[]): StreamingToolPreview | null {
+	for (let i = blocks.length - 1; i >= 0; i--) {
+		const b = blocks[i];
+		if (b?.type === 'tool' && b.phase === 'streaming_args' && b.partialJson) {
+			return { name: b.name, partialJson: b.partialJson, index: b.streamIndex };
+		}
+	}
+	return null;
+}
+
+/** 块列表 → 与 ChatMarkdown 一致的 AssistantSegment[]（不经由整段 content 解析） */
+export function liveBlocksToAssistantSegments(blocks: LiveAgentBlock[], t: TFunction): AssistantSegment[] {
+	const out: AssistantSegment[] = [];
+
+	for (const b of blocks) {
+		if (b.type === 'text' && b.text.trim()) {
+			out.push({ type: 'markdown', text: b.text });
+		} else if (b.type === 'sub_agent_delta') {
+			out.push({
+				type: 'sub_agent_markdown',
+				parentToolCallId: b.parentToolCallId,
+				depth: b.depth,
+				text: b.text,
+				variant: 'text',
+			});
+		} else if (b.type === 'sub_agent_thinking') {
+			out.push({
+				type: 'sub_agent_markdown',
+				parentToolCallId: b.parentToolCallId,
+				depth: b.depth,
+				text: b.text,
+				variant: 'thinking',
+			});
+		} else if (b.type === 'tool_progress') {
+			const text =
+				b.detail != null && b.detail !== ''
+					? t('agent.toolProgress.detail', { name: b.toolName, detail: b.detail })
+					: b.phase === 'executing'
+						? t('agent.toolProgress.executing', { name: b.toolName })
+						: `${b.toolName} (${b.phase})`;
+			out.push({
+				type: 'activity',
+				text,
+				status: 'info',
+			});
+		} else if (b.type === 'tool') {
+			if (b.phase === 'streaming_args') {
+				out.push(
+					...buildStreamingToolSegments(
+						{ name: b.name, partialJson: b.partialJson, index: b.streamIndex },
+						{ t }
+					)
+				);
+			} else if (b.phase === 'running') {
+				out.push(...segmentsFromPendingToolCall(b.name, b.argsJson || b.partialJson || '{}', t));
+			} else if (b.phase === 'done') {
+				out.push(
+					...segmentsFromClosedToolRound(
+						b.name,
+						b.argsJson || '{}',
+						b.resultText ?? '',
+						b.success !== false,
+						t
+					)
+				);
+			}
+		}
+	}
+
+	return finalizeAssistantSegmentsForRender(out);
+}

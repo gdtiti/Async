@@ -1979,8 +1979,10 @@ body {
 	z-index: 1;
 }
 
-/* ??????????? + ?? + ??????????? 999px??????????/??? */
+/* 用户气泡默认可视块高 ≈ 内边距 + 两行正文；最大高度为两倍，超出部分在气泡内滚动 */
 .ref-msg-user {
+	--ref-user-bubble-unit: calc(24px + 2 * 1.5em);
+	--ref-user-bubble-max-h: calc(2 * var(--ref-user-bubble-unit));
 	display: block;
 	width: 100%;
 	max-width: 100%;
@@ -2002,6 +2004,25 @@ body {
 	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
 	appearance: none;
 	-webkit-appearance: none;
+	max-height: var(--ref-user-bubble-max-h);
+	overflow-y: auto;
+	overflow-x: hidden;
+	overscroll-behavior: contain;
+	scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+	scrollbar-width: thin;
+}
+
+.ref-msg-user::-webkit-scrollbar {
+	width: 8px;
+}
+
+.ref-msg-user::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.18);
+	border-radius: 8px;
+}
+
+.ref-msg-user::-webkit-scrollbar-thumb:hover {
+	background: rgba(255, 255, 255, 0.28);
 }
 
 .ref-msg-user::-moz-focus-inner {
@@ -2052,6 +2073,10 @@ body {
 }
 
 .ref-msg-slot--assistant .ref-thought-block + .ref-msg-assistant-body {
+	margin-top: 12px;
+}
+
+.ref-msg-slot--assistant .ref-msg-assistant-body + .ref-thought-block {
 	margin-top: 12px;
 }
 

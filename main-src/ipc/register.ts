@@ -263,10 +263,13 @@ function runChatStream(
 						onTextDelta: (piece) => send({ threadId, type: 'delta', text: piece }),
 						onToolInputDelta: (p) =>
 							send({ threadId, type: 'tool_input_delta', name: p.name, partialJson: p.partialJson, index: p.index }),
+						onToolProgress: (p) =>
+							send({ threadId, type: 'tool_progress', name: p.name, phase: p.phase, detail: p.detail }),
 						onThinkingDelta: (text) => send({ threadId, type: 'thinking_delta', text }),
-						onToolCall: (name, args) => send({ threadId, type: 'tool_call', name, args: JSON.stringify(args) }),
-						onToolResult: (name, result, success) =>
-							send({ threadId, type: 'tool_result', name, result, success }),
+						onToolCall: (name, args, toolCallId) =>
+							send({ threadId, type: 'tool_call', name, args: JSON.stringify(args), toolCallId }),
+						onToolResult: (name, result, success, toolCallId) =>
+							send({ threadId, type: 'tool_result', name, result, success, toolCallId }),
 						onDone: (full, usage) => {
 							updateLastAssistant(threadId, full);
 							accumulateTokenUsage(threadId, usage?.inputTokens, usage?.outputTokens);

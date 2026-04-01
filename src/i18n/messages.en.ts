@@ -332,6 +332,8 @@ export const messagesEn: Record<string, string> = {
 	'agent.edit.streamingPlaceholder': 'Streaming patch…',
 	'agent.working': 'Continuing to work on this change…',
 	'agent.toolPending': '{{name}}…',
+	'agent.toolProgress.executing': 'Running: {{name}}',
+	'agent.toolProgress.detail': '{{name}}: {{detail}}',
 
 	'agent.activity.reading': 'Reading {{path}}',
 	'agent.activity.read': 'Read {{path}}',

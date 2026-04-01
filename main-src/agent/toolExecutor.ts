@@ -703,18 +703,19 @@ async function executeAgentDelegate(call: ToolCall, execCtx: ToolExecutionContex
 					nestingDepth,
 				});
 			},
-			onToolCall: (name, args) => {
+			onToolCall: (name, args, toolUseId) => {
 				const line = `\n[tool] ${name} ${JSON.stringify(args).slice(0, 200)}\n`;
 				logTranscript(line);
 				emit?.({
 					type: 'tool_call',
 					name,
 					args: JSON.stringify(args),
+					toolCallId: toolUseId,
 					parentToolCallId,
 					nestingDepth,
 				});
 			},
-			onToolResult: (name, result, success) => {
+			onToolResult: (name, result, success, toolUseId) => {
 				const line = `\n[result] ${name} success=${success}\n`;
 				logTranscript(line);
 				emit?.({
@@ -722,6 +723,17 @@ async function executeAgentDelegate(call: ToolCall, execCtx: ToolExecutionContex
 					name,
 					result,
 					success,
+					toolCallId: toolUseId,
+					parentToolCallId,
+					nestingDepth,
+				});
+			},
+			onToolProgress: (p) => {
+				emit?.({
+					type: 'tool_progress',
+					name: p.name,
+					phase: p.phase,
+					detail: p.detail,
 					parentToolCallId,
 					nestingDepth,
 				});

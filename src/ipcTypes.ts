@@ -46,10 +46,24 @@ export type ChatStreamPayload =
 	| ({ threadId: string; type: 'delta'; text: string } & ChatStreamNest)
 	| { threadId: string; type: 'done'; text: string; pendingAgentPatches?: AgentPendingPatch[]; usage?: TurnTokenUsage }
 	| { threadId: string; type: 'error'; message: string }
-	| ({ threadId: string; type: 'tool_call'; name: string; args: string } & ChatStreamNest)
-	| ({ threadId: string; type: 'tool_result'; name: string; result: string; success: boolean } & ChatStreamNest)
+	| ({ threadId: string; type: 'tool_call'; name: string; args: string; toolCallId: string } & ChatStreamNest)
+	| ({
+			threadId: string;
+			type: 'tool_result';
+			name: string;
+			result: string;
+			success: boolean;
+			toolCallId: string;
+	  } & ChatStreamNest)
 	| ({ threadId: string; type: 'tool_input_delta'; name: string; partialJson: string; index: number } & ChatStreamNest)
 	| ({ threadId: string; type: 'thinking_delta'; text: string } & ChatStreamNest)
+	| ({
+			threadId: string;
+			type: 'tool_progress';
+			name: string;
+			phase: string;
+			detail?: string;
+	  } & ChatStreamNest)
 	| {
 			threadId: string;
 			type: 'tool_approval_request';
