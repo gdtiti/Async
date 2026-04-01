@@ -128,6 +128,10 @@ export const messagesEn: Record<string, string> = {
 	'app.editorEmptyDescription':
 		'Select a file from Explorer, or ask the agent on the right to inspect and change the project with you.',
 	'app.reloadFileAria': 'Reload file',
+	'app.editorMarkdownSource': 'Source',
+	'app.editorMarkdownPreview': 'Preview',
+	'app.editorMarkdownModeAria': 'Markdown display mode',
+	'app.planEditorBuilt': 'Built ✓',
 	'app.lspSoon': 'Language services coming soon',
 	'app.lspStarting': 'Starting TS language service…',
 	'app.lspReady': 'TypeScript LSP ready (go to definition)',
@@ -444,7 +448,10 @@ export const messagesEn: Record<string, string> = {
 	'plan.review.fullShow': 'Show full plan (tables & risks)',
 	'plan.review.fullHide': 'Hide full plan',
 	'plan.review.todo': 'TODO ({{done}}/{{total}})',
+	'plan.review.model': 'Model',
 	'plan.review.build': 'Build',
+	'plan.review.executeUserBubble':
+		'Execute the saved plan document: follow every step in order and apply the necessary code changes. The full plan is attached in the system context for this turn.',
 
 	'thought.thinking': 'Thinking… {{sec}}s',
 	'thought.for': 'Thought for {{sec}}s',

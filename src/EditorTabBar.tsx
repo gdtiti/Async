@@ -1,10 +1,14 @@
 import { FileTypeIcon } from './fileTypeIcons';
 import { voidShellDebugLog } from './tabCloseDebug';
 
+export type MarkdownTabView = 'source' | 'preview';
+
 export type EditorTab = {
 	id: string;
 	filePath: string;
 	dirty: boolean;
+	/** 仅 `.md` / `.mdx`：当前为源码编辑或 Markdown 预览 */
+	markdownView?: MarkdownTabView;
 };
 
 type Props = {

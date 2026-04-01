@@ -129,6 +129,10 @@ export const messagesZhCN: Record<string, string> = {
 	'app.editorEmptyTitle': '打开一个文件开始编辑',
 	'app.editorEmptyDescription': '从左侧资源管理器选择文件，或者在右侧让助手帮你一起分析和修改项目。',
 	'app.reloadFileAria': '重新加载文件',
+	'app.editorMarkdownSource': '源码',
+	'app.editorMarkdownPreview': '预览',
+	'app.editorMarkdownModeAria': 'Markdown 显示方式',
+	'app.planEditorBuilt': '已构建 ✓',
 	'app.lspSoon': '语言服务即将接入',
 	'app.lspStarting': '正在启动 TS 语言服务…',
 	'app.lspReady': 'TypeScript 语言服务已就绪（跳转定义）',
@@ -452,7 +456,10 @@ export const messagesZhCN: Record<string, string> = {
 	'plan.review.fullShow': '查看完整计划（含表格与风险说明）',
 	'plan.review.fullHide': '收起完整计划',
 	'plan.review.todo': '待办（{{done}}/{{total}}）',
+	'plan.review.model': '模型',
 	'plan.review.build': '开始执行',
+	'plan.review.executeUserBubble':
+		'请执行已保存的计划文档：严格按其中步骤顺序完成实现并修改代码。完整计划已在本轮系统上下文中提供。',
 
 	// thought block
 	'thought.thinking': '思考中… {{sec}}s',

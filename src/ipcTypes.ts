@@ -99,6 +99,13 @@ export type ChatSkillCreatorPayload = {
 	scope: 'user' | 'project';
 };
 
+/** Plan Build：主进程将计划全文注入系统上下文（优先读磁盘），短文本仅作用户可见气泡 */
+export type ChatPlanExecutePayload = {
+	fromAbsPath?: string;
+	inlineMarkdown?: string;
+	planTitle?: string;
+};
+
 /** `chat:send` IPC 载荷（与主进程一致） */
 export type ChatSendPayload = {
 	threadId: string;
@@ -108,6 +115,7 @@ export type ChatSendPayload = {
 	modelId?: string;
 	/** 与 `text` 二选一：走 Skill Creator 分支时传此项，`text` 可为空字符串 */
 	skillCreator?: ChatSkillCreatorPayload;
+	planExecute?: ChatPlanExecutePayload;
 };
 
 /** `plan:save` IPC 载荷 */
@@ -120,5 +128,7 @@ export type PlanSavePayload = {
 export type PlanSaveResult = {
 	ok: boolean;
 	path?: string;
+	/** 工作区内相对路径（`.async/plans/...`），便于在编辑器中打开 */
+	relPath?: string;
 	error?: string;
 };

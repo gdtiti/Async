@@ -40,6 +40,8 @@ import {
 	touchFileInThread,
 	saveSummary,
 	savePlan,
+	getExecutedPlanFileKeys,
+	markPlanFileExecuted,
 	type ChatMessage,
 	type ThreadPlan,
 } from '../threadStore.js';
@@ -337,6 +339,70 @@ function runChatStream(
 			abortByThread.delete(threadId);
 		}
 	})();
+}
+
+const MAX_PLAN_EXECUTE_INJECT_CHARS = 200_000;
+
+function readPlanFileForExecute(absPath: string): string | null {
+	let resolved: string;
+	try {
+		resolved = path.resolve(absPath);
+	} catch {
+		return null;
+	}
+	const userPlansDir = path.join(app.getPath('userData'), '.async', 'plans');
+	const root = getWorkspaceRoot();
+	const wsPlansDir = root ? path.join(root, '.async', 'plans') : null;
+	const allowed =
+		isPathInsideRoot(resolved, userPlansDir) ||
+		(wsPlansDir != null && isPathInsideRoot(resolved, wsPlansDir));
+	if (!allowed) {
+		return null;
+	}
+	try {
+		if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+			return null;
+		}
+		let t = fs.readFileSync(resolved, 'utf8');
+		if (t.length > MAX_PLAN_EXECUTE_INJECT_CHARS) {
+			t = `${t.slice(0, MAX_PLAN_EXECUTE_INJECT_CHARS)}\n\n… (truncated)`;
+		}
+		return t;
+	} catch {
+		return null;
+	}
+}
+
+function appendPlanExecuteToSystem(
+	base: string | undefined,
+	exec: { fromAbsPath?: string; inlineMarkdown?: string; planTitle?: string } | undefined
+): string {
+	if (!exec) {
+		return base ?? '';
+	}
+	let body: string | null = null;
+	if (exec.fromAbsPath) {
+		body = readPlanFileForExecute(exec.fromAbsPath);
+	}
+	const inline = typeof exec.inlineMarkdown === 'string' ? exec.inlineMarkdown.trim() : '';
+	if ((body == null || !body.trim()) && inline) {
+		body =
+			inline.length > MAX_PLAN_EXECUTE_INJECT_CHARS
+				? `${inline.slice(0, MAX_PLAN_EXECUTE_INJECT_CHARS)}\n\n… (truncated)`
+				: inline;
+	}
+	if (body == null || !body.trim()) {
+		return base ?? '';
+	}
+	const title = String(exec.planTitle ?? 'Plan').trim() || 'Plan';
+	const block = [
+		'## Saved plan document (execute strictly; the visible user message is only a trigger)',
+		`Plan title: ${title}`,
+		'',
+		body,
+	].join('\n');
+	const trimmedBase = base?.trim() ?? '';
+	return trimmedBase ? `${trimmedBase}\n\n---\n${block}` : block;
 }
 
 export function registerIpc(): void {
@@ -710,6 +776,27 @@ export function registerIpc(): void {
 		return { ok };
 	});
 
+	ipcMain.handle('threads:getExecutedPlanKeys', (_e, threadId: string) => {
+		const id = String(threadId ?? '');
+		if (!id) {
+			return { ok: false as const };
+		}
+		return { ok: true as const, keys: getExecutedPlanFileKeys(id) };
+	});
+
+	ipcMain.handle(
+		'threads:markPlanExecuted',
+		(_e, payload: { threadId?: string; pathKey?: string }) => {
+			const threadId = String(payload?.threadId ?? '');
+			const pathKey = String(payload?.pathKey ?? '');
+			if (!threadId || !pathKey) {
+				return { ok: false as const };
+			}
+			markPlanFileExecuted(threadId, pathKey);
+			return { ok: true as const };
+		}
+	);
+
 	ipcMain.handle('agent:applyDiffChunk', (_e, payload: { threadId?: string; chunk?: string }) => {
 		const threadId = String(payload?.threadId ?? '');
 		const chunk = typeof payload?.chunk === 'string' ? payload.chunk : '';
@@ -762,6 +849,8 @@ export function registerIpc(): void {
 				mode?: string;
 				modelId?: string;
 				skillCreator?: { userNote: string; scope: SkillCreatorScope };
+				/** Plan Build：完整计划写入系统上下文，可见用户气泡仅短触发语 */
+				planExecute?: { fromAbsPath?: string; inlineMarkdown?: string; planTitle?: string };
 			}
 		) => {
 			const { threadId, text } = payload;
@@ -828,6 +917,7 @@ export function registerIpc(): void {
 						finalSystemAppend = finalSystemAppend ? `${finalSystemAppend}\n\n---\n${gitBlock}` : gitBlock;
 					}
 				}
+				finalSystemAppend = appendPlanExecuteToSystem(finalSystemAppend, payload.planExecute);
 				const t = appendMessage(threadId, { role: 'user', content: visible });
 				runChatStream(win, threadId, t.messages, mode, modelSelection, finalSystemAppend);
 				return { ok: true as const };
@@ -865,6 +955,8 @@ export function registerIpc(): void {
 					finalSystemAppend = finalSystemAppend ? `${finalSystemAppend}\n\n---\n${gitBlock}` : gitBlock;
 				}
 			}
+
+			finalSystemAppend = appendPlanExecuteToSystem(finalSystemAppend, payload.planExecute);
 
 			const t = appendMessage(threadId, { role: 'user', content: userText });
 			runChatStream(win, threadId, t.messages, mode, modelSelection, finalSystemAppend);
@@ -1183,13 +1275,23 @@ export function registerIpc(): void {
 		'plan:save',
 		(_e, payload: { filename: string; content: string }) => {
 			try {
-				const dir = path.join(app.getPath('userData'), '.async', 'plans');
-				fs.mkdirSync(dir, { recursive: true });
 				const safe = String(payload.filename ?? 'plan.md')
 					.replace(/[<>:"/\\|?*]/g, '_')
 					.slice(0, 120);
+				const content = String(payload.content ?? '');
+				const wsRoot = getWorkspaceRoot();
+				if (wsRoot) {
+					const dir = path.join(wsRoot, '.async', 'plans');
+					fs.mkdirSync(dir, { recursive: true });
+					const full = path.join(dir, safe);
+					fs.writeFileSync(full, content, 'utf8');
+					const relPath = path.join('.async', 'plans', safe).replace(/\\/g, '/');
+					return { ok: true as const, path: full, relPath };
+				}
+				const dir = path.join(app.getPath('userData'), '.async', 'plans');
+				fs.mkdirSync(dir, { recursive: true });
 				const full = path.join(dir, safe);
-				fs.writeFileSync(full, String(payload.content ?? ''), 'utf8');
+				fs.writeFileSync(full, content, 'utf8');
 				return { ok: true as const, path: full };
 			} catch (e) {
 				return { ok: false as const, error: String(e) };

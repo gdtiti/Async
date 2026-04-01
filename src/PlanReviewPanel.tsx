@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChatMarkdown } from './ChatMarkdown';
 import type { ParsedPlan, PlanTodoItem } from './planParser';
 import { useI18n } from './i18n';
+import type { ModelPickerItem } from './ModelPickerDropdown';
 
 type Props = {
 	plan: ParsedPlan;
-	planFilePath: string | null;
-	onBuild: () => void;
+	planFileDisplayPath: string | null;
+	initialBuildModelId: string;
+	modelItems: ModelPickerItem[];
+	/** 当前会话已对该计划文件成功执行 Build */
+	planBuilt?: boolean;
+	onBuild: (modelId: string) => void;
 	onClose: () => void;
 	onTodoToggle: (id: string) => void;
 };
@@ -37,11 +42,25 @@ function TodoItem({ todo, onToggle }: { todo: PlanTodoItem; onToggle: () => void
 	);
 }
 
-export function PlanReviewPanel({ plan, planFilePath, onBuild, onClose, onTodoToggle }: Props) {
+export function PlanReviewPanel({
+	plan,
+	planFileDisplayPath,
+	initialBuildModelId,
+	modelItems,
+	planBuilt = false,
+	onBuild,
+	onClose,
+	onTodoToggle,
+}: Props) {
 	const { t } = useI18n();
 	const [showTodos, setShowTodos] = useState(true);
 	const [showFullPlan, setShowFullPlan] = useState(false);
+	const [buildModelId, setBuildModelId] = useState(initialBuildModelId);
 	const doneCount = plan.todos.filter((t) => t.status === 'completed').length;
+
+	useEffect(() => {
+		setBuildModelId(initialBuildModelId);
+	}, [initialBuildModelId, plan.name]);
 
 	return (
 		<div className="ref-plan-review" role="region" aria-label={t('plan.review.aria')}>
@@ -59,6 +78,24 @@ export function PlanReviewPanel({ plan, planFilePath, onBuild, onClose, onTodoTo
 						</svg>
 					</button>
 				</div>
+				<div className="ref-plan-review-head-model">
+					<label className="ref-plan-review-model-label" htmlFor="ref-plan-build-model">
+						{t('plan.review.model')}
+					</label>
+					<select
+						id="ref-plan-build-model"
+						className="ref-plan-review-model-select"
+						value={buildModelId}
+						disabled={planBuilt}
+						onChange={(e) => setBuildModelId(e.target.value)}
+					>
+						{modelItems.map((m) => (
+							<option key={m.id} value={m.id}>
+								{m.label}
+							</option>
+						))}
+					</select>
+				</div>
 			</div>
 
 			<div className="ref-plan-review-body">
@@ -67,13 +104,13 @@ export function PlanReviewPanel({ plan, planFilePath, onBuild, onClose, onTodoTo
 					<p className="ref-plan-review-overview">{plan.overview}</p>
 				) : null}
 
-				{planFilePath ? (
+				{planFileDisplayPath ? (
 					<div className="ref-plan-review-file">
 						<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
 							<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
 							<polyline points="14 2 14 8 20 8" />
 						</svg>
-						<span className="ref-plan-review-file-path">{planFilePath}</span>
+						<span className="ref-plan-review-file-path">{planFileDisplayPath}</span>
 					</div>
 				) : null}
 
@@ -123,8 +160,8 @@ export function PlanReviewPanel({ plan, planFilePath, onBuild, onClose, onTodoTo
 						</button>
 						{showTodos ? (
 							<div className="ref-plan-review-todos-list">
-								{plan.todos.map((t) => (
-									<TodoItem key={t.id} todo={t} onToggle={() => onTodoToggle(t.id)} />
+								{plan.todos.map((item) => (
+									<TodoItem key={item.id} todo={item} onToggle={() => onTodoToggle(item.id)} />
 								))}
 							</div>
 						) : null}
@@ -133,14 +170,20 @@ export function PlanReviewPanel({ plan, planFilePath, onBuild, onClose, onTodoTo
 			</div>
 
 			<div className="ref-plan-review-foot">
-				<button
-					type="button"
-					className="ref-plan-review-build"
-					onClick={onBuild}
-				>
-					{t('plan.review.build')}
-					<kbd className="ref-kbd">Ctrl+&#x21B5;</kbd>
-				</button>
+				{planBuilt ? (
+					<div className="ref-plan-review-built" role="status">
+						{t('app.planEditorBuilt')}
+					</div>
+				) : (
+					<button
+						type="button"
+						className="ref-plan-review-build"
+						onClick={() => onBuild(buildModelId)}
+					>
+						{t('plan.review.build')}
+						<kbd className="ref-kbd">Ctrl+&#x21B5;</kbd>
+					</button>
+				)}
 			</div>
 		</div>
 	);

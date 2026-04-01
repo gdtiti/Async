@@ -18,6 +18,7 @@ import { OpenWorkspaceModal } from './OpenWorkspaceModal';
 import { WorkspaceExplorer, type GitPathStatusMap } from './WorkspaceExplorer';
 import {
 	type AgentPendingPatch,
+	type ChatPlanExecutePayload,
 	type ChatStreamPayload,
 	coerceThinkingByModelId,
 	type ThinkingLevel,
@@ -97,7 +98,15 @@ import {
 import { normalizeIndexingSettings, type IndexingSettingsState } from './indexingSettingsTypes';
 import { defaultEditorSettings, editorSettingsToMonacoOptions, type EditorSettings } from './EditorSettingsPanel';
 import type { McpServerConfig, McpServerStatus } from './mcpTypes';
-import { EditorTabBar, tabIdFromPath, type EditorTab } from './EditorTabBar';
+import { EditorTabBar, tabIdFromPath, type EditorTab, type MarkdownTabView } from './EditorTabBar';
+import {
+	initialMarkdownViewForTab,
+	isMarkdownEditorPath,
+	markdownViewForTab,
+	stripLeadingYamlFrontmatter,
+	stripPlanFrontmatterForPreview,
+} from './editorMarkdownView';
+import { isPlanMdPath, planExecutedKey } from './planExecutedKey';
 import { MenubarFileMenu } from './MenubarFileMenu';
 import { QuickOpenPalette, quickOpenPrimaryShortcutLabel, saveShortcutLabel } from './quickOpenPalette';
 import { registerTsLspMonacoOnce } from './tsLspMonaco';
@@ -650,6 +659,8 @@ export default function App() {
 	/** `messages` 最近一次由 `threads:messages` 写入时对应的线程；与 `currentId` 不一致时不做文件条 persist 的读/清，避免切线程空窗期误删 localStorage */
 	const [messagesThreadId, setMessagesThreadId] = useState<string | null>(null);
 	const currentIdRef = useRef(currentId);
+	/** Plan Build 成功后写入 threads.json；在 stream done 时与 pending 对齐 */
+	const planBuildPendingMarkerRef = useRef<{ threadId: string; pathKey: string } | null>(null);
 	currentIdRef.current = currentId;
 	/** 点击某条用户消息后，从该条起截断并重发（与 threads:messages 顺序一致） */
 	const [resendFromUserIndex, setResendFromUserIndex] = useState<number | null>(null);
@@ -693,10 +704,15 @@ export default function App() {
 	} | null>(null);
 	/** Plan 模式 — 解析出的计划文档 */
 	const [parsedPlan, setParsedPlan] = useState<ParsedPlan | null>(null);
-	/** Plan 文件保存路径 */
+	/** Plan 文件绝对路径（磁盘） */
 	const [planFilePath, setPlanFilePath] = useState<string | null>(null);
-	/** 上次 Build 时注入的计划内容 */
-	const planBuildContentRef = useRef<string | null>(null);
+	/** 工作区内相对路径，用于在编辑器中打开预览 */
+	const [planFileRelPath, setPlanFileRelPath] = useState<string | null>(null);
+	/** 当前线程已执行 Build 的计划文件键（与 planExecutedKey 一致） */
+	const [executedPlanKeys, setExecutedPlanKeys] = useState<string[]>([]);
+	const openFileInTabRef = useRef<(rel: string, revealLine?: number, revealEndLine?: number) => Promise<void>>(
+		async () => {}
+	);
 	const [rightPanelTab, setRightPanelTab] = useState<'explorer' | 'search' | 'git'>('git');
 	const [treeEpoch, setTreeEpoch] = useState(0);
 	const [commitMsg, setCommitMsg] = useState('');
@@ -714,6 +730,7 @@ export default function App() {
 	const [anthropicBaseURL, setAnthropicBaseURL] = useState('');
 	const [geminiApiKey, setGeminiApiKey] = useState('');
 	const [defaultModel, setDefaultModel] = useState(AUTO_MODEL_ID);
+	const [editorPlanBuildModelId, setEditorPlanBuildModelId] = useState(AUTO_MODEL_ID);
 	const [thinkingByModelId, setThinkingByModelId] = useState<Record<string, ThinkingLevel>>({});
 	const [streamingThinking, setStreamingThinking] = useState('');
 	const [streamingToolPreview, setStreamingToolPreview] = useState<{
@@ -1570,6 +1587,21 @@ export default function App() {
 				resetLiveAgentBlocks();
 				setFileChangesDismissed(false);
 				setDismissedFiles(new Set());
+				const pendPlan = planBuildPendingMarkerRef.current;
+				if (pendPlan && pendPlan.threadId === payload.threadId) {
+					planBuildPendingMarkerRef.current = null;
+					if (pendPlan.pathKey && shell) {
+						void shell.invoke('threads:markPlanExecuted', {
+							threadId: pendPlan.threadId,
+							pathKey: pendPlan.pathKey,
+						});
+						if (pendPlan.threadId === currentIdRef.current) {
+							setExecutedPlanKeys((prev) =>
+								prev.includes(pendPlan.pathKey) ? prev : [...prev, pendPlan.pathKey]
+							);
+						}
+					}
+				}
 				/* 新一轮助手回复落库前，勿让旧 persist 在 loadMessages 空窗期把面板状态粘回去 */
 				clearPersistedAgentFileChanges(payload.threadId);
 				if (payload.pendingAgentPatches && payload.pendingAgentPatches.length > 0) {
@@ -1611,10 +1643,17 @@ export default function App() {
 					if (shell) {
 						void (async () => {
 							const r = (await shell.invoke('plan:save', { filename, content: md })) as
-								| { ok: true; path: string }
+								| { ok: true; path: string; relPath?: string }
 								| { ok: false };
 							if (r.ok) {
 								setPlanFilePath(r.path);
+								if (r.relPath) {
+									setPlanFileRelPath(r.relPath);
+									setLayoutMode('editor');
+									queueMicrotask(() => void openFileInTabRef.current(r.relPath!));
+								} else {
+									setPlanFileRelPath(null);
+								}
 							}
 							// 同时保存结构化 plan 到 threadStore
 							const structuredPlan = {
@@ -1647,6 +1686,7 @@ export default function App() {
 							? Math.max(0.1, (end - start) / 1000)
 							: 0.3;
 				setThoughtSecondsByThread((prev) => ({ ...prev, [payload.threadId]: thinkSec }));
+				planBuildPendingMarkerRef.current = null;
 				streamStartedAtRef.current = null;
 				firstTokenAtRef.current = null;
 				setAwaitingReply(false);
@@ -1844,6 +1884,9 @@ export default function App() {
 		resetLiveAgentBlocks();
 		streamStartedAtRef.current = null;
 		firstTokenAtRef.current = null;
+		setParsedPlan(null);
+		setPlanFilePath(null);
+		setPlanFileRelPath(null);
 		await loadMessages(r.id);
 		setComposerSegments([]);
 		setInlineResendSegments([]);
@@ -1878,6 +1921,9 @@ export default function App() {
 		resetLiveAgentBlocks();
 		streamStartedAtRef.current = null;
 		firstTokenAtRef.current = null;
+		setParsedPlan(null);
+		setPlanFilePath(null);
+		setPlanFileRelPath(null);
 		setResendFromUserIndex(null);
 		setComposerSegments([]);
 		setInlineResendSegments([]);
@@ -1993,7 +2039,17 @@ export default function App() {
 		}
 	}, [editingThreadId]);
 
-	const onSend = async (textOverride?: string, opts?: { threadId?: string }) => {
+	const onSend = async (
+		textOverride?: string,
+		opts?: {
+			threadId?: string;
+			modeOverride?: ComposerMode;
+			modelIdOverride?: string;
+			planExecute?: ChatPlanExecutePayload;
+			/** 非空时在本轮 stream 成功 done 后标记该计划文件已执行 Build */
+			planBuildPathKey?: string;
+		}
+	) => {
 		const resendIdx = resendFromUserIndex;
 		const segments = resendIdx !== null ? inlineResendSegments : composerSegments;
 		const fromSegments = segmentsToWireText(segments).trim();
@@ -2048,14 +2104,21 @@ export default function App() {
 		streamThreadRef.current = targetThreadId;
 		setAwaitingReply(true);
 
+		if (opts?.planExecute && opts.planBuildPathKey) {
+			const pk = opts.planBuildPathKey.trim().toLowerCase();
+			if (pk) {
+				planBuildPendingMarkerRef.current = { threadId: targetThreadId, pathKey: pk };
+			}
+		}
+
 		if (resendIdx !== null) {
 			setResendFromUserIndex(null);
 			const r = (await shell.invoke('chat:editResend', {
 				threadId: targetThreadId,
 				visibleIndex: resendIdx,
 				text,
-				mode: composerMode,
-				modelId: defaultModel,
+				mode: opts?.modeOverride ?? composerMode,
+				modelId: opts?.modelIdOverride ?? defaultModel,
 			})) as { ok?: boolean };
 			if (!r?.ok) {
 				setAwaitingReply(false);
@@ -2072,8 +2135,9 @@ export default function App() {
 		await shell.invoke('chat:send', {
 			threadId: targetThreadId,
 			text,
-			mode: composerMode,
-			modelId: defaultModel,
+			mode: opts?.modeOverride ?? composerMode,
+			modelId: opts?.modelIdOverride ?? defaultModel,
+			planExecute: opts?.planExecute,
 		});
 		void refreshThreads();
 	};
@@ -2082,6 +2146,7 @@ export default function App() {
 		if (!shell || !currentId) {
 			return;
 		}
+		planBuildPendingMarkerRef.current = null;
 		setMistakeLimitRequest(null);
 		await shell.invoke('chat:abort', currentId);
 		// Let the 'done' event from backend finalize the state
@@ -2144,31 +2209,103 @@ export default function App() {
 		[]
 	);
 
-	const onPlanBuild = useCallback(() => {
-		if (!parsedPlan) return;
-		planBuildContentRef.current = parsedPlan.body;
+	const onPlanBuild = useCallback(
+		(modelId: string) => {
+			if (!parsedPlan || !shell) {
+				return;
+			}
+			const threadId = currentIdRef.current;
+			if (!threadId) {
+				return;
+			}
+			const pbKeyEarly = planExecutedKey(workspace, planFileRelPath, planFilePath);
+			if (pbKeyEarly && executedPlanKeys.includes(pbKeyEarly)) {
+				return;
+			}
+			const planExecute: ChatPlanExecutePayload = {
+				fromAbsPath: planFilePath ?? undefined,
+				inlineMarkdown: toPlanMd(parsedPlan),
+				planTitle: parsedPlan.name,
+			};
+			setParsedPlan(null);
+			setPlanFilePath(null);
+			setPlanFileRelPath(null);
+			setPlanQuestion(null);
+			setPlanQuestionRequestId(null);
+			setComposerModePersist('agent');
+			setComposerSegments([{ id: newSegmentId(), kind: 'text', text: '' }]);
+			void onSend(t('plan.review.executeUserBubble'), {
+				modeOverride: 'agent',
+				modelIdOverride: modelId,
+				planExecute,
+				planBuildPathKey: pbKeyEarly || undefined,
+			});
+		},
+		[
+			parsedPlan,
+			planFilePath,
+			planFileRelPath,
+			workspace,
+			executedPlanKeys,
+			shell,
+			setComposerModePersist,
+			t,
+			onSend,
+		]
+	);
 
-		// 构建结构化步骤注入文本
-		const stepLines = parsedPlan.todos.length > 0
-			? parsedPlan.todos.map((s, i) => `${i + 1}. ${s.content}`).join('\n')
-			: '';
-		const structuredContext = stepLines
-			? `\n\n[Structured Plan — execute these steps in order]\n${stepLines}`
-			: '';
-
-		setParsedPlan(null);
-		setPlanQuestion(null);
-		setComposerModePersist('agent');
-		const buildPrompt = `请根据以下计划执行所有步骤，逐个修改文件：\n\n${parsedPlan.body}${structuredContext}`;
-		setComposerSegments(userMessageToSegments(buildPrompt, workspaceFileList));
-		setTimeout(() => {
-			const ref = hasConversation ? composerRichBottomRef.current : composerRichHeroRef.current;
-			ref?.focus();
-		}, 50);
-	}, [parsedPlan, workspaceFileList, hasConversation, setComposerModePersist]);
+	const onExecutePlanFromEditor = useCallback(
+		(modelId: string) => {
+			if (!shell || awaitingReply) {
+				return;
+			}
+			const threadId = currentIdRef.current;
+			if (!threadId || !hasConversation) {
+				return;
+			}
+			const fp = filePath.trim().replace(/\\/g, '/');
+			if (!isPlanMdPath(fp)) {
+				return;
+			}
+			const pbKey = planExecutedKey(workspace, fp, null);
+			if (pbKey && executedPlanKeys.includes(pbKey)) {
+				return;
+			}
+			const body = stripLeadingYamlFrontmatter(editorValue);
+			const parsed = parsePlanDocument(body);
+			const baseName = fp.split('/').pop() ?? 'plan.plan.md';
+			const planTitle = parsed?.name ?? baseName.replace(/\.plan\.md$/i, '');
+			const planExecute: ChatPlanExecutePayload = {
+				inlineMarkdown: parsed ? toPlanMd(parsed) : editorValue,
+				planTitle,
+			};
+			setComposerModePersist('agent');
+			setComposerSegments([{ id: newSegmentId(), kind: 'text', text: '' }]);
+			void onSend(t('plan.review.executeUserBubble'), {
+				modeOverride: 'agent',
+				modelIdOverride: modelId,
+				planExecute,
+				planBuildPathKey: pbKey || undefined,
+			});
+		},
+		[
+			shell,
+			awaitingReply,
+			hasConversation,
+			filePath,
+			editorValue,
+			workspace,
+			executedPlanKeys,
+			setComposerModePersist,
+			t,
+			onSend,
+		]
+	);
 
 	const onPlanReviewClose = useCallback(() => {
 		setParsedPlan(null);
+		setPlanFilePath(null);
+		setPlanFileRelPath(null);
 	}, []);
 
 	const onPersistLanguage = useCallback(
@@ -2410,7 +2547,16 @@ export default function App() {
 		// Check if tab already open
 		const existing = openTabs.find((t2) => t2.id === tid);
 		if (!existing) {
-			setOpenTabs((prev) => [...prev, { id: tid, filePath: rel, dirty: false }]);
+			const mdView = initialMarkdownViewForTab(rel);
+			setOpenTabs((prev) => [
+				...prev,
+				{
+					id: tid,
+					filePath: rel,
+					dirty: false,
+					...(mdView != null ? { markdownView: mdView } : {}),
+				},
+			]);
 		}
 		setActiveTabId(tid);
 		// Also set legacy filePath
@@ -2443,6 +2589,32 @@ export default function App() {
 			setEditorValue(t('app.readFileFailed', { detail: String(err) }));
 		}
 	}, [shell, openTabs, t]);
+
+	openFileInTabRef.current = openFileInTab;
+
+	useEffect(() => {
+		if (isPlanMdPath(filePath.trim())) {
+			setEditorPlanBuildModelId(defaultModel);
+		}
+	}, [filePath, defaultModel]);
+
+	useEffect(() => {
+		if (!shell || !currentId) {
+			setExecutedPlanKeys([]);
+			return;
+		}
+		let cancelled = false;
+		void shell.invoke('threads:getExecutedPlanKeys', currentId).then((r) => {
+			if (cancelled) {
+				return;
+			}
+			const rec = r as { ok?: boolean; keys?: string[] };
+			setExecutedPlanKeys(rec.ok && Array.isArray(rec.keys) ? rec.keys : []);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [shell, currentId]);
 
 	const handleOpenWorkspaceSkillFile = useCallback(
 		(rel: string) => {
@@ -2558,6 +2730,60 @@ export default function App() {
 		const u = workspaceRelativeFileUrl(workspace, fp);
 		return u ?? fp.replace(/\\/g, '/');
 	}, [workspace, filePath]);
+
+	const activeEditorTab = useMemo(
+		() => openTabs.find((t2) => t2.filePath === filePath.trim()),
+		[openTabs, filePath]
+	);
+	const markdownPaneMode = useMemo(() => {
+		const fp = filePath.trim();
+		if (!fp) {
+			return null;
+		}
+		return markdownViewForTab(fp, activeEditorTab?.markdownView);
+	}, [filePath, activeEditorTab?.markdownView]);
+
+	const setMarkdownPaneMode = useCallback((mode: MarkdownTabView) => {
+		const fp = filePath.trim();
+		if (!fp || !isMarkdownEditorPath(fp)) {
+			return;
+		}
+		setOpenTabs((prev) => prev.map((t) => (t.filePath === fp ? { ...t, markdownView: mode } : t)));
+	}, [filePath]);
+
+	const markdownPreviewContent = useMemo(() => {
+		const fp = filePath.trim();
+		if (!fp) {
+			return editorValue;
+		}
+		return stripPlanFrontmatterForPreview(fp, editorValue);
+	}, [filePath, editorValue]);
+
+	const editorActivePlanPathKey = useMemo(() => {
+		const fp = filePath.trim();
+		if (!isPlanMdPath(fp)) {
+			return '';
+		}
+		return planExecutedKey(workspace, fp, null);
+	}, [filePath, workspace]);
+
+	const editorPlanFileIsBuilt = useMemo(
+		() => Boolean(editorActivePlanPathKey && executedPlanKeys.includes(editorActivePlanPathKey)),
+		[editorActivePlanPathKey, executedPlanKeys]
+	);
+
+	const showPlanFileEditorChrome =
+		hasConversation && !!currentId && isPlanMdPath(filePath.trim());
+
+	const planReviewPathKeyMemo = useMemo(
+		() => planExecutedKey(workspace, planFileRelPath, planFilePath),
+		[workspace, planFileRelPath, planFilePath]
+	);
+
+	const planReviewIsBuilt = useMemo(
+		() => Boolean(planReviewPathKeyMemo && executedPlanKeys.includes(planReviewPathKeyMemo)),
+		[planReviewPathKeyMemo, executedPlanKeys]
+	);
 
 	const onMonacoMount = useCallback(
 		(ed: MonacoEditorNS.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
@@ -2743,6 +2969,7 @@ export default function App() {
 		const savedRel = r.relPath;
 		await shell.invoke('fs:writeFile', savedRel, editorValue);
 		const newTid = tabIdFromPath(savedRel);
+		const mdViewSaveAs = initialMarkdownViewForTab(savedRel);
 		setOpenTabs((prev) => {
 			const idx = activeTabId
 				? prev.findIndex((t2) => t2.id === activeTabId)
@@ -2751,10 +2978,23 @@ export default function App() {
 					: -1;
 			if (idx >= 0) {
 				const next = [...prev];
-				next[idx] = { id: newTid, filePath: savedRel, dirty: false };
+				next[idx] = {
+					id: newTid,
+					filePath: savedRel,
+					dirty: false,
+					...(mdViewSaveAs != null ? { markdownView: mdViewSaveAs } : {}),
+				};
 				return next;
 			}
-			return [...prev, { id: newTid, filePath: savedRel, dirty: false }];
+			return [
+				...prev,
+				{
+					id: newTid,
+					filePath: savedRel,
+					dirty: false,
+					...(mdViewSaveAs != null ? { markdownView: mdViewSaveAs } : {}),
+				},
+			];
 		});
 		setActiveTabId(newTid);
 		setFilePath(savedRel);
@@ -4085,7 +4325,10 @@ export default function App() {
 				{hasConversation && parsedPlan && composerMode === 'plan' ? (
 					<PlanReviewPanel
 						plan={parsedPlan}
-						planFilePath={planFilePath}
+						planFileDisplayPath={planFileRelPath ?? planFilePath}
+						initialBuildModelId={defaultModel}
+						modelItems={modelPickerItems}
+						planBuilt={planReviewIsBuilt}
 						onBuild={onPlanBuild}
 						onClose={onPlanReviewClose}
 						onTodoToggle={onPlanTodoToggle}
@@ -4803,6 +5046,28 @@ export default function App() {
 										<div className="ref-editor-bc-toolbar-inner">
 											<EditorFileBreadcrumb filePath={filePath.trim()} />
 											<div className="ref-editor-bc-actions">
+												{markdownPaneMode != null ? (
+													<div
+														className="ref-editor-md-mode-toggle"
+														role="group"
+														aria-label={t('app.editorMarkdownModeAria')}
+													>
+														<button
+															type="button"
+															className={`ref-editor-md-mode-btn ${markdownPaneMode === 'source' ? 'is-active' : ''}`}
+															onClick={() => setMarkdownPaneMode('source')}
+														>
+															{t('app.editorMarkdownSource')}
+														</button>
+														<button
+															type="button"
+															className={`ref-editor-md-mode-btn ${markdownPaneMode === 'preview' ? 'is-active' : ''}`}
+															onClick={() => setMarkdownPaneMode('preview')}
+														>
+															{t('app.editorMarkdownPreview')}
+														</button>
+													</div>
+												) : null}
 												<button
 													type="button"
 													className="ref-icon-tile"
@@ -4822,38 +5087,81 @@ export default function App() {
 												>
 													{t('common.save')}
 												</button>
+												{showPlanFileEditorChrome ? (
+													<div className="ref-editor-plan-chrome">
+														<select
+															className="ref-editor-plan-model-select"
+															value={editorPlanBuildModelId}
+															disabled={editorPlanFileIsBuilt}
+															onChange={(e) => setEditorPlanBuildModelId(e.target.value)}
+															aria-label={t('plan.review.model')}
+														>
+															{modelPickerItems.map((m) => (
+																<option key={m.id} value={m.id}>
+																	{m.label}
+																</option>
+															))}
+														</select>
+														{editorPlanFileIsBuilt ? (
+															<span className="ref-editor-plan-built" role="status">
+																{t('app.planEditorBuilt')}
+															</span>
+														) : (
+															<button
+																type="button"
+																className="ref-editor-plan-build-btn"
+																disabled={awaitingReply}
+																onClick={() => onExecutePlanFromEditor(editorPlanBuildModelId)}
+															>
+																{t('plan.review.build')}
+															</button>
+														)}
+													</div>
+												) : null}
 											</div>
 										</div>
 									</div>
 									<div className="ref-editor-canvas">
-										<div className="ref-editor-pane">
-											<div className="ref-monaco-fill">
-												<Editor
-													key={filePath.trim()}
-													height="100%"
-													theme="void-dark"
-													path={monacoDocumentPath || filePath.trim()}
-													language={languageFromFilePath(filePath.trim())}
-													value={editorValue}
-													onChange={(v) => {
-														setEditorValue(v ?? '');
-														setOpenTabs((prev) =>
-															prev.map((tab) =>
-																tab.filePath === filePath.trim() ? { ...tab, dirty: true } : tab
-															)
-														);
-													}}
-													onMount={onMonacoMount}
-													options={{
-														...editorSettingsToMonacoOptions(editorSettings),
-														scrollbar: {
-															verticalScrollbarSize: 8,
-															horizontalScrollbarSize: 8,
-															useShadows: false,
-														},
-													}}
-												/>
-											</div>
+										<div
+											className={`ref-editor-pane${markdownPaneMode === 'preview' ? ' ref-editor-pane--md-preview' : ''}`}
+										>
+											{markdownPaneMode === 'preview' ? (
+												<div
+													className="ref-editor-md-preview-scroll"
+													role="document"
+													aria-label={t('app.editorMarkdownPreview')}
+												>
+													<ChatMarkdown content={markdownPreviewContent} />
+												</div>
+											) : (
+												<div className="ref-monaco-fill">
+													<Editor
+														key={filePath.trim()}
+														height="100%"
+														theme="void-dark"
+														path={monacoDocumentPath || filePath.trim()}
+														language={languageFromFilePath(filePath.trim())}
+														value={editorValue}
+														onChange={(v) => {
+															setEditorValue(v ?? '');
+															setOpenTabs((prev) =>
+																prev.map((tab) =>
+																	tab.filePath === filePath.trim() ? { ...tab, dirty: true } : tab
+																)
+															);
+														}}
+														onMount={onMonacoMount}
+														options={{
+															...editorSettingsToMonacoOptions(editorSettings),
+															scrollbar: {
+																verticalScrollbarSize: 8,
+																horizontalScrollbarSize: 8,
+																useShadows: false,
+															},
+														}}
+													/>
+												</div>
+											)}
 										</div>
 									</div>
 								</>
@@ -5054,6 +5362,28 @@ export default function App() {
 									<span className="ref-editor-file-name" title={filePath.trim() || undefined}>
 										{editorFileBasename || t('app.noFileSelected')}
 									</span>
+									{markdownPaneMode != null ? (
+										<div
+											className="ref-editor-md-mode-toggle"
+											role="group"
+											aria-label={t('app.editorMarkdownModeAria')}
+										>
+											<button
+												type="button"
+												className={`ref-editor-md-mode-btn ${markdownPaneMode === 'source' ? 'is-active' : ''}`}
+												onClick={() => setMarkdownPaneMode('source')}
+											>
+												{t('app.editorMarkdownSource')}
+											</button>
+											<button
+												type="button"
+												className={`ref-editor-md-mode-btn ${markdownPaneMode === 'preview' ? 'is-active' : ''}`}
+												onClick={() => setMarkdownPaneMode('preview')}
+											>
+												{t('app.editorMarkdownPreview')}
+											</button>
+										</div>
+									) : null}
 									<button
 										type="button"
 										className="ref-icon-tile"
@@ -5075,29 +5405,79 @@ export default function App() {
 									>
 										{t('common.save')}
 									</button>
-								</div>
-								<div className="ref-editor-pane">
-									{filePath.trim() ? (
-										<div className="ref-monaco-fill">
-											<Editor
-												key={filePath.trim()}
-												height="100%"
-												theme="void-dark"
-												path={monacoDocumentPath || filePath.trim()}
-												language={languageFromFilePath(filePath.trim())}
-												value={editorValue}
-												onChange={(v) => setEditorValue(v ?? '')}
-												onMount={onMonacoMount}
-												options={{
-													...editorSettingsToMonacoOptions(editorSettings),
-													scrollbar: {
-														verticalScrollbarSize: 8,
-														horizontalScrollbarSize: 8,
-														useShadows: false,
-													},
-												}}
-											/>
+									{showPlanFileEditorChrome ? (
+										<div className="ref-editor-plan-chrome">
+											<select
+												className="ref-editor-plan-model-select"
+												value={editorPlanBuildModelId}
+												disabled={editorPlanFileIsBuilt}
+												onChange={(e) => setEditorPlanBuildModelId(e.target.value)}
+												aria-label={t('plan.review.model')}
+											>
+												{modelPickerItems.map((m) => (
+													<option key={m.id} value={m.id}>
+														{m.label}
+													</option>
+												))}
+											</select>
+											{editorPlanFileIsBuilt ? (
+												<span className="ref-editor-plan-built" role="status">
+													{t('app.planEditorBuilt')}
+												</span>
+											) : (
+												<button
+													type="button"
+													className="ref-editor-plan-build-btn"
+													disabled={awaitingReply}
+													onClick={() => onExecutePlanFromEditor(editorPlanBuildModelId)}
+												>
+													{t('plan.review.build')}
+												</button>
+											)}
 										</div>
+									) : null}
+								</div>
+								<div
+									className={`ref-editor-pane${markdownPaneMode === 'preview' ? ' ref-editor-pane--md-preview' : ''}`}
+								>
+									{filePath.trim() ? (
+										markdownPaneMode === 'preview' ? (
+											<div
+												className="ref-editor-md-preview-scroll"
+												role="document"
+												aria-label={t('app.editorMarkdownPreview')}
+											>
+												<ChatMarkdown content={markdownPreviewContent} />
+											</div>
+										) : (
+											<div className="ref-monaco-fill">
+												<Editor
+													key={filePath.trim()}
+													height="100%"
+													theme="void-dark"
+													path={monacoDocumentPath || filePath.trim()}
+													language={languageFromFilePath(filePath.trim())}
+													value={editorValue}
+													onChange={(v) => {
+														setEditorValue(v ?? '');
+														setOpenTabs((prev) =>
+															prev.map((tab) =>
+																tab.filePath === filePath.trim() ? { ...tab, dirty: true } : tab
+															)
+														);
+													}}
+													onMount={onMonacoMount}
+													options={{
+														...editorSettingsToMonacoOptions(editorSettings),
+														scrollbar: {
+															verticalScrollbarSize: 8,
+															horizontalScrollbarSize: 8,
+															useShadows: false,
+														},
+													}}
+												/>
+											</div>
+										)
 									) : (
 										<div className="ref-editor-empty">{t('app.selectFileToView')}</div>
 									)}

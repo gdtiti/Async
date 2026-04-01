@@ -27,6 +27,8 @@ const INVOKE_CHANNELS = new Set([
 	'threads:select',
 	'threads:delete',
 	'threads:rename',
+	'threads:getExecutedPlanKeys',
+	'threads:markPlanExecuted',
 	'chat:send',
 	'chat:editResend',
 	'chat:abort',

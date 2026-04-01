@@ -38,6 +38,8 @@ export type ThreadRecord = {
 	summaryCoversMessageCount?: number;
 	/** 结构化计划（从 Plan 模式输出解析而来） */
 	plan?: ThreadPlan;
+	/** 本会话已对哪些计划文件执行过 Build（工作区相对路径，/ 分隔，小写） */
+	executedPlanFileKeys?: string[];
 };
 
 export type PlanStepStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
@@ -292,6 +294,27 @@ export function updatePlanStepStatus(threadId: string, stepId: string, status: P
 		t.plan.updatedAt = Date.now();
 		save();
 	}
+}
+
+export function getExecutedPlanFileKeys(threadId: string): string[] {
+	const t = data.threads[threadId];
+	return Array.isArray(t?.executedPlanFileKeys) ? [...t.executedPlanFileKeys!] : [];
+}
+
+export function markPlanFileExecuted(threadId: string, pathKey: string): void {
+	const k = String(pathKey ?? '').trim().toLowerCase();
+	if (!k) {
+		return;
+	}
+	const t = data.threads[threadId];
+	if (!t) {
+		return;
+	}
+	const set = new Set((t.executedPlanFileKeys ?? []).map((x) => String(x).toLowerCase()));
+	set.add(k);
+	t.executedPlanFileKeys = [...set];
+	t.updatedAt = Date.now();
+	save();
 }
 
 /** 保存摘要到线程记录（不修改 messages）。 */
