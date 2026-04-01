@@ -2,8 +2,9 @@
  * 多轮 Agent 工具循环 — 核心引擎。
  *
  * 历史中的结构化助手消息经 `structuredAssistantToApi.ts` 展开为 OpenAI/Anthropic 原生 tool 序列；
- * 随后 `apiConversationRepair.ts` 做跨消息配对修复（孤儿 tool、缺失 tool 响应补全、Anthropic 侧孤儿 tool_result user 等），
- * 对齐 Claude Code `messages.ts` `ensureToolResultPairing`；无法安全展开时仍回退单条 legacy XML。
+ * 随后 `messageNormalizeForApi.ts` 做相邻 user 合并、纯文本 assistant 回溯合并、assistant 内孤儿 server/mcp tool_use 剥离（对齐 CC `normalizeMessagesForAPI` 子集），
+ * 再由 `apiConversationRepair.ts` 做跨消息配对修复（孤儿 tool、缺失 tool 响应补全、Anthropic 侧孤儿 tool_result user 等），
+ * 对齐 Claude Code `messages.ts` `ensureToolResultPairing`；无法安全展开时仍回退单条 legacy XML。配对修复后再合并一次相邻 user，避免 repair 产生连续 user。
  *
  * 类似 Cursor / Claude Code 的实现方式：
  * 1. 将对话消息 + 工具定义发给 LLM
@@ -42,6 +43,12 @@ import { repairAgentThreadMessagesForApi } from './agentToolProtocolRepair.js';
 import { StructuredAssistantBuilder } from './structuredAssistantBuilder.js';
 import { parseAgentAssistantPayload } from '../../src/agentStructuredMessage.js';
 import { repairAnthropicToolPairing, repairOpenAIToolPairing } from './apiConversationRepair.js';
+import {
+	mergeAdjacentAnthropicUserMessages,
+	mergeAdjacentOpenAIUserMessages,
+	normalizeAnthropicMessagesForApi,
+	normalizeOpenAIMessagesForApi,
+} from './messageNormalizeForApi.js';
 import {
 	expandStructuredAssistantPayloadToAnthropic,
 	expandStructuredAssistantPayloadToOpenAI,
@@ -411,7 +418,9 @@ async function runOpenAILoop(
 		agentToolDefsForLoop(options.composerMode, settings, options.toolPoolOverride)
 	);
 
-	const conversation: OAIMsg[] = repairOpenAIToolPairing(threadToOpenAI(threadMessages, systemContent));
+	let conversation: OAIMsg[] = normalizeOpenAIMessagesForApi(threadToOpenAI(threadMessages, systemContent));
+	conversation = repairOpenAIToolPairing(conversation);
+	conversation = mergeAdjacentOpenAIUserMessages(conversation);
 	const structured = new StructuredAssistantBuilder();
 	const effort = openAIReasoningEffort(options.thinkingLevel ?? 'off');
 	let accUsage: TurnTokenUsage | undefined;
@@ -771,7 +780,9 @@ async function runAnthropicLoop(
 	if (!model) { handlers.onError('模型请求名称为空。'); return; }
 	const temperature = temperatureForMode(options.composerMode);
 
-	const conversation: MessageParam[] = repairAnthropicToolPairing(threadToAnthropic(threadMessages));
+	let conversation: MessageParam[] = normalizeAnthropicMessagesForApi(threadToAnthropic(threadMessages));
+	conversation = repairAnthropicToolPairing(conversation);
+	conversation = mergeAdjacentAnthropicUserMessages(conversation);
 	if (conversation.length === 0) { handlers.onError('没有可发送的对话消息。'); return; }
 
 	const tools = toAnthropicTools(
