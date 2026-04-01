@@ -17,7 +17,7 @@ export type McpServerConfig = {
 	command?: string;
 	args?: string[];
 	env?: Record<string, string>;
-	/** SSE/HTTP 配置 */
+	/** 远程 MCP 端点（SSE 或 Streamable HTTP） */
 	url?: string;
 	headers?: Record<string, string>;
 	/** 自动启动（默认 true） */

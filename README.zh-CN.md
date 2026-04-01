@@ -54,14 +54,6 @@ Async Shell 是一款开源的 AI 原生桌面应用，定位是你和 Agent 之
 
 ## 界面预览
 
-GitHub 的 README 里用 `<img>` 引用 **SVG** 经常加载失败（安全策略），所以这里统一用 **PNG**。示意图的源文件是 `docs/assets/` 下的同名 **SVG**，改完图后在本机执行下面命令即可重新生成 PNG：
-
-```bash
-npm run readme:screenshots
-```
-
-若要用真实界面截图，可直接替换 `docs/assets/` 里对应的 `.png` 文件。
-
 ### Editor 布局
 
 <p align="center">

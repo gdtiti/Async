@@ -14,7 +14,9 @@
     "desktop": "npm run build && cross-env ASYNC_SHELL_LOAD_DIST=1 electron .",
     "dev": "npm run build:main && concurrently -k \"npm run build:main:watch\" \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "dev:debug": "npm run build:main && concurrently -k \"npm run build:main:watch\" \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env ASYNC_SHELL_DEVTOOLS=1 electron .\"",
-    "start:electron": "npm run desktop"
+    "start:electron": "npm run desktop",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@types/diff": "^5.2.3",
@@ -29,12 +31,14 @@
     "sharp": "^0.34.5",
     "typescript": "^5.9.3",
     "vite": "^6.0.3",
+    "vitest": "^3.2.4",
     "wait-on": "^8.0.1"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@chenglou/pretext": "^0.0.3",
     "@google/generative-ai": "^0.21.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@monaco-editor/react": "^4.6.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",

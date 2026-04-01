@@ -213,10 +213,13 @@ function McpServerEditForm({ config, onChange, onSave, onCancel, onDelete, isNew
 					<span>{t('mcp.form.transport')}</span>
 					<select
 						value={config.transport}
-						onChange={(e) => onChange({ ...config, transport: e.target.value as 'stdio' | 'sse' })}
+						onChange={(e) =>
+							onChange({ ...config, transport: e.target.value as 'stdio' | 'sse' | 'http' })
+						}
 					>
 						<option value="stdio">{t('mcp.transport.stdio')}</option>
 						<option value="sse">{t('mcp.transport.sse')}</option>
+						<option value="http">{t('mcp.transport.http')}</option>
 					</select>
 				</label>
 			</div>
@@ -293,7 +296,11 @@ function McpServerEditForm({ config, onChange, onSave, onCancel, onDelete, isNew
 							<input
 								value={config.url ?? ''}
 								onChange={(e) => onChange({ ...config, url: e.target.value })}
-								placeholder="http://localhost:8080/sse"
+								placeholder={
+									config.transport === 'http'
+										? 'http://localhost:8080/mcp'
+										: 'http://localhost:8080/sse'
+								}
 							/>
 						</label>
 					</div>

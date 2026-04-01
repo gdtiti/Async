@@ -11,6 +11,8 @@ import type {
 	McpToolResult,
 } from './mcpTypes.js';
 import type { AgentToolDef } from '../agent/agentTools.js';
+import { buildMcpToolName } from './mcpStringUtils.js';
+import { resolveMcpToolInvocation } from './mcpToolResolve.js';
 
 export type McpManagerEvents = {
 	servers_changed: [];
@@ -23,14 +25,14 @@ export type McpToolWithSource = McpToolDef & {
 	serverName: string;
 };
 
-/** 将 MCP 工具转换为 Agent 工具格式 */
+/** 将 MCP 工具转换为 Agent 工具格式（命名规则与 Claude Code 一致） */
 function mcpToolToAgentTool(tool: McpToolWithSource): AgentToolDef {
 	return {
-		name: `mcp__${tool.serverId}__${tool.name}`,
+		name: buildMcpToolName(tool.serverId, tool.name),
 		description: tool.description ?? `MCP tool: ${tool.name} (from ${tool.serverName})`,
 		parameters: {
 			type: 'object',
-			properties: tool.inputSchema.properties ?? {},
+			properties: (tool.inputSchema.properties ?? {}) as Record<string, Record<string, unknown>>,
 			required: tool.inputSchema.required ?? [],
 		},
 	};
@@ -65,6 +67,19 @@ export class McpManager extends EventEmitter<McpManagerEvents> {
 	/** 获取当前配置 */
 	getConfigs(): McpServerConfig[] {
 		return this.configs;
+	}
+
+	/** 已连接客户端（用于资源列举等，与 Claude Code 的 mcpClients 用途类似） */
+	getConnectedClients(): McpClient[] {
+		return Array.from(this.clients.values()).filter((c) => c.getServerStatus().status === 'connected');
+	}
+
+	/** 按配置 id 或显示名解析客户端（与 ListMcpResources / ReadMcpResource 的 server 参数一致） */
+	getClientByServerRef(ref: string): McpClient | undefined {
+		for (const c of this.clients.values()) {
+			if (c.config.id === ref || c.config.name === ref) return c;
+		}
+		return undefined;
 	}
 
 	/** 启动所有已启用且 autoStart 的服务器 */
@@ -116,21 +131,14 @@ export class McpManager extends EventEmitter<McpManagerEvents> {
 		this.emit('servers_changed');
 	}
 
-	/** 调用工具 */
+	/** 调用工具（按规范化名匹配 server，按远端真实 tool name 调用） */
 	async callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
-		// Parse tool name: mcp__<serverId>__<toolName>
-		const match = name.match(/^mcp__(.+)__(.+)$/);
-		if (!match) {
-			throw new Error(`Invalid MCP tool name: ${name}`);
+		const resolved = resolveMcpToolInvocation(Array.from(this.clients.values()), name);
+		if (!resolved.ok) {
+			throw new Error(resolved.message);
 		}
-
-		const [, serverId, toolName] = match;
-		const client = this.clients.get(serverId!);
-		if (!client) {
-			throw new Error(`MCP server not found: ${serverId}`);
-		}
-
-		return client.callTool(toolName!, args);
+		const client = resolved.client as McpClient;
+		return client.callTool(resolved.toolName, args);
 	}
 
 	/** 判断工具名是否为 MCP 工具 */

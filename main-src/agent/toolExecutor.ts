@@ -73,6 +73,95 @@ function formatMcpToolResultForAgent(result: McpToolResult): string {
 	return text || '(empty MCP result)';
 }
 
+const MAX_MCP_RESOURCE_LIST_CHARS = 100_000;
+
+async function executeListMcpResources(call: ToolCall): Promise<ToolResult> {
+	const filter = String(call.arguments.server ?? '').trim();
+	const mgr = getMcpManager();
+	const clients = mgr.getConnectedClients();
+	let targets = clients;
+	if (filter) {
+		targets = clients.filter((c) => c.config.id === filter || c.config.name === filter);
+		if (targets.length === 0) {
+			return {
+				toolCallId: call.id,
+				name: call.name,
+				content: `No connected MCP server matches "${filter}".`,
+				isError: true,
+			};
+		}
+	}
+	const rows: Array<{
+		uri: string;
+		name: string;
+		server: string;
+		mimeType?: string;
+		description?: string;
+	}> = [];
+	for (const c of targets) {
+		const st = c.getServerStatus();
+		for (const r of st.resources) {
+			rows.push({
+				uri: r.uri,
+				name: r.name,
+				server: c.config.name,
+				mimeType: r.mimeType,
+				description: r.description,
+			});
+		}
+	}
+	let text = JSON.stringify(rows, null, 2);
+	if (text.length > MAX_MCP_RESOURCE_LIST_CHARS) {
+		text = text.slice(0, MAX_MCP_RESOURCE_LIST_CHARS) + '\n... (truncated)';
+	}
+	return { toolCallId: call.id, name: call.name, content: text || '[]', isError: false };
+}
+
+async function executeReadMcpResource(call: ToolCall): Promise<ToolResult> {
+	const server = String(call.arguments.server ?? '').trim();
+	const uri = String(call.arguments.uri ?? '').trim();
+	if (!server || !uri) {
+		return {
+			toolCallId: call.id,
+			name: call.name,
+			content: 'Error: server and uri are required',
+			isError: true,
+		};
+	}
+	const client = getMcpManager().getClientByServerRef(server);
+	if (!client) {
+		return {
+			toolCallId: call.id,
+			name: call.name,
+			content: `MCP server not found: ${server}`,
+			isError: true,
+		};
+	}
+	if (client.getServerStatus().status !== 'connected') {
+		return {
+			toolCallId: call.id,
+			name: call.name,
+			content: `MCP server not connected: ${server}`,
+			isError: true,
+		};
+	}
+	try {
+		const raw = await client.readResource(uri);
+		const text = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
+		const clipped =
+			text.length > MAX_READ_SIZE ? text.slice(0, MAX_READ_SIZE) + '\n... (truncated)' : text;
+		return { toolCallId: call.id, name: call.name, content: clipped, isError: false };
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : String(e);
+		return {
+			toolCallId: call.id,
+			name: call.name,
+			content: `MCP resources/read failed: ${msg}`,
+			isError: true,
+		};
+	}
+}
+
 async function executeMcpAgentTool(call: ToolCall): Promise<ToolResult> {
 	try {
 		const raw = await getMcpManager().callTool(call.name, call.arguments);
@@ -113,6 +202,10 @@ export async function executeTool(call: ToolCall, hooks: ToolExecutionHooks = {}
 			return await executeGetDiagnostics(call);
 		case 'delegate_task':
 			return await executeDelegateTask(call);
+		case 'ListMcpResourcesTool':
+			return await executeListMcpResources(call);
+		case 'ReadMcpResourceTool':
+			return await executeReadMcpResource(call);
 		default:
 			if (getMcpManager().isMcpTool(call.name)) {
 				return await executeMcpAgentTool(call);

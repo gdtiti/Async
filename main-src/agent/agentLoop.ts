@@ -14,6 +14,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam, ContentBlockParam, ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages';
 import type { ChatMessage } from '../threadStore.js';
 import type { ShellSettings, ModelRequestParadigm, ThinkingLevel } from '../settingsStore.js';
+import { assembleAgentToolPool, filterMcpToolsByDenyPrefixes } from './agentToolPool.js';
 import type { TurnTokenUsage } from '../llm/types.js';
 import { composeSystem, temperatureForMode } from '../llm/modePrompts.js';
 import {
@@ -45,7 +46,13 @@ export type BeforeExecuteToolResult = { proceed: true } | { proceed: false; reje
 const DEFAULT_MAX_CONSECUTIVE_MISTAKES = 5;
 
 /** 只读类工具：不向 UI 发送 tool_input_delta，避免参数 JSON 流式刷新；完成后由活动行渐入展示 */
-const READ_TOOLS_SKIP_INPUT_DELTA = new Set(['read_file', 'list_dir', 'search_files']);
+const READ_TOOLS_SKIP_INPUT_DELTA = new Set([
+	'read_file',
+	'list_dir',
+	'search_files',
+	'ListMcpResourcesTool',
+	'ReadMcpResourceTool',
+]);
 
 function shouldEmitToolInputDelta(toolName: string): boolean {
 	return !READ_TOOLS_SKIP_INPUT_DELTA.has(toolName);
@@ -204,21 +211,30 @@ function inferOpenAIToolNameFromPartialArguments(partial: string): string {
 	return '';
 }
 
-/** Agent 模式：合并内置工具与已连接 MCP 服务器的工具（与 Claude Code 的 mcp__server__tool 命名一致）。Plan 模式不暴露 MCP，避免计划阶段执行外部副作用。 */
-function agentToolDefsForLoop(composerMode: ComposerMode): AgentToolDef[] {
-	const toolMode = composerMode === 'plan' ? 'plan' : 'agent';
-	const base = agentToolsForComposerMode(toolMode);
-	if (toolMode !== 'agent') {
-		return base;
-	}
-	return [...base, ...getMcpManager().getAgentTools()];
+/**
+ * 组装本轮回合的工具表（对齐 Claude Code assembleToolPool）：
+ * - Plan：仅只读内置工具 + List/Read MCP 资源工具；不注册动态 `mcp__*` 工具。
+ * - Agent：内置 + 过滤后的动态 MCP 工具；同名以内置为准。
+ */
+function agentToolDefsForLoop(composerMode: ComposerMode, settings: ShellSettings): AgentToolDef[] {
+	return assembleAgentToolPool(composerMode, {
+		mcpToolDenyPrefixes: settings.mcpToolDenyPrefixes,
+	});
 }
 
-function appendMcpToolsSystemHint(systemContent: string, composerMode: ComposerMode): string {
+function appendMcpToolsSystemHint(
+	systemContent: string,
+	composerMode: ComposerMode,
+	settings: ShellSettings
+): string {
 	if (composerMode !== 'agent') {
 		return systemContent;
 	}
-	const n = getMcpManager().getAgentTools().length;
+	const mcpTools = filterMcpToolsByDenyPrefixes(
+		getMcpManager().getAgentTools(),
+		settings.mcpToolDenyPrefixes
+	);
+	const n = mcpTools.length;
 	if (n === 0) {
 		return systemContent;
 	}
@@ -227,12 +243,16 @@ function appendMcpToolsSystemHint(systemContent: string, composerMode: ComposerM
 		'',
 		`## MCP tools (${n})`,
 		'Additional tools from configured Model Context Protocol servers are registered with names prefixed `mcp__`.',
+		'Use `ListMcpResourcesTool` / `ReadMcpResourceTool` to browse MCP resources when needed.',
 		'Use them when the user needs integrations beyond the built-in workspace tools (e.g. web, APIs, databases). Follow each tool\'s description and parameter schema.',
 	].join('\n');
 }
 
-async function prepareMcpBeforeAgentLoop(composerMode: ComposerMode): Promise<void> {
-	if (composerMode !== 'agent') {
+/**
+ * 为工具会话准备 MCP 连接：Agent 需要动态工具；Plan 仅需连接以便 ListMcpResourcesTool / ReadMcpResourceTool。
+ */
+async function prepareMcpConnectionsForSession(composerMode: ComposerMode): Promise<void> {
+	if (composerMode !== 'agent' && composerMode !== 'plan') {
 		return;
 	}
 	const mgr = getMcpManager();
@@ -249,7 +269,7 @@ export async function runAgentLoop(
 	handlers: AgentLoopHandlers
 ): Promise<void> {
 	const messagesForApi = repairAgentThreadMessagesForApi(threadMessages);
-	await prepareMcpBeforeAgentLoop(options.composerMode);
+	await prepareMcpConnectionsForSession(options.composerMode);
 	switch (options.paradigm) {
 		case 'anthropic':
 			return runAnthropicLoop(settings, messagesForApi, options, handlers);
@@ -363,11 +383,12 @@ async function runOpenAILoop(
 	const storedSystem = threadMessages.find((m) => m.role === 'system');
 	const systemContent = appendMcpToolsSystemHint(
 		composeSystem(storedSystem?.content, options.composerMode, options.agentSystemAppend),
-		options.composerMode
+		options.composerMode,
+		settings
 	);
 	const temperature = temperatureForMode(options.composerMode);
 
-	const tools = toOpenAITools(agentToolDefsForLoop(options.composerMode));
+	const tools = toOpenAITools(agentToolDefsForLoop(options.composerMode, settings));
 
 	const conversation: OAIMsg[] = threadToOpenAI(threadMessages, systemContent);
 	let fullContent = '';
@@ -701,7 +722,8 @@ async function runAnthropicLoop(
 	const storedSystem = threadMessages.find((m) => m.role === 'system');
 	const system = appendMcpToolsSystemHint(
 		composeSystem(storedSystem?.content, options.composerMode, options.agentSystemAppend),
-		options.composerMode
+		options.composerMode,
+		settings
 	);
 	const model = options.requestModelId.trim();
 	if (!model) { handlers.onError('模型请求名称为空。'); return; }
@@ -710,7 +732,7 @@ async function runAnthropicLoop(
 	const conversation: MessageParam[] = threadToAnthropic(threadMessages);
 	if (conversation.length === 0) { handlers.onError('没有可发送的对话消息。'); return; }
 
-	const tools = toAnthropicTools(agentToolDefsForLoop(options.composerMode));
+	const tools = toAnthropicTools(agentToolDefsForLoop(options.composerMode, settings));
 	let fullContent = '';
 	const thinkBudget = anthropicThinkingBudget(options.thinkingLevel ?? 'off');
 	let accUsage: TurnTokenUsage | undefined;

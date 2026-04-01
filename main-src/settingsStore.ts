@@ -102,6 +102,11 @@ export type ShellSettings = {
 	indexing?: ShellIndexingSettings;
 	/** MCP 服务器配置 */
 	mcpServers?: McpServerConfig[];
+	/**
+	 * MCP 工具全名前缀拒绝列表（与 Claude Code 按 `mcp__server` 等规则预过滤类似）。
+	 * 若某工具名以列表中任一条目开头，则不会进入模型可见工具表（仅影响动态 MCP 工具，不含 ListMcpResourcesTool 等内置项）。
+	 */
+	mcpToolDenyPrefixes?: string[];
 };
 
 const defaultSettings: ShellSettings = {

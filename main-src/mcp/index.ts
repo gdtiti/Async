@@ -6,3 +6,14 @@
 export * from './mcpTypes.js';
 export { McpClient, type McpClientEvents } from './mcpClient.js';
 export { McpManager, getMcpManager, destroyMcpManager, type McpManagerEvents, type McpToolWithSource } from './mcpManager.js';
+export {
+	buildMcpToolName,
+	getMcpPrefix,
+	mcpInfoFromString,
+	normalizeNameForMCP,
+} from './mcpStringUtils.js';
+export {
+	resolveMcpToolInvocation,
+	type McpClientLike,
+	type ResolveMcpToolResult,
+} from './mcpToolResolve.js';

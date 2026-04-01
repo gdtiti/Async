@@ -26,8 +26,15 @@ export type ToolResult = {
 	isError: boolean;
 };
 
-/** 只读工具：可安全并发执行，不修改文件系统或运行副作用命令 */
-export const READ_ONLY_AGENT_TOOL_NAMES = ['read_file', 'list_dir', 'search_files', 'get_diagnostics'] as const;
+/** 只读工具：可安全并发执行，不修改文件系统或运行副作用命令（含 Claude Code 风格的 MCP 资源工具） */
+export const READ_ONLY_AGENT_TOOL_NAMES = [
+	'read_file',
+	'list_dir',
+	'search_files',
+	'get_diagnostics',
+	'ListMcpResourcesTool',
+	'ReadMcpResourceTool',
+] as const;
 
 export function isReadOnlyAgentTool(name: string): boolean {
 	return (READ_ONLY_AGENT_TOOL_NAMES as readonly string[]).includes(name);
@@ -179,6 +186,35 @@ export const AGENT_TOOLS: AgentToolDef[] = [
 				},
 			},
 			required: ['task'],
+		},
+	},
+	{
+		name: 'ListMcpResourcesTool',
+		description:
+			'List resources exposed by connected MCP (Model Context Protocol) servers. Each entry includes uri, name, optional mimeType/description, and server (the configured MCP server display name). Use optional `server` to filter to one server. Requires MCP servers to be connected (e.g. enabled in settings).',
+		parameters: {
+			type: 'object',
+			properties: {
+				server: {
+					type: 'string',
+					description:
+						'Optional: MCP server id or display name to filter; omit to list from all connected servers.',
+				},
+			},
+			required: [],
+		},
+	},
+	{
+		name: 'ReadMcpResourceTool',
+		description:
+			'Read a resource from a connected MCP server by URI (same naming as Claude Code). Use ListMcpResourcesTool first to discover URIs. Parameters must identify the server (id or display name as configured) and the resource uri.',
+		parameters: {
+			type: 'object',
+			properties: {
+				server: { type: 'string', description: 'MCP server id or display name from settings' },
+				uri: { type: 'string', description: 'Resource URI to read' },
+			},
+			required: ['server', 'uri'],
 		},
 	},
 ];
