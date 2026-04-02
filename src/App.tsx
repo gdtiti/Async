@@ -526,14 +526,6 @@ function IconCloseSmall({ className }: { className?: string }) {
 	);
 }
 
-function IconChipClear({ className }: { className?: string }) {
-	return (
-		<svg className={className} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" aria-hidden>
-			<path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-		</svg>
-	);
-}
-
 function IconPencil({ className }: { className?: string }) {
 	return (
 		<svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -763,7 +755,7 @@ export default function App() {
 	const openFileInTabRef = useRef<(rel: string, revealLine?: number, revealEndLine?: number) => Promise<void>>(
 		async () => {}
 	);
-	const [agentGitPanelOpen, setAgentGitPanelOpen] = useState(true);
+	const [agentGitPanelOpen, setAgentGitPanelOpen] = useState(false);
 	const [treeEpoch, setTreeEpoch] = useState(0);
 	const [commitMsg, setCommitMsg] = useState('');
 	const [lastTurnUsage, setLastTurnUsage] = useState<TurnTokenUsage | null>(null);
@@ -4398,8 +4390,7 @@ export default function App() {
 	const renderStackedChatComposer = (
 		slot: 'bottom' | 'inline',
 		composer: { segments: ComposerSegment[]; setSegments: typeof setComposerSegments; canSend: boolean },
-		extraClass?: string,
-		hideModeReset = false
+		extraClass?: string
 	) => {
 		const richRef = slot === 'bottom' ? composerRichBottomRef : composerRichInlineRef;
 		const plusRef = slot === 'bottom' ? plusAnchorBottomRef : plusAnchorInlineRef;
@@ -4429,16 +4420,6 @@ export default function App() {
 						<span className="ref-mode-chip-label">{composerModeLabel(composerMode, t)}</span>
 						<IconChevron className="ref-mode-chip-menu-chev" />
 					</button>
-					{composerMode !== 'agent' && !hideModeReset ? (
-						<button
-							type="button"
-							className="ref-mode-chip-clear"
-							aria-label={t('app.resetAgentModeAria')}
-							onClick={() => setComposerModePersist('agent')}
-						>
-							<IconChipClear className="ref-mode-chip-clear-svg" />
-						</button>
-					) : null}
 				</div>
 				<div className="ref-model-pill-anchor" ref={modelRef}>
 					<button
@@ -4622,8 +4603,7 @@ export default function App() {
 								setSegments: setInlineResendSegments,
 								canSend: canSendInlineResend,
 							},
-							'ref-capsule--inline-edit',
-							hideModeReset
+							'ref-capsule--inline-edit'
 						)}
 					</div>
 				);
@@ -4981,7 +4961,7 @@ export default function App() {
 						segments: composerSegments,
 						setSegments: setComposerSegments,
 						canSend: canSendComposer,
-					}, undefined, isEditorRail)
+					}, undefined)
 				) : isEditorRail ? null : (
 					<>
 						<div className="ref-capsule">
@@ -5040,16 +5020,6 @@ export default function App() {
 										<span className="ref-mode-chip-label">{composerModeLabel(composerMode, t)}</span>
 										<IconChevron className="ref-mode-chip-menu-chev" />
 									</button>
-									{composerMode !== 'agent' ? (
-										<button
-											type="button"
-											className="ref-mode-chip-clear"
-											aria-label={t('app.resetAgentModeAria')}
-											onClick={() => setComposerModePersist('agent')}
-										>
-											<IconChipClear className="ref-mode-chip-clear-svg" />
-										</button>
-									) : null}
 								</div>
 								<div className="ref-model-pill-anchor" ref={modelPillHeroRef}>
 									<button
@@ -5388,18 +5358,6 @@ export default function App() {
 							<IconSidebarRight />
 						</button>
 					</div>
-					{layoutMode === 'agent' ? (
-						<button
-							type="button"
-							className={`ref-layout-btn ref-layout-btn--git ${agentGitPanelOpen ? 'is-active' : ''}`}
-							onClick={() => setAgentGitPanelOpen((open) => !open)}
-							title={t('app.tabGit')}
-							aria-label={t('app.tabGit')}
-							aria-pressed={agentGitPanelOpen}
-						>
-							<IconGitSCM />
-						</button>
-					) : null}
 					<button
 						type="button"
 						className="ref-icon-tile ref-settings-btn"
@@ -5724,7 +5682,7 @@ export default function App() {
 
 				{layoutMode === 'agent' ? (
 				<main
-					className={`ref-center ref-center--agent-layout ${hasConversation ? 'ref-center--chat' : ''}`}
+					className={`ref-center ref-center--agent-layout ${hasConversation ? 'ref-center--chat' : 'ref-center--empty-agent'}`}
 					aria-label={t('app.commandCenter')}
 					onKeyDown={onPlanNewIdea}
 				>
@@ -5741,6 +5699,18 @@ export default function App() {
 							</div>
 						) : null}
 					</div>
+
+					<button
+						type="button"
+						className={`ref-agent-rail-toggle ${agentGitPanelOpen ? 'is-open' : ''}`}
+						onClick={() => setAgentGitPanelOpen((open) => !open)}
+						title={t('app.tabGit')}
+						aria-label={t('app.tabGit')}
+						aria-pressed={agentGitPanelOpen}
+						aria-controls="agent-git-sidebar"
+					>
+						<IconGitSCM />
+					</button>
 
 					{renderAgentConversationBelowContext()}
 				</main>
@@ -6015,6 +5985,7 @@ export default function App() {
 
 				{layoutMode === 'agent' ? (
 				<aside
+					id="agent-git-sidebar"
 					className={`ref-right ref-right--agent-layout ${agentGitPanelOpen ? 'is-open' : 'is-collapsed'}`}
 					aria-label={t('app.rightSidebar')}
 					aria-hidden={!agentGitPanelOpen}
@@ -6032,13 +6003,12 @@ export default function App() {
 							<div className="ref-right-icon-tabs ref-right-icon-tabs--single" aria-label={t('app.rightSidebarViews')}>
 								<button
 									type="button"
-									aria-pressed="true"
-									aria-label={t('app.tabGit')}
-									title={t('app.tabGit')}
-									className="ref-right-icon-tab is-active"
+									aria-label={t('common.close')}
+									title={t('common.close')}
+									className="ref-right-icon-tab"
 									onClick={() => setAgentGitPanelOpen(false)}
 								>
-									<IconGitSCM />
+									<IconCloseSmall />
 								</button>
 							</div>
 						</div>

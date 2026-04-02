@@ -2250,7 +2250,21 @@ body {
 }
 
 .ref-center--agent-layout {
+	position: relative;
 	padding-inline: 28px;
+}
+
+.ref-center--empty-agent {
+	--ref-center-composer-lift: clamp(18px, 4vh, 52px);
+}
+
+.ref-center--empty-agent .ref-hero-spacer {
+	max-height: min(48vh, 520px);
+}
+
+.ref-center--empty-agent .ref-command-stack {
+	margin-top: auto;
+	margin-bottom: clamp(10px, 2vh, 18px);
 }
 
 .ref-center--chat .ref-messages {
@@ -5512,6 +5526,49 @@ body {
 	filter: blur(6px);
 	pointer-events: none;
 	overflow: hidden;
+}
+
+.ref-agent-rail-toggle {
+	position: absolute;
+	top: 14px;
+	right: 24px;
+	z-index: 4;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 10px;
+	background: rgba(14, 16, 20, 0.78);
+	color: var(--void-fg-3);
+	cursor: pointer;
+	box-shadow:
+		0 10px 26px rgba(0, 0, 0, 0.22),
+		inset 0 1px 0 rgba(255, 255, 255, 0.04);
+	backdrop-filter: blur(18px);
+	-webkit-backdrop-filter: blur(18px);
+	transition:
+		color 0.22s var(--void-ease-out-expo),
+		background 0.22s var(--void-ease-out-expo),
+		border-color 0.22s var(--void-ease-out-expo),
+		box-shadow 0.22s var(--void-ease-out-expo),
+		transform 0.18s var(--void-ease-spring);
+}
+
+.ref-agent-rail-toggle:hover {
+	color: var(--void-fg-0);
+	background: rgba(28, 31, 38, 0.92);
+	transform: translateY(-1px);
+}
+
+.ref-agent-rail-toggle.is-open {
+	color: var(--void-fg-0);
+	background: linear-gradient(180deg, rgba(129, 140, 248, 0.2) 0%, rgba(99, 102, 241, 0.12) 100%);
+	border-color: rgba(129, 140, 248, 0.24);
+	box-shadow:
+		0 12px 28px rgba(43, 50, 116, 0.28),
+		inset 0 0 0 1px rgba(129, 140, 248, 0.2);
 }
 
 .ref-agent-review-shell {

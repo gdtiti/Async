@@ -8,7 +8,7 @@ export type ComposerMode = 'agent' | 'plan' | 'debug' | 'ask';
 const MODE_IDS: ComposerMode[] = ['agent', 'plan', 'debug', 'ask'];
 
 /** 首帧估算高度（hint + 模式行 + 分隔 + 子项） */
-const plusMenuEstHeight = () => MODE_IDS.length * 48 + 220;
+const plusMenuEstHeight = () => MODE_IDS.length * 48 + 180;
 
 function IconAgent({ className }: { className?: string }) {
 	return (
@@ -223,7 +223,6 @@ export function ComposerPlusMenu({ open, onClose, anchorRef, mode, onSelectMode 
 			role="menu"
 			aria-label={t('composer.plusMenuAria')}
 		>
-			<div className="ref-plus-menu-hint">{t('composer.plusMenuHint')}</div>
 			<div className="ref-plus-menu-modes" role="group" aria-label={t('composer.plusMenuModes')}>
 				{modes.map((m) => (
 					<button

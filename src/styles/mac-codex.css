@@ -2682,6 +2682,18 @@
 	padding: 20px 30px 22px;
 }
 
+:root[data-ui-style='mac-codex'] .ref-center--empty-agent {
+	--ref-center-composer-lift: clamp(10px, 3vh, 36px);
+}
+
+:root[data-ui-style='mac-codex'] .ref-center--empty-agent .ref-hero-spacer {
+	max-height: min(52vh, 560px);
+}
+
+:root[data-ui-style='mac-codex'] .ref-center--empty-agent .ref-command-stack {
+	margin-bottom: clamp(8px, 1.8vh, 16px);
+}
+
 :root[data-ui-style='mac-codex'] .ref-center--agent-layout .ref-context-block--agent {
 	margin-bottom: 10px;
 	padding: 0 4px;
@@ -2712,6 +2724,34 @@
 
 :root[data-ui-style='mac-codex'] .ref-right--agent-layout .ref-agent-review-head {
 	padding: 16px 18px 10px 16px;
+}
+
+:root[data-ui-style='mac-codex'] .ref-agent-rail-toggle {
+	top: 18px;
+	right: 28px;
+	border-radius: 12px;
+	border-color: color-mix(in srgb, var(--surface-glass-stroke) 92%, transparent);
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--surface-panel-bg-strong) 88%, transparent) 0%, color-mix(in srgb, var(--surface-panel-bg-soft) 78%, transparent) 100%);
+	color: var(--color-text-secondary);
+	box-shadow:
+		0 14px 34px rgba(0, 0, 0, 0.18),
+		inset 0 1px 0 color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+}
+
+:root[data-ui-style='mac-codex'] .ref-agent-rail-toggle:hover {
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--surface-tint-soft) 74%, var(--surface-panel-bg-strong)) 0%, color-mix(in srgb, var(--surface-panel-bg-soft) 94%, transparent) 100%);
+	color: var(--color-text-primary);
+}
+
+:root[data-ui-style='mac-codex'] .ref-agent-rail-toggle.is-open {
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--surface-tint-strong) 74%, var(--surface-panel-bg-strong)) 0%, color-mix(in srgb, var(--surface-panel-bg-soft) 96%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--color-accent) 26%, transparent);
+	box-shadow:
+		0 16px 38px color-mix(in srgb, var(--color-accent) 16%, transparent),
+		inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 24%, transparent);
 }
 
 :root[data-ui-style='mac-codex'] .ref-right--agent-layout.is-open {
@@ -2787,6 +2827,29 @@
 	box-shadow:
 		0 30px 84px rgba(0, 0, 0, 0.42),
 		inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+:root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-agent-rail-toggle {
+	border-color: rgba(205, 217, 224, 0.08);
+	background:
+		linear-gradient(180deg, rgba(22, 29, 35, 0.92) 0%, rgba(16, 22, 28, 0.88) 100%);
+	box-shadow:
+		0 18px 42px rgba(0, 0, 0, 0.34),
+		inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+:root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-agent-rail-toggle:hover {
+	background:
+		linear-gradient(180deg, rgba(35, 45, 55, 0.96) 0%, rgba(22, 29, 35, 0.92) 100%);
+}
+
+:root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-agent-rail-toggle.is-open {
+	background:
+		linear-gradient(180deg, rgba(36, 68, 93, 0.94) 0%, rgba(22, 34, 46, 0.96) 100%);
+	border-color: rgba(55, 214, 212, 0.24);
+	box-shadow:
+		0 18px 44px rgba(18, 34, 51, 0.44),
+		inset 0 0 0 1px rgba(55, 214, 212, 0.18);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--agent-shell::before {
