@@ -277,6 +277,33 @@ export const messagesZhCN: Record<string, string> = {
 	'settings.general.lead2': ' 请在左侧选择 ',
 	'settings.general.leadBold2': '模型',
 	'settings.general.lead3': ' 配置。',
+	'settings.general.streamSmooth.sectionTitle': '对话流式展示',
+	'settings.general.streamSmooth.sectionLead':
+		'仅影响界面：正文与思考按字素逐帧揭示；工具参数仍为实时。关闭后每段 IPC 立即上屏。',
+	'settings.general.streamSmooth.cardTitle': '平滑流式展示',
+	'settings.general.streamSmooth.cardDesc': '减轻极快模型一次性糊屏；关闭后最快、最跟手。',
+	'settings.general.streamSmooth.customToggleTitle': '自定义积压档位',
+	'settings.general.streamSmooth.customToggleDesc': '开启后可按队列长度微调每帧揭示量；关闭则只用上方预设。',
+	'settings.general.streamSmooth.advancedSummary': '编辑档位数值',
+	'settings.general.streamSmooth.presetLabel': '揭示速度预设',
+	'settings.general.streamSmooth.preset.character': '逐字（最慢、最明显）',
+	'settings.general.streamSmooth.preset.balanced': '平衡（推荐）',
+	'settings.general.streamSmooth.preset.fast': '较快',
+	'settings.general.streamSmooth.presetHelp.character':
+		'积压很少时几乎一字一帧；积压极大时仍会略加速，避免长文永远刷不完。',
+	'settings.general.streamSmooth.presetHelp.balanced':
+		'按队列长度分档：短队列逐字感强，队列越长每帧略多字素，兼顾观感与追进度。',
+	'settings.general.streamSmooth.presetHelp.fast':
+		'整体比「平衡」更激进，适合更在意跟手、可接受略少「打字机」感的场景。',
+	'settings.general.streamSmooth.presetHelp.customActive': '已启用下方自定义档位；预设说明暂不使用。',
+	'settings.general.streamSmooth.customBands': '使用自定义积压档位',
+	'settings.general.streamSmooth.customBandsHint':
+		'队列长度按 UTF-16 码元计（约等于编辑器字符数）。前三档填「上限」与「每帧字素」；第四档为更长队列的字素数。保存时会自动整理上限递增。',
+	'settings.general.streamSmooth.colMaxQueue': '队列上限 ≤',
+	'settings.general.streamSmooth.colGraphemes': '每帧字素数',
+	'settings.general.streamSmooth.bandTier': '第 {{n}} 档（较短队列）',
+	'settings.general.streamSmooth.bandRest': '第 4 档：其余更长队列',
+	'settings.general.streamSmooth.resetBands': '恢复默认档位',
 	'settings.language': '界面语言',
 	'settings.languageHint': '切换后立即生效；将保存到本机设置。',
 	'settings.languageZh': '简体中文',

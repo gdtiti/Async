@@ -12,8 +12,9 @@
     "icons": "node scripts/export-app-icon.mjs",
     "readme:screenshots": "node scripts/export-readme-screenshots.mjs",
     "desktop": "npm run build && cross-env ASYNC_SHELL_LOAD_DIST=1 electron .",
-    "dev": "npm run build:main && concurrently -k \"npm run build:main:watch\" \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
-    "dev:debug": "npm run build:main && concurrently -k \"npm run build:main:watch\" \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env ASYNC_SHELL_DEVTOOLS=1 electron .\"",
+    "desktop:dev": "npm run dev",
+    "dev": "npm run build:main && node scripts/free-port-5173.mjs && concurrently -k \"npm run build:main:watch\" \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
+    "dev:debug": "npm run build:main && node scripts/free-port-5173.mjs && concurrently -k \"npm run build:main:watch\" \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env ASYNC_SHELL_DEVTOOLS=1 electron .\"",
     "start:electron": "npm run desktop",
     "test": "vitest run",
     "test:watch": "vitest"

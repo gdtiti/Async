@@ -86,9 +86,10 @@ function shouldSealThinkingChunk(text: string): boolean {
 function appendRootThinking(blocks: LiveAgentBlock[], piece: string): LiveAgentBlock[] {
 	if (!piece) return blocks;
 	const base = blocks.slice();
+	const lastBlock = base[base.length - 1];
 	let current =
-		base[base.length - 1]?.type === 'thinking' && !base[base.length - 1]!.sealed
-			? ({ ...base[base.length - 1] } as Extract<LiveAgentBlock, { type: 'thinking' }>)
+		lastBlock?.type === 'thinking' && !lastBlock.sealed
+			? ({ ...lastBlock } as Extract<LiveAgentBlock, { type: 'thinking' }>)
 			: null;
 
 	if (current) {

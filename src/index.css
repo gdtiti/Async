@@ -6584,20 +6584,197 @@ body {
 	border-color: var(--void-fg-3);
 }
 
-.ref-settings-field select {
+/* 数字输入：与文本框一致，隐藏系统上下箭头 */
+.ref-settings-field input[type='number'] {
+	-moz-appearance: textfield;
+}
+
+.ref-settings-field input[type='number']::-webkit-outer-spin-button,
+.ref-settings-field input[type='number']::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
+/*
+ * 原生 void 下拉：请在 <select> 上加 class="ref-settings-native-select"。
+ * Win/Electron 下仅靠 .ref-settings-field select 仍可能保留系统箭头，故用元素+类名 + !important。
+ */
+select.ref-settings-native-select {
+	-webkit-appearance: none !important;
+	-moz-appearance: none !important;
+	appearance: none !important;
+	box-sizing: border-box;
+	max-width: 100%;
+	padding: 10px 36px 10px 12px;
+	border-radius: 10px;
+	border: 1px solid var(--void-border);
+	border-style: solid;
+	box-shadow: none;
+	background: var(--void-bg-1)
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E")
+		no-repeat right 12px center / 12px 12px;
+	color: var(--void-fg-0);
+	font-size: 13px;
+	font-family: inherit;
+	line-height: 1.35;
+	cursor: pointer;
+	transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+select.ref-settings-native-select::-ms-expand {
+	display: none;
+}
+
+select.ref-settings-native-select:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+select.ref-settings-native-select:hover:not(:disabled) {
+	border-color: var(--void-border-soft, var(--void-border));
+	background-color: var(--void-bg-2, var(--void-bg-1));
+}
+
+select.ref-settings-native-select:focus {
+	outline: none;
+	border-color: var(--void-fg-3);
+}
+
+.ref-settings-field select.ref-settings-native-select,
+.ref-settings-field--language select.ref-settings-native-select,
+.ref-mcp-edit-field select.ref-settings-native-select {
+	width: 100%;
+}
+
+/* 自绘下拉（VoidSelect）：不依赖原生 <select>，Electron/Win 下样式稳定 */
+.ref-void-select {
+	width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
+}
+
+.ref-void-select-trigger {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	width: 100%;
+	min-height: 42px;
 	padding: 10px 12px;
 	border-radius: 10px;
 	border: 1px solid var(--void-border);
+	border-style: solid;
 	background: var(--void-bg-1);
 	color: var(--void-fg-0);
 	font-size: 13px;
 	font-family: inherit;
-	max-width: 100%;
+	line-height: 1.35;
+	cursor: pointer;
+	text-align: left;
+	box-shadow: none;
+	transition: border-color 0.12s ease, background-color 0.12s ease;
 }
 
-.ref-settings-field select:focus {
+.ref-void-select-trigger:hover:not(:disabled) {
+	border-color: var(--void-border-soft, var(--void-border));
+	background: var(--void-bg-2, var(--void-bg-1));
+}
+
+.ref-void-select-trigger:focus {
 	outline: none;
 	border-color: var(--void-fg-3);
+}
+
+.ref-void-select-trigger:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.ref-void-select-value {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ref-void-select-chev {
+	flex-shrink: 0;
+	color: var(--void-fg-3);
+	opacity: 0.9;
+	transition: transform 0.15s ease;
+}
+
+.ref-void-select-trigger.is-open .ref-void-select-chev {
+	transform: rotate(180deg);
+}
+
+.ref-void-select--compact .ref-void-select-trigger {
+	min-height: 0;
+	padding: 6px 10px;
+	font-size: 12px;
+	border-radius: 8px;
+}
+
+.ref-void-select-menu {
+	box-sizing: border-box;
+	padding: 6px;
+	border-radius: 10px;
+	border: 1px solid var(--void-border);
+	background: var(--void-bg-2);
+	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.ref-void-select-option {
+	display: block;
+	width: 100%;
+	margin: 0;
+	padding: 8px 10px;
+	border: none;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--void-fg-1);
+	font-size: 13px;
+	font-family: inherit;
+	text-align: left;
+	cursor: pointer;
+	transition: background 0.1s ease, color 0.1s ease;
+}
+
+.ref-void-select-option:hover:not(:disabled) {
+	background: var(--void-bg-3);
+	color: var(--void-fg-0);
+}
+
+.ref-void-select-option.is-selected {
+	background: rgba(129, 140, 248, 0.12);
+	color: var(--void-fg-0);
+}
+
+.ref-void-select-option:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.ref-editor-plan-chrome .ref-void-select {
+	min-width: 120px;
+	max-width: 200px;
+	width: auto;
+	flex-shrink: 0;
+}
+
+.ref-plan-review-head-model .ref-void-select {
+	min-width: 140px;
+	max-width: 220px;
+	width: auto;
+}
+
+.ref-plan-review-head-model .ref-void-select--compact .ref-void-select-trigger {
+	border-radius: 8px;
+}
+
+.ref-plan-review-head-model .ref-void-select-trigger:focus {
+	border-color: var(--void-ring, #e8a848);
 }
 
 .ref-settings-models-hint {
@@ -6805,6 +6982,13 @@ body {
 	color: var(--void-fg-0);
 	font-size: 13px;
 	font-family: inherit;
+	-moz-appearance: textfield;
+}
+
+.ref-settings-agent-number::-webkit-outer-spin-button,
+.ref-settings-agent-number::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
 }
 
 .ref-settings-agent-section {
@@ -7605,6 +7789,33 @@ body {
 	margin-bottom: 0;
 }
 
+.ref-settings-stream-smooth-tier {
+	margin-bottom: 14px;
+}
+
+.ref-settings-stream-smooth-tier:last-child {
+	margin-bottom: 0;
+}
+
+.ref-settings-stream-smooth-tier-head {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--void-fg-2, #a1a1aa);
+	margin-bottom: 8px;
+}
+
+.ref-settings-stream-smooth-tier-pair {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px 16px;
+}
+
+@media (max-width: 480px) {
+	.ref-settings-stream-smooth-tier-pair {
+		grid-template-columns: 1fr;
+	}
+}
+
 .ref-settings-remove-model {
 	padding: 4px 10px;
 	border-radius: 6px;
@@ -8028,22 +8239,13 @@ body {
 .ref-plan-review-model-select {
 	min-width: 140px;
 	max-width: 220px;
-	padding: 5px 8px;
+	padding: 6px 32px 6px 10px;
 	font-size: 12px;
-	color: #e0e0e0;
-	background: #252525;
-	border: 1px solid #3a3a3a;
-	border-radius: 6px;
-	cursor: pointer;
-}
-
-.ref-plan-review-model-select:hover {
-	border-color: #555;
+	border-radius: 8px;
 }
 
 .ref-plan-review-model-select:focus {
-	outline: none;
-	border-color: #e8a848;
+	border-color: var(--void-ring, #e8a848);
 }
 
 .ref-plan-review-label {
@@ -9703,22 +9905,14 @@ body {
 .ref-editor-plan-model-select {
 	min-width: 120px;
 	max-width: 200px;
-	padding: 5px 8px;
+	padding: 6px 30px 6px 10px;
 	font-size: 12px;
-	color: #e0e0e0;
-	background: #252525;
-	border: 1px solid #3a3a3a;
-	border-radius: 6px;
-	cursor: pointer;
+	border-radius: 8px;
 }
 
 .ref-editor-plan-model-select:disabled {
 	opacity: 0.55;
 	cursor: default;
-}
-
-.ref-editor-plan-model-select:hover:not(:disabled) {
-	border-color: #555;
 }
 
 .ref-editor-plan-built {
@@ -10784,12 +10978,11 @@ body {
 	color: var(--void-fg-2);
 }
 
-/* Match .ref-settings-field inputs; include implicit type=text and fix invalid [type= text] selector */
+/* Match .ref-settings-field inputs；select 须加 .ref-settings-native-select，见上方 */
 .ref-mcp-edit-field input:not([type]),
 .ref-mcp-edit-field input[type='text'],
 .ref-mcp-edit-field input[type='password'],
-.ref-mcp-edit-field input[type='number'],
-.ref-mcp-edit-field select {
+.ref-mcp-edit-field input[type='number'] {
 	box-sizing: border-box;
 	width: 100%;
 	max-width: 100%;
@@ -10804,8 +10997,17 @@ body {
 	transition: border-color 0.12s;
 }
 
-.ref-mcp-edit-field input:focus,
-.ref-mcp-edit-field select:focus {
+.ref-mcp-edit-field input[type='number'] {
+	-moz-appearance: textfield;
+}
+
+.ref-mcp-edit-field input[type='number']::-webkit-outer-spin-button,
+.ref-mcp-edit-field input[type='number']::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
+.ref-mcp-edit-field input:focus {
 	outline: none;
 	border-color: var(--void-fg-3);
 }

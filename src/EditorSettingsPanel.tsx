@@ -1,4 +1,5 @@
 import { useI18n } from './i18n';
+import { VoidSelect } from './VoidSelect';
 
 export type EditorSettings = {
 	tabSize: number;
@@ -75,14 +76,16 @@ export function EditorSettingsPanel({ value, onChange }: Props) {
 
 				<label className="ref-settings-field ref-settings-field--compact">
 					<span>{t('editorSettings.tabSize')}</span>
-					<select
-						value={v.tabSize}
-						onChange={(e) => patch({ tabSize: Number(e.target.value) })}
-					>
-						<option value="2">2</option>
-						<option value="4">4</option>
-						<option value="8">8</option>
-					</select>
+					<VoidSelect
+						ariaLabel={t('editorSettings.tabSize')}
+						value={String(v.tabSize)}
+						onChange={(s) => patch({ tabSize: Number(s) })}
+						options={[
+							{ value: '2', label: '2' },
+							{ value: '4', label: '4' },
+							{ value: '8', label: '8' },
+						]}
+					/>
 				</label>
 
 				<div className="ref-settings-agent-card">
@@ -105,27 +108,31 @@ export function EditorSettingsPanel({ value, onChange }: Props) {
 
 				<label className="ref-settings-field ref-settings-field--compact">
 					<span>{t('editorSettings.wordWrap')}</span>
-					<select
+					<VoidSelect
+						ariaLabel={t('editorSettings.wordWrap')}
 						value={v.wordWrap}
-						onChange={(e) => patch({ wordWrap: e.target.value as EditorSettings['wordWrap'] })}
-					>
-						<option value="off">Off</option>
-						<option value="on">On</option>
-						<option value="wordWrapColumn">Word Wrap Column</option>
-						<option value="bounded">Bounded</option>
-					</select>
+						onChange={(s) => patch({ wordWrap: s as EditorSettings['wordWrap'] })}
+						options={[
+							{ value: 'off', label: 'Off' },
+							{ value: 'on', label: 'On' },
+							{ value: 'wordWrapColumn', label: 'Word Wrap Column' },
+							{ value: 'bounded', label: 'Bounded' },
+						]}
+					/>
 				</label>
 
 				<label className="ref-settings-field ref-settings-field--compact">
 					<span>{t('editorSettings.renderWhitespace')}</span>
-					<select
+					<VoidSelect
+						ariaLabel={t('editorSettings.renderWhitespace')}
 						value={v.renderWhitespace}
-						onChange={(e) => patch({ renderWhitespace: e.target.value as EditorSettings['renderWhitespace'] })}
-					>
-						<option value="none">None</option>
-						<option value="boundary">Boundary</option>
-						<option value="all">All</option>
-					</select>
+						onChange={(s) => patch({ renderWhitespace: s as EditorSettings['renderWhitespace'] })}
+						options={[
+							{ value: 'none', label: 'None' },
+							{ value: 'boundary', label: 'Boundary' },
+							{ value: 'all', label: 'All' },
+						]}
+					/>
 				</label>
 			</section>
 
@@ -163,26 +170,30 @@ export function EditorSettingsPanel({ value, onChange }: Props) {
 
 				<label className="ref-settings-field ref-settings-field--compact">
 					<span>{t('editorSettings.lineNumbers')}</span>
-					<select
+					<VoidSelect
+						ariaLabel={t('editorSettings.lineNumbers')}
 						value={v.lineNumbers}
-						onChange={(e) => patch({ lineNumbers: e.target.value as EditorSettings['lineNumbers'] })}
-					>
-						<option value="on">On</option>
-						<option value="off">Off</option>
-						<option value="relative">Relative</option>
-					</select>
+						onChange={(s) => patch({ lineNumbers: s as EditorSettings['lineNumbers'] })}
+						options={[
+							{ value: 'on', label: 'On' },
+							{ value: 'off', label: 'Off' },
+							{ value: 'relative', label: 'Relative' },
+						]}
+					/>
 				</label>
 
 				<label className="ref-settings-field ref-settings-field--compact">
 					<span>{t('editorSettings.cursorStyle')}</span>
-					<select
+					<VoidSelect
+						ariaLabel={t('editorSettings.cursorStyle')}
 						value={v.cursorStyle}
-						onChange={(e) => patch({ cursorStyle: e.target.value as EditorSettings['cursorStyle'] })}
-					>
-						<option value="line">Line</option>
-						<option value="block">Block</option>
-						<option value="underline">Underline</option>
-					</select>
+						onChange={(s) => patch({ cursorStyle: s as EditorSettings['cursorStyle'] })}
+						options={[
+							{ value: 'line', label: 'Line' },
+							{ value: 'block', label: 'Block' },
+							{ value: 'underline', label: 'Underline' },
+						]}
+					/>
 				</label>
 
 				<div className="ref-settings-agent-card">
@@ -263,14 +274,16 @@ export function EditorSettingsPanel({ value, onChange }: Props) {
 
 				<label className="ref-settings-field ref-settings-field--compact">
 					<span>{t('editorSettings.autoSave')}</span>
-					<select
+					<VoidSelect
+						ariaLabel={t('editorSettings.autoSave')}
 						value={v.autoSave}
-						onChange={(e) => patch({ autoSave: e.target.value as EditorSettings['autoSave'] })}
-					>
-						<option value="off">Off</option>
-						<option value="afterDelay">After Delay</option>
-						<option value="onFocusChange">On Focus Change</option>
-					</select>
+						onChange={(s) => patch({ autoSave: s as EditorSettings['autoSave'] })}
+						options={[
+							{ value: 'off', label: 'Off' },
+							{ value: 'afterDelay', label: 'After Delay' },
+							{ value: 'onFocusChange', label: 'On Focus Change' },
+						]}
+					/>
 				</label>
 			</section>
 		</div>

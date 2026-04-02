@@ -44,6 +44,7 @@ import {
 } from './agentFileChangesPersist';
 import { mergeAgentFileChangesWithGit } from './agentFileChangesFromGit';
 import { ModelPickerDropdown, type ModelPickerItem } from './ModelPickerDropdown';
+import { VoidSelect } from './VoidSelect';
 import { SettingsPage, type SettingsNavId } from './SettingsPage';
 import {
 	AUTO_MODEL_ID,
@@ -113,6 +114,48 @@ import { registerTsLspMonacoOnce } from './tsLspMonaco';
 import { monacoWorkspaceRootRef } from './tsLspWorkspaceRef';
 import { workspaceRelativeFileUrl } from './workspaceUri';
 import { voidShellDebugLog } from './tabCloseDebug';
+import {
+	createStreamSmoothGraphemeStepFn,
+	ensureFourStreamSmoothBands,
+	coerceStreamSmoothPreset,
+	type StreamSmoothBand,
+	type StreamSmoothPreset,
+	type StreamSmoothUiSnapshot,
+} from './streamSmoothSettings';
+
+/**
+ * 从头部取出至多 n 个字素（优先 Intl.Segmenter），用于对话平滑揭示。
+ * 无 Segmenter 时按 Unicode 码位切分，避免把增补平面字符拆半。
+ */
+function takeLeadingGraphemes(s: string, count: number): { piece: string; rest: string } {
+	if (!s || count <= 0) return { piece: '', rest: s };
+	const IntlSeg = (Intl as unknown as { Segmenter?: new (loc: string, opts: { granularity: string }) => { segment: (input: string) => Iterable<{ segment: string }> } }).Segmenter;
+	if (typeof IntlSeg === 'function') {
+		try {
+			const seg = new IntlSeg('und', { granularity: 'grapheme' });
+			let n = 0;
+			let end = 0;
+			for (const { segment } of seg.segment(s)) {
+				n++;
+				end += segment.length;
+				if (n >= count) break;
+			}
+			return { piece: s.slice(0, end), rest: s.slice(end) };
+		} catch {
+			/* fall through */
+		}
+	}
+	let rest = s;
+	let piece = '';
+	for (let i = 0; i < count && rest.length > 0; i++) {
+		const cp = rest.codePointAt(0);
+		if (cp === undefined) break;
+		const len = cp > 0xffff ? 2 : 1;
+		piece += rest.slice(0, len);
+		rest = rest.slice(len);
+	}
+	return { piece, rest };
+}
 
 type ProjectAgentSliceState = {
 	rules: AgentRule[];
@@ -903,6 +946,20 @@ export default function App() {
 	const streamThreadRef = useRef<string | null>(null);
 	const streamStartedAtRef = useRef<number | null>(null);
 	const firstTokenAtRef = useRef<number | null>(null);
+	/** 展示层限流：待刷新的根线程正文（与 IPC 到达解耦） */
+	const streamSmoothPendingTextRef = useRef('');
+	const streamSmoothPendingThinkingRef = useRef('');
+	const streamSmoothRafRef = useRef<number | null>(null);
+	const [smoothStreamDisplay, setSmoothStreamDisplay] = useState(true);
+	const smoothStreamDisplayRef = useRef(true);
+	const [smoothStreamPreset, setSmoothStreamPreset] = useState<StreamSmoothPreset>('balanced');
+	const [smoothStreamUseCustomBands, setSmoothStreamUseCustomBands] = useState(false);
+	const [smoothStreamBands, setSmoothStreamBands] = useState<StreamSmoothBand[]>(() =>
+		ensureFourStreamSmoothBands(null)
+	);
+	const streamSmoothStepRef = useRef<(pendingLen: number) => number>(
+		createStreamSmoothGraphemeStepFn(true, false, 'balanced', ensureFourStreamSmoothBands(null))
+	);
 	const onNewThreadRef = useRef<() => Promise<void>>(async () => {});
 	const composerRichHeroRef = useRef<HTMLDivElement>(null);
 	const composerRichBottomRef = useRef<HTMLDivElement>(null);
@@ -933,6 +990,29 @@ export default function App() {
 		}
 		setStreamingToolPreview(null);
 	}, []);
+
+	useEffect(() => {
+		smoothStreamDisplayRef.current = smoothStreamDisplay;
+	}, [smoothStreamDisplay]);
+
+	useEffect(() => {
+		streamSmoothStepRef.current = createStreamSmoothGraphemeStepFn(
+			smoothStreamDisplay,
+			smoothStreamUseCustomBands,
+			smoothStreamPreset,
+			smoothStreamBands
+		);
+	}, [smoothStreamDisplay, smoothStreamUseCustomBands, smoothStreamPreset, smoothStreamBands]);
+
+	const streamSmoothUi = useMemo<StreamSmoothUiSnapshot>(
+		() => ({
+			enabled: smoothStreamDisplay,
+			preset: smoothStreamPreset,
+			useCustomBands: smoothStreamUseCustomBands,
+			bands: smoothStreamBands,
+		}),
+		[smoothStreamDisplay, smoothStreamPreset, smoothStreamUseCustomBands, smoothStreamBands]
+	);
 
 	const respondToolApproval = useCallback(
 		async (approved: boolean) => {
@@ -1361,7 +1441,13 @@ export default function App() {
 					};
 					agent?: AgentCustomization;
 					editor?: Partial<EditorSettings>;
-					ui?: { sidebarLayout?: { left?: unknown; right?: unknown } };
+					ui?: {
+						sidebarLayout?: { left?: unknown; right?: unknown };
+						smoothStreamDisplay?: boolean;
+						streamSmoothPreset?: string;
+						streamSmoothUseCustomBands?: boolean;
+						streamSmoothBands?: unknown;
+					};
 					indexing?: {
 						symbolIndexEnabled?: boolean;
 						semanticIndexEnabled?: boolean;
@@ -1385,6 +1471,10 @@ export default function App() {
 					const s0 = readSidebarLayout();
 					syncDesktopSidebarLayout(shell, clampSidebarLayout(s0.left, s0.right));
 				}
+				setSmoothStreamDisplay(st.ui?.smoothStreamDisplay !== false);
+				setSmoothStreamPreset(coerceStreamSmoothPreset(st.ui?.streamSmoothPreset));
+				setSmoothStreamUseCustomBands(st.ui?.streamSmoothUseCustomBands === true);
+				setSmoothStreamBands(ensureFourStreamSmoothBands(st.ui?.streamSmoothBands));
 				setApiKey(st.openAI?.apiKey ?? '');
 				setBaseURL(st.openAI?.baseURL ?? '');
 				setProxyUrl(st.openAI?.proxyUrl ?? '');
@@ -1447,52 +1537,170 @@ export default function App() {
 				return;
 			}
 			const trackLiveBlocks = composerMode === 'agent' || composerMode === 'plan';
-			if (payload.type === 'delta') {
-				setStreaming((s) => {
-					if (payload.parentToolCallId) {
-						const inner = escapeSubAgentXmlText(payload.text);
-						const p = escapeStreamAttr(payload.parentToolCallId);
-						const d = payload.nestingDepth ?? 1;
-						return `${s}<sub_agent_delta parent="${p}" depth="${d}">${inner}</sub_agent_delta>`;
+
+			const cancelStreamSmoothRafOnly = () => {
+				if (streamSmoothRafRef.current !== null) {
+					cancelAnimationFrame(streamSmoothRafRef.current);
+					streamSmoothRafRef.current = null;
+				}
+			};
+
+			const flushPendingRootStreamSmooth = () => {
+				cancelStreamSmoothRafOnly();
+				const pt = streamSmoothPendingTextRef.current;
+				if (pt) {
+					streamSmoothPendingTextRef.current = '';
+					setStreaming((s) => s + pt);
+					if (trackLiveBlocks) {
+						setLiveAssistantBlocks((st) =>
+							applyLiveAgentChatPayload(st, { type: 'delta', text: pt })
+						);
 					}
-					if (s.length === 0 && payload.text.length > 0) {
-						firstTokenAtRef.current = Date.now();
+				}
+				const pk = streamSmoothPendingThinkingRef.current;
+				if (pk) {
+					streamSmoothPendingThinkingRef.current = '';
+					setStreamingThinking((s) => s + pk);
+					if (trackLiveBlocks) {
+						setLiveAssistantBlocks((st) =>
+							applyLiveAgentChatPayload(st, { type: 'thinking_delta', text: pk })
+						);
 					}
-					return s + payload.text;
+				}
+			};
+
+			const pumpRootStreamSmooth = () => {
+				streamSmoothRafRef.current = null;
+				if (!smoothStreamDisplayRef.current) {
+					return;
+				}
+				const pt = streamSmoothPendingTextRef.current;
+				if (pt.length > 0) {
+					const n = streamSmoothStepRef.current(pt.length);
+					const { piece, rest } = takeLeadingGraphemes(pt, n);
+					streamSmoothPendingTextRef.current = rest;
+					if (piece) {
+						setStreaming((s) => s + piece);
+						if (trackLiveBlocks) {
+							setLiveAssistantBlocks((st) =>
+								applyLiveAgentChatPayload(st, { type: 'delta', text: piece })
+							);
+						}
+					}
+				}
+				const pk = streamSmoothPendingThinkingRef.current;
+				if (pk.length > 0) {
+					const n = streamSmoothStepRef.current(pk.length);
+					const { piece, rest } = takeLeadingGraphemes(pk, n);
+					streamSmoothPendingThinkingRef.current = rest;
+					if (piece) {
+						setStreamingThinking((s) => s + piece);
+						if (trackLiveBlocks) {
+							setLiveAssistantBlocks((st) =>
+								applyLiveAgentChatPayload(st, { type: 'thinking_delta', text: piece })
+							);
+						}
+					}
+				}
+				if (
+					streamSmoothPendingTextRef.current.length > 0 ||
+					streamSmoothPendingThinkingRef.current.length > 0
+				) {
+					streamSmoothRafRef.current = requestAnimationFrame(pumpRootStreamSmooth);
+				}
+			};
+
+			const scheduleRootStreamSmooth = () => {
+				if (!smoothStreamDisplayRef.current) {
+					return;
+				}
+				if (streamSmoothRafRef.current === null) {
+					streamSmoothRafRef.current = requestAnimationFrame(pumpRootStreamSmooth);
+				}
+			};
+
+			/** 工具参数必须每条 IPC 立即进块：多工具并行时单槽 rAF 合并会丢更新，导致无流式卡片 / 执行参数残缺。 */
+			const applyToolInputDeltaUi = (p: {
+				name: string;
+				partialJson: string;
+				index: number;
+			}) => {
+				if (streamingToolPreviewClearTimerRef.current !== null) {
+					window.clearTimeout(streamingToolPreviewClearTimerRef.current);
+					streamingToolPreviewClearTimerRef.current = null;
+				}
+				setStreamingToolPreview({
+					name: p.name,
+					partialJson: p.partialJson,
+					index: p.index,
 				});
 				if (trackLiveBlocks) {
 					setLiveAssistantBlocks((st) =>
 						applyLiveAgentChatPayload(st, {
-							type: 'delta',
-							text: payload.text,
-							parentToolCallId: payload.parentToolCallId,
-							nestingDepth: payload.nestingDepth,
+							type: 'tool_input_delta',
+							name: p.name,
+							partialJson: p.partialJson,
+							index: p.index,
 						})
 					);
+				}
+			};
+
+			const resetStreamSmoothOnTurnEnd = () => {
+				cancelStreamSmoothRafOnly();
+				streamSmoothPendingTextRef.current = '';
+				streamSmoothPendingThinkingRef.current = '';
+			};
+
+			if (payload.type === 'delta') {
+				const subParent = payload.parentToolCallId;
+				if (subParent) {
+					const deltaText = payload.text;
+					setStreaming((s) => {
+						const inner = escapeSubAgentXmlText(deltaText);
+						const p = escapeStreamAttr(subParent);
+						const d = payload.nestingDepth ?? 1;
+						return `${s}<sub_agent_delta parent="${p}" depth="${d}">${inner}</sub_agent_delta>`;
+					});
+					if (trackLiveBlocks) {
+						setLiveAssistantBlocks((st) =>
+							applyLiveAgentChatPayload(st, {
+								type: 'delta',
+								text: deltaText,
+								parentToolCallId: subParent,
+								nestingDepth: payload.nestingDepth,
+							})
+						);
+					}
+				} else {
+					if (payload.text.length > 0 && firstTokenAtRef.current === null) {
+						firstTokenAtRef.current = Date.now();
+					}
+					if (smoothStreamDisplayRef.current) {
+						streamSmoothPendingTextRef.current += payload.text;
+						scheduleRootStreamSmooth();
+					} else {
+						setStreaming((s) => s + payload.text);
+						if (trackLiveBlocks) {
+							setLiveAssistantBlocks((st) =>
+								applyLiveAgentChatPayload(st, {
+									type: 'delta',
+									text: payload.text,
+								})
+							);
+						}
+					}
 				}
 			} else if (payload.type === 'tool_input_delta') {
 				if (payload.parentToolCallId) {
 					// 嵌套工具参数流式预览易与主线程混淆，仅写入正文标记
 				} else {
-					if (streamingToolPreviewClearTimerRef.current !== null) {
-						window.clearTimeout(streamingToolPreviewClearTimerRef.current);
-						streamingToolPreviewClearTimerRef.current = null;
-					}
-					setStreamingToolPreview({
+					flushPendingRootStreamSmooth();
+					applyToolInputDeltaUi({
 						name: payload.name,
 						partialJson: payload.partialJson,
 						index: payload.index,
 					});
-					if (trackLiveBlocks) {
-						setLiveAssistantBlocks((st) =>
-							applyLiveAgentChatPayload(st, {
-								type: 'tool_input_delta',
-								name: payload.name,
-								partialJson: payload.partialJson,
-								index: payload.index,
-							})
-						);
-					}
 				}
 			} else if (payload.type === 'thinking_delta') {
 				const parentToolCallId = payload.parentToolCallId;
@@ -1513,6 +1721,9 @@ export default function App() {
 							})
 						);
 					}
+				} else if (smoothStreamDisplayRef.current) {
+					streamSmoothPendingThinkingRef.current += payload.text;
+					scheduleRootStreamSmooth();
 				} else {
 					setStreamingThinking((s) => s + payload.text);
 					if (trackLiveBlocks) {
@@ -1526,6 +1737,7 @@ export default function App() {
 				}
 			} else if (payload.type === 'tool_call') {
 				if (!payload.parentToolCallId) {
+					flushPendingRootStreamSmooth();
 					if (streamingToolPreviewClearTimerRef.current !== null) {
 						window.clearTimeout(streamingToolPreviewClearTimerRef.current);
 						streamingToolPreviewClearTimerRef.current = null;
@@ -1554,6 +1766,7 @@ export default function App() {
 				}
 			} else if (payload.type === 'tool_result') {
 				if (!payload.parentToolCallId) {
+					flushPendingRootStreamSmooth();
 					setStreamingToolPreview(null);
 				}
 				const truncated = payload.result.length > 3000 ? payload.result.slice(0, 3000) + '\n... (truncated)' : payload.result;
@@ -1618,6 +1831,7 @@ export default function App() {
 					subAgentBgToastTimerRef.current = null;
 				}, 6500);
 			} else if (payload.type === 'done') {
+				resetStreamSmoothOnTurnEnd();
 				const start = streamStartedAtRef.current;
 				const ft = firstTokenAtRef.current;
 				const end = Date.now();
@@ -1733,6 +1947,7 @@ export default function App() {
 				void loadMessages(payload.threadId);
 				void refreshThreads();
 			} else if (payload.type === 'error') {
+				resetStreamSmoothOnTurnEnd();
 				const start = streamStartedAtRef.current;
 				const end = Date.now();
 				const thinkSec =
@@ -1760,7 +1975,15 @@ export default function App() {
 				void refreshThreads();
 			}
 		});
-		return () => unsub();
+		return () => {
+			unsub();
+			if (streamSmoothRafRef.current !== null) {
+				cancelAnimationFrame(streamSmoothRafRef.current);
+				streamSmoothRafRef.current = null;
+			}
+			streamSmoothPendingTextRef.current = '';
+			streamSmoothPendingThinkingRef.current = '';
+		};
 	}, [shell, loadMessages, refreshThreads, clearStreamingToolPreviewNow, resetLiveAgentBlocks, t, composerMode]);
 
 	useEffect(() => {
@@ -2374,6 +2597,27 @@ export default function App() {
 		[shell]
 	);
 
+	const onStreamSmoothChange = useCallback(
+		(next: StreamSmoothUiSnapshot) => {
+			const bands = ensureFourStreamSmoothBands(next.bands);
+			setSmoothStreamDisplay(next.enabled);
+			setSmoothStreamPreset(next.preset);
+			setSmoothStreamUseCustomBands(next.useCustomBands);
+			setSmoothStreamBands(bands);
+			if (shell) {
+				void shell.invoke('settings:set', {
+					ui: {
+						smoothStreamDisplay: next.enabled,
+						streamSmoothPreset: next.preset,
+						streamSmoothUseCustomBands: next.useCustomBands,
+						streamSmoothBands: bands,
+					},
+				});
+			}
+		},
+		[shell]
+	);
+
 	const persistSettings = useCallback(async () => {
 		if (!shell) {
 			return;
@@ -2414,6 +2658,12 @@ export default function App() {
 				tsLspEnabled: indexingSettings.tsLspEnabled,
 			},
 			mcp: { servers: mcpServers },
+			ui: {
+				smoothStreamDisplay,
+				streamSmoothPreset: smoothStreamPreset,
+				streamSmoothUseCustomBands: smoothStreamUseCustomBands,
+				streamSmoothBands: smoothStreamBands,
+			},
 		});
 	}, [
 		shell,
@@ -2432,6 +2682,10 @@ export default function App() {
 		indexingSettings,
 		locale,
 		mcpServers,
+		smoothStreamDisplay,
+		smoothStreamPreset,
+		smoothStreamUseCustomBands,
+		smoothStreamBands,
 	]);
 
 	/** 离开设置页时写入磁盘（返回、点遮罩、Esc 等） */
@@ -5151,19 +5405,17 @@ export default function App() {
 												</button>
 												{showPlanFileEditorChrome ? (
 													<div className="ref-editor-plan-chrome">
-														<select
-															className="ref-editor-plan-model-select"
+														<VoidSelect
+															variant="compact"
+															ariaLabel={t('plan.review.model')}
 															value={editorPlanBuildModelId}
 															disabled={editorPlanFileIsBuilt}
-															onChange={(e) => setEditorPlanBuildModelId(e.target.value)}
-															aria-label={t('plan.review.model')}
-														>
-															{modelPickerItems.map((m) => (
-																<option key={m.id} value={m.id}>
-																	{m.label}
-																</option>
-															))}
-														</select>
+															onChange={setEditorPlanBuildModelId}
+															options={modelPickerItems.map((m) => ({
+																value: m.id,
+																label: m.label,
+															}))}
+														/>
 														{editorPlanFileIsBuilt ? (
 															<span className="ref-editor-plan-built" role="status">
 																{t('app.planEditorBuilt')}
@@ -5469,19 +5721,17 @@ export default function App() {
 									</button>
 									{showPlanFileEditorChrome ? (
 										<div className="ref-editor-plan-chrome">
-											<select
-												className="ref-editor-plan-model-select"
+											<VoidSelect
+												variant="compact"
+												ariaLabel={t('plan.review.model')}
 												value={editorPlanBuildModelId}
 												disabled={editorPlanFileIsBuilt}
-												onChange={(e) => setEditorPlanBuildModelId(e.target.value)}
-												aria-label={t('plan.review.model')}
-											>
-												{modelPickerItems.map((m) => (
-													<option key={m.id} value={m.id}>
-														{m.label}
-													</option>
-												))}
-											</select>
+												onChange={setEditorPlanBuildModelId}
+												options={modelPickerItems.map((m) => ({
+													value: m.id,
+													label: m.label,
+												}))}
+											/>
 											{editorPlanFileIsBuilt ? (
 												<span className="ref-editor-plan-built" role="status">
 													{t('app.planEditorBuilt')}
@@ -5910,6 +6160,8 @@ export default function App() {
 							onOpenSkillCreator={startSkillCreatorFlow}
 							onOpenWorkspaceSkillFile={handleOpenWorkspaceSkillFile}
 							onDeleteWorkspaceSkillDisk={handleDeleteWorkspaceSkillDisk}
+							streamSmooth={streamSmoothUi}
+							onStreamSmoothChange={onStreamSmoothChange}
 						/>
 					</div>
 				</div>

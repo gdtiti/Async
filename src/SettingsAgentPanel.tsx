@@ -10,6 +10,7 @@ import type {
 	AgentSubagent,
 } from './agentSettingsTypes';
 import { defaultAgentCustomization, isWorkspaceDiskImportedSkill } from './agentSettingsTypes';
+import { VoidSelect } from './VoidSelect';
 
 function newId(): string {
 	return globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -459,26 +460,26 @@ export function SettingsAgentPanel({
 									<>
 										<label className="ref-settings-field ref-settings-field--compact">
 											<span>{t('agentSettings.itemScopeStorage')}</span>
-											<select
+											<VoidSelect
 												value={r.origin ?? 'user'}
-												onChange={(e) => updateRule(r.id, { origin: e.target.value as AgentItemOrigin })}
-											>
-												<option value="user">{t('agentSettings.originUser')}</option>
-												<option value="project" disabled={!workspaceOpen}>
-													{t('agentSettings.originProject')}
-												</option>
-											</select>
+												onChange={(v) => updateRule(r.id, { origin: v as AgentItemOrigin })}
+												options={[
+													{ value: 'user', label: t('agentSettings.originUser') },
+													{ value: 'project', label: t('agentSettings.originProject'), disabled: !workspaceOpen },
+												]}
+											/>
 										</label>
 										<label className="ref-settings-field ref-settings-field--compact">
 											<span>{t('agentSettings.scope')}</span>
-											<select
+											<VoidSelect
 												value={r.scope}
-												onChange={(e) => updateRule(r.id, { scope: e.target.value as AgentRuleScope })}
-											>
-												<option value="always">{t('agentSettings.scopeAlways')}</option>
-												<option value="glob">{t('agentSettings.scopeGlob')}</option>
-												<option value="manual">{t('agentSettings.scopeManual')}</option>
-											</select>
+												onChange={(v) => updateRule(r.id, { scope: v as AgentRuleScope })}
+												options={[
+													{ value: 'always', label: t('agentSettings.scopeAlways') },
+													{ value: 'glob', label: t('agentSettings.scopeGlob') },
+													{ value: 'manual', label: t('agentSettings.scopeManual') },
+												]}
+											/>
 										</label>
 										{r.scope === 'glob' ? (
 											<label className="ref-settings-field ref-settings-field--compact">
@@ -626,15 +627,18 @@ export function SettingsAgentPanel({
 													<>
 														<label className="ref-settings-field ref-settings-field--compact">
 															<span>{t('agentSettings.itemScopeStorage')}</span>
-															<select
+															<VoidSelect
 																value={s.origin ?? 'user'}
-																onChange={(e) => updateSkill(s.id, { origin: e.target.value as AgentItemOrigin })}
-															>
-																<option value="user">{t('agentSettings.originUser')}</option>
-																<option value="project" disabled={!workspaceOpen}>
-																	{t('agentSettings.originProject')}
-																</option>
-															</select>
+																onChange={(v) => updateSkill(s.id, { origin: v as AgentItemOrigin })}
+																options={[
+																	{ value: 'user', label: t('agentSettings.originUser') },
+																	{
+																		value: 'project',
+																		label: t('agentSettings.originProject'),
+																		disabled: !workspaceOpen,
+																	},
+																]}
+															/>
 														</label>
 														<label className="ref-settings-field ref-settings-field--compact">
 															<span>{t('agentSettings.slugLabel')}</span>
@@ -769,15 +773,14 @@ export function SettingsAgentPanel({
 									<>
 										<label className="ref-settings-field ref-settings-field--compact">
 											<span>{t('agentSettings.itemScopeStorage')}</span>
-											<select
+											<VoidSelect
 												value={s.origin ?? 'user'}
-												onChange={(e) => updateSub(s.id, { origin: e.target.value as AgentItemOrigin })}
-											>
-												<option value="user">{t('agentSettings.originUser')}</option>
-												<option value="project" disabled={!workspaceOpen}>
-													{t('agentSettings.originProject')}
-												</option>
-											</select>
+												onChange={(v) => updateSub(s.id, { origin: v as AgentItemOrigin })}
+												options={[
+													{ value: 'user', label: t('agentSettings.originUser') },
+													{ value: 'project', label: t('agentSettings.originProject'), disabled: !workspaceOpen },
+												]}
+											/>
 										</label>
 										<label className="ref-settings-field ref-settings-field--compact">
 											<span>{t('agentSettings.subDesc')}</span>

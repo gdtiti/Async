@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChatMarkdown } from './ChatMarkdown';
 import type { ParsedPlan, PlanTodoItem } from './planParser';
 import { useI18n } from './i18n';
+import { VoidSelect } from './VoidSelect';
 import type { ModelPickerItem } from './ModelPickerDropdown';
 
 type Props = {
@@ -82,19 +83,15 @@ export function PlanReviewPanel({
 					<label className="ref-plan-review-model-label" htmlFor="ref-plan-build-model">
 						{t('plan.review.model')}
 					</label>
-					<select
+					<VoidSelect
 						id="ref-plan-build-model"
-						className="ref-plan-review-model-select"
+						variant="compact"
+						ariaLabel={t('plan.review.model')}
 						value={buildModelId}
 						disabled={planBuilt}
-						onChange={(e) => setBuildModelId(e.target.value)}
-					>
-						{modelItems.map((m) => (
-							<option key={m.id} value={m.id}>
-								{m.label}
-							</option>
-						))}
-					</select>
+						onChange={setBuildModelId}
+						options={modelItems.map((m) => ({ value: m.id, label: m.label }))}
+					/>
 				</div>
 			</div>
 

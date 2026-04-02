@@ -272,6 +272,33 @@ export const messagesEn: Record<string, string> = {
 	'settings.general.lead2': ', open ',
 	'settings.general.leadBold2': 'Models',
 	'settings.general.lead3': ' in the sidebar.',
+	'settings.general.streamSmooth.sectionTitle': 'Chat streaming display',
+	'settings.general.streamSmooth.sectionLead':
+		'UI only: text and thinking reveal by grapheme; tool arguments stay real-time. When off, every IPC chunk renders immediately.',
+	'settings.general.streamSmooth.cardTitle': 'Smooth streaming',
+	'settings.general.streamSmooth.cardDesc': 'Reduces wall-of-text flashes from very fast models. Off = fastest, most immediate.',
+	'settings.general.streamSmooth.customToggleTitle': 'Custom backlog tiers',
+	'settings.general.streamSmooth.customToggleDesc': 'Tune per-frame reveal by queue length. Off = use the preset above only.',
+	'settings.general.streamSmooth.advancedSummary': 'Edit tier values',
+	'settings.general.streamSmooth.presetLabel': 'Reveal speed preset',
+	'settings.general.streamSmooth.preset.character': 'Character-by-character (slowest, clearest)',
+	'settings.general.streamSmooth.preset.balanced': 'Balanced (recommended)',
+	'settings.general.streamSmooth.preset.fast': 'Faster',
+	'settings.general.streamSmooth.presetHelp.character':
+		'Near one grapheme per frame when the queue is small; speeds up slightly when the backlog is huge so long answers still finish.',
+	'settings.general.streamSmooth.presetHelp.balanced':
+		'Tiered by queue length: stronger typewriter feel when caught up, more graphemes per frame when far behind.',
+	'settings.general.streamSmooth.presetHelp.fast':
+		'More aggressive than Balanced—snappier, less “typing machine” feel.',
+	'settings.general.streamSmooth.presetHelp.customActive': 'Custom tiers below are active; preset description does not apply.',
+	'settings.general.streamSmooth.customBands': 'Use custom backlog tiers',
+	'settings.general.streamSmooth.customBandsHint':
+		'Queue length uses UTF-16 code units (≈ editor characters). Tiers 1–3: upper bound + graphemes/frame. Tier 4: graphemes for longer backlogs. Bounds are normalized to stay increasing.',
+	'settings.general.streamSmooth.colMaxQueue': 'Queue ≤',
+	'settings.general.streamSmooth.colGraphemes': 'Graphemes / frame',
+	'settings.general.streamSmooth.bandTier': 'Tier {{n}} (shorter queue)',
+	'settings.general.streamSmooth.bandRest': 'Tier 4: all longer queues',
+	'settings.general.streamSmooth.resetBands': 'Restore default tiers',
 	'settings.language': 'Display language',
 	'settings.languageHint': 'Applies immediately; saved to local settings.',
 	'settings.languageZh': '简体中文',

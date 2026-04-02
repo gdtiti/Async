@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from './i18n';
+import { VoidSelect } from './VoidSelect';
 import type { McpServerConfig, McpServerStatus, McpServerTemplate } from './mcpTypes';
 import { MCP_SERVER_TEMPLATES } from './mcpTypes';
 
@@ -211,16 +212,16 @@ function McpServerEditForm({ config, onChange, onSave, onCancel, onDelete, isNew
 			<div className="ref-mcp-edit-row">
 				<label className="ref-mcp-edit-field">
 					<span>{t('mcp.form.transport')}</span>
-					<select
+					<VoidSelect
+						ariaLabel={t('mcp.form.transport')}
 						value={config.transport}
-						onChange={(e) =>
-							onChange({ ...config, transport: e.target.value as 'stdio' | 'sse' | 'http' })
-						}
-					>
-						<option value="stdio">{t('mcp.transport.stdio')}</option>
-						<option value="sse">{t('mcp.transport.sse')}</option>
-						<option value="http">{t('mcp.transport.http')}</option>
-					</select>
+						onChange={(v) => onChange({ ...config, transport: v as 'stdio' | 'sse' | 'http' })}
+						options={[
+							{ value: 'stdio', label: t('mcp.transport.stdio') },
+							{ value: 'sse', label: t('mcp.transport.sse') },
+							{ value: 'http', label: t('mcp.transport.http') },
+						]}
+					/>
 				</label>
 			</div>
 			

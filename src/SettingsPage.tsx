@@ -14,6 +14,9 @@ import { SettingsMcpPanel } from './SettingsMcpPanel';
 import type { McpServerConfig, McpServerStatus } from './mcpTypes';
 import type { IndexingSettingsState } from './indexingSettingsTypes';
 import { useI18n, type AppLocale } from './i18n';
+import type { StreamSmoothUiSnapshot } from './streamSmoothSettings';
+import { SettingsStreamSmoothPanel } from './SettingsStreamSmoothPanel';
+import { VoidSelect } from './VoidSelect';
 
 export type SettingsNavId =
 	| 'general'
@@ -188,6 +191,8 @@ type Props = {
 	onRestartMcpServer: (id: string) => void;
 	shell: NonNullable<Window['asyncShell']> | null;
 	workspaceOpen: boolean;
+	streamSmooth: StreamSmoothUiSnapshot;
+	onStreamSmoothChange: (next: StreamSmoothUiSnapshot) => void;
 };
 
 export function SettingsPage({
@@ -231,6 +236,8 @@ export function SettingsPage({
 	onRestartMcpServer,
 	shell,
 	workspaceOpen,
+	streamSmooth,
+	onStreamSmoothChange,
 }: Props) {
 	const { t, locale, setLocale } = useI18n();
 	const navItems = useMemo(() => navItemsForT(t), [t]);
@@ -421,19 +428,21 @@ export function SettingsPage({
 								<div className="ref-settings-field ref-settings-field--language">
 									<span>{t('settings.language')}</span>
 									<p className="ref-settings-proxy-hint">{t('settings.languageHint')}</p>
-									<select
+									<VoidSelect
+										ariaLabel={t('settings.language')}
 										value={locale}
-										aria-label={t('settings.language')}
-										onChange={(e) => {
-											const next = e.target.value === 'en' ? 'en' : 'zh-CN';
-											setLocale(next);
-											onPersistLanguage?.(next);
+										onChange={(next) => {
+											const v = next === 'en' ? 'en' : 'zh-CN';
+											setLocale(v);
+											onPersistLanguage?.(v);
 										}}
-									>
-										<option value="zh-CN">{t('settings.languageZh')}</option>
-										<option value="en">{t('settings.languageEn')}</option>
-									</select>
+										options={[
+											{ value: 'zh-CN', label: t('settings.languageZh') },
+											{ value: 'en', label: t('settings.languageEn') },
+										]}
+									/>
 								</div>
+								<SettingsStreamSmoothPanel value={streamSmooth} onChange={onStreamSmoothChange} />
 							</div>
 						) : null}
 
@@ -608,17 +617,15 @@ export function SettingsPage({
 													</label>
 													<label className="ref-settings-field ref-settings-field--compact">
 														<span>{t('settings.requestParadigm')}</span>
-														<select
+														<VoidSelect
+															ariaLabel={t('settings.paradigmAria')}
 															value={m.paradigm}
-															onChange={(e) => patchEntry(m.id, { paradigm: e.target.value as ModelRequestParadigm })}
-															aria-label={t('settings.paradigmAria')}
-														>
-															{LLM_PROVIDER_OPTIONS.map((o) => (
-																<option key={o.id} value={o.id}>
-																	{t(`settings.paradigm.${o.id}`)}
-																</option>
-															))}
-														</select>
+															onChange={(v) => patchEntry(m.id, { paradigm: v as ModelRequestParadigm })}
+															options={LLM_PROVIDER_OPTIONS.map((o) => ({
+																value: o.id,
+																label: t(`settings.paradigm.${o.id}`),
+															}))}
+														/>
 													</label>
 												</div>
 												<details className="ref-settings-model-advanced">

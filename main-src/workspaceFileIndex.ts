@@ -34,6 +34,11 @@ const SKIP_DIR_NAMES = new Set([
 	'Pods',
 	'.gradle',
 	'DerivedData',
+	// Windows：用户主目录下常见连接点/受保护目录，监听会 EPERM 且通常不应索引
+	'appdata',
+	'application data',
+	'cookies',
+	'local settings',
 ]);
 
 /** 单工作区最大文件条数（提高上限以适配大型 monorepo） */
@@ -225,7 +230,17 @@ function attachWatcher(rootNorm: string): void {
 		ignored: (p) => shouldIgnoreAbsolutePath(p),
 		ignoreInitial: true,
 		persistent: true,
+		// 用户主目录等场景下部分子目录无监听权限，否则会未处理的 Promise 拒绝
+		ignorePermissionErrors: true,
 		awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 100 },
+	});
+
+	watcher.on('error', (err: unknown) => {
+		const code = err && typeof err === 'object' && 'code' in err ? (err as NodeJS.ErrnoException).code : undefined;
+		if (code === 'EPERM' || code === 'EACCES') {
+			return;
+		}
+		console.warn('[workspaceFileIndex] chokidar error:', err);
 	});
 
 	const applyAdd = (absPath: string) => {
