@@ -22,15 +22,40 @@ export const THEME_CHROME = {
 
 export type ThemeChromeScheme = keyof typeof THEME_CHROME;
 
-export function applyThemeChromeToWindow(win: BrowserWindow, scheme: ThemeChromeScheme): void {
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
+
+export type NativeChromeOverride = {
+	backgroundColor: string;
+	titleBarColor: string;
+	symbolColor: string;
+};
+
+function isHex6(s: unknown): s is string {
+	return typeof s === 'string' && HEX6.test(s.trim());
+}
+
+/** Apply window background + Windows titleBarOverlay; optional hex override from renderer appearance. */
+export function applyThemeChromeToWindow(
+	win: BrowserWindow,
+	scheme: ThemeChromeScheme,
+	override?: NativeChromeOverride | null
+): void {
 	const c = THEME_CHROME[scheme];
 	if (win.isDestroyed()) {
 		return;
 	}
-	win.setBackgroundColor(c.backgroundColor);
+	const bg =
+		override && isHex6(override.backgroundColor) ? override.backgroundColor.trim() : c.backgroundColor;
+	const barColor = override && isHex6(override.titleBarColor) ? override.titleBarColor.trim() : c.titleBarOverlay.color;
+	const symColor = override && isHex6(override.symbolColor) ? override.symbolColor.trim() : c.titleBarOverlay.symbolColor;
+	win.setBackgroundColor(bg);
 	if (process.platform === 'win32') {
 		try {
-			win.setTitleBarOverlay({ ...c.titleBarOverlay });
+			win.setTitleBarOverlay({
+				color: barColor,
+				symbolColor: symColor,
+				height: c.titleBarOverlay.height,
+			});
 		} catch {
 			/* ignore */
 		}

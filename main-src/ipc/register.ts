@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, clipboard } from 'electron';
 import { createAppWindow } from '../appWindow.js';
-import { applyThemeChromeToWindow, type ThemeChromeScheme } from '../themeChrome.js';
+import { applyThemeChromeToWindow, type NativeChromeOverride, type ThemeChromeScheme } from '../themeChrome.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -842,18 +842,44 @@ export function registerIpc(): void {
 		return next;
 	});
 
-	ipcMain.handle('theme:applyChrome', (e, payload: { scheme?: string }) => {
-		const s = payload?.scheme;
-		if (s !== 'light' && s !== 'dark') {
-			return { ok: false as const, error: 'bad-scheme' as const };
+	ipcMain.handle(
+		'theme:applyChrome',
+		(
+			e,
+			payload: {
+				scheme?: string;
+				backgroundColor?: string;
+				titleBarColor?: string;
+				symbolColor?: string;
+			}
+		) => {
+			const s = payload?.scheme;
+			if (s !== 'light' && s !== 'dark') {
+				return { ok: false as const, error: 'bad-scheme' as const };
+			}
+			const win = BrowserWindow.fromWebContents(e.sender);
+			if (!win) {
+				return { ok: false as const, error: 'no-window' as const };
+			}
+			const hex = /^#[0-9a-fA-F]{6}$/;
+			const hasCustom =
+				typeof payload?.backgroundColor === 'string' &&
+				typeof payload?.titleBarColor === 'string' &&
+				typeof payload?.symbolColor === 'string' &&
+				hex.test(payload.backgroundColor.trim()) &&
+				hex.test(payload.titleBarColor.trim()) &&
+				hex.test(payload.symbolColor.trim());
+			const override: NativeChromeOverride | null = hasCustom
+				? {
+						backgroundColor: payload!.backgroundColor!.trim(),
+						titleBarColor: payload!.titleBarColor!.trim(),
+						symbolColor: payload!.symbolColor!.trim(),
+					}
+				: null;
+			applyThemeChromeToWindow(win, s as ThemeChromeScheme, override);
+			return { ok: true as const };
 		}
-		const win = BrowserWindow.fromWebContents(e.sender);
-		if (!win) {
-			return { ok: false as const, error: 'no-window' as const };
-		}
-		applyThemeChromeToWindow(win, s as ThemeChromeScheme);
-		return { ok: true as const };
-	});
+	);
 
 	ipcMain.handle('workspaceAgent:get', () => {
 		const root = getWorkspaceRoot();

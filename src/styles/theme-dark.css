@@ -12,6 +12,8 @@
 	--void-accent-cool: #37d6d4;
 	--void-accent-cool-soft: rgba(55, 214, 212, 0.16);
 	--void-accent-warm: #ff9d59;
+	/** Ask / 辅助蓝（与主强调青区分，供 mode chip 等） */
+	--void-accent-assist: #8aa8ff;
 	--void-accent-warm-soft: rgba(255, 157, 89, 0.16);
 	--void-accent-glow: rgba(55, 214, 212, 0.18);
 	--void-accent-soft: rgba(55, 214, 212, 0.1);

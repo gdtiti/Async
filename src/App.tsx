@@ -54,6 +54,7 @@ import {
 	applyThemePresetToAppearance,
 	applyAppearanceSettingsToDom,
 	defaultAppearanceSettings,
+	nativeWindowChromeFromAppearance,
 	normalizeAppearanceSettings,
 	replaceBuiltinChromeColorsForScheme,
 	shouldMigrateChromeWhenLeavingScheme,
@@ -861,7 +862,7 @@ export default function App() {
 	const shell = useAsyncShell();
 	const [colorMode, setColorMode] = useState<AppColorMode>(() => readStoredColorMode());
 	const [appearanceSettings, setAppearanceSettings] = useState<AppAppearanceSettings>(() => defaultAppearanceSettings());
-	const { effectiveScheme, setTransitionOrigin } = useAppColorScheme({ colorMode, shell: shell ?? undefined });
+	const { effectiveScheme, setTransitionOrigin } = useAppColorScheme({ colorMode });
 	const monacoChromeTheme = getVoidMonacoTheme(effectiveScheme);
 	const effectiveSchemePrevRef = useRef(effectiveScheme);
 	const shellRef = useRef(shell);
@@ -918,6 +919,20 @@ export default function App() {
 	useEffect(() => {
 		applyAppearanceSettingsToDom(appearanceSettings, effectiveScheme);
 	}, [appearanceSettings, effectiveScheme]);
+
+	useEffect(() => {
+		if (!shell) {
+			return;
+		}
+		const c = nativeWindowChromeFromAppearance(appearanceSettings, effectiveScheme);
+		void shell.invoke('theme:applyChrome', {
+			scheme: effectiveScheme,
+			backgroundColor: c.backgroundColor,
+			titleBarColor: c.titleBarColor,
+			symbolColor: c.symbolColor,
+		});
+	}, [shell, appearanceSettings, effectiveScheme]);
+
 	const { t, setLocale, locale } = useI18n();
 	const [ipcOk, setIpcOk] = useState<string>('…');
 	const [workspace, setWorkspace] = useState<string | null>(null);

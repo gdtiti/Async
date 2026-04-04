@@ -14,9 +14,9 @@ export function interpolate(template: string, params?: TParams): string {
 
 export function createTranslate(locale: AppLocale): TFunction {
 	const primary = locale === 'en' ? messagesEn : messagesZhCN;
-	const fallback = messagesZhCN;
+	const secondary = locale === 'en' ? messagesZhCN : messagesEn;
 	return (key: string, params?: TParams): string => {
-		const raw = primary[key] ?? fallback[key] ?? key;
+		const raw = primary[key] ?? secondary[key] ?? key;
 		return interpolate(raw, params);
 	};
 }

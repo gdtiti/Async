@@ -69,6 +69,15 @@ function macCodexBuiltinPreviewVarsDark(): Record<string, string> {
 		'--void-scrollbar-thumb-active': 'rgba(164, 178, 191, 0.64)',
 		'--ref-menubar-chrome-bg': '#161d24',
 		'--void-sidebar-fill': 'rgba(19, 25, 31, 0.98)',
+		'--void-accent-cool': '#37d6d4',
+		'--void-accent-warm': '#ff9d59',
+		'--void-accent-assist': '#8aa8ff',
+		'--void-accent-cool-soft': 'rgba(55, 214, 212, 0.16)',
+		'--void-accent-warm-soft': 'rgba(255, 157, 89, 0.16)',
+		'--surface-tint-soft': 'rgba(55, 214, 212, 0.05)',
+		'--surface-tint-strong': 'rgba(55, 214, 212, 0.09)',
+		'--app-backdrop':
+			'radial-gradient(circle at top center, rgba(55, 214, 212, 0.08) 0%, transparent 28%), radial-gradient(circle at 84% 12%, rgba(255, 157, 89, 0.08) 0%, transparent 22%), radial-gradient(circle at 14% 18%, rgba(58, 122, 147, 0.06) 0%, transparent 24%), linear-gradient(180deg, #171f26 0%, #11171c 100%)',
 	};
 }
 
@@ -96,6 +105,15 @@ function macCodexBuiltinPreviewVarsLight(): Record<string, string> {
 		'--void-scrollbar-thumb-active': 'rgba(82, 96, 120, 0.58)',
 		'--ref-menubar-chrome-bg': 'rgba(240, 244, 250, 0.86)',
 		'--void-sidebar-fill': 'rgba(245, 247, 251, 0.78)',
+		'--void-accent-cool': '#418eff',
+		'--void-accent-warm': '#a78bfa',
+		'--void-accent-assist': '#3d62c4',
+		'--void-accent-cool-soft': 'rgba(78, 146, 255, 0.16)',
+		'--void-accent-warm-soft': 'rgba(167, 139, 250, 0.14)',
+		'--surface-tint-soft': 'rgba(65, 142, 255, 0.08)',
+		'--surface-tint-strong': 'rgba(65, 142, 255, 0.13)',
+		'--app-backdrop':
+			'radial-gradient(circle at top center, rgba(65, 142, 255, 0.1) 0%, transparent 34%), radial-gradient(circle at 10% 18%, rgba(56, 189, 248, 0.08) 0%, transparent 22%), radial-gradient(circle at 86% 12%, rgba(167, 139, 250, 0.08) 0%, transparent 24%), linear-gradient(180deg, #f0f4fa 0%, #e8edf5 48%, #e4eaf3 100%)',
 	};
 }
 
@@ -122,6 +140,42 @@ const APPEARANCE_CHROME_CSS_VAR_KEYS: string[] = [
 	'--void-scrollbar-thumb-active',
 	'--ref-menubar-chrome-bg',
 	'--void-sidebar-fill',
+	'--void-accent-cool',
+	'--void-accent-warm',
+	'--void-accent-assist',
+	'--void-accent-cool-soft',
+	'--void-accent-warm-soft',
+	'--surface-tint-soft',
+	'--surface-tint-strong',
+	'--app-backdrop',
+	'--surface-panel-bg',
+	'--surface-panel-bg-strong',
+	'--surface-panel-bg-soft',
+	'--surface-glass-stroke',
+	'--surface-search-bg',
+	'--shadow-floating',
+	'--shadow-toolbar',
+	'--shadow-pressed',
+	'--shadow-popover',
+	'--shadow-accent',
+	'--surface-popover-bg',
+	'--surface-control-bg',
+	'--surface-control-bg-hover',
+	'--surface-control-bg-active',
+	'--surface-code-bg',
+	'--surface-bubble-user',
+	'--surface-card-bg',
+	'--surface-card-bg-soft',
+	'--void-shadow-card',
+	'--void-shadow-soft',
+	'--void-thought-meta',
+	'--void-thought-body',
+	'--void-thought-detail',
+	'--void-git-untracked',
+	'--void-git-modified',
+	'--void-git-added',
+	'--void-git-deleted',
+	'--void-git-ignored',
 ];
 
 /**
@@ -469,6 +523,153 @@ function accentContrast(hex: string): string {
 	return relativeLuminance(hex) > 0.45 ? '#111111' : '#FCFCFC';
 }
 
+/** 与主色搭配的「暖色」高光（用于 mac-codex 多光晕背景，避免换主题后仍残留青/橙固定色） */
+function accentWarmCompanion(accentHex: string): string {
+	return mixHex(accentHex, '#ea580c', 0.26);
+}
+
+function buildAppBackdropLayers(bg0: string, bg1: string, accent: string, warm: string): string {
+	const mid = mixHex(bg0, bg1, 0.38);
+	return [
+		`radial-gradient(circle at top center, ${hexToRgba(accent, 0.12)} 0%, transparent 30%)`,
+		`radial-gradient(circle at 84% 12%, ${hexToRgba(warm, 0.1)} 0%, transparent 24%)`,
+		`radial-gradient(circle at 14% 18%, ${hexToRgba(mixHex(accent, bg1, 0.45), 0.07)} 0%, transparent 26%)`,
+		`linear-gradient(180deg, ${mid} 0%, ${bg0} 100%)`,
+	].join(', ');
+}
+
+/**
+ * mac-codex 布局大量依赖 --surface-* / --shadow-*；若只改 --void-bg-* 而不覆盖这些，换主题时侧栏/卡片仍像默认 Async。
+ */
+function macCodexSemanticSurfaceTokens(
+	isLight: boolean,
+	bg0: string,
+	bg1: string,
+	bg2: string,
+	fg0: string,
+	fg2: string,
+	fg3: string,
+	accent: string,
+	warm: string,
+	contrastBoost: number
+): Record<string, string> {
+	const a = contrastBoost * 0.04;
+	if (!isLight) {
+		const cardTop = mixHex(bg1, accent, 0.055 + a);
+		const cardBot = mixHex(bg0, accent, 0.032 + a * 0.8);
+		const shadowTint = mixHex('#0f172a', accent, 0.25);
+		return {
+			'--surface-panel-bg': hexToRgba(bg1, 0.96),
+			'--surface-panel-bg-strong': hexToRgba(mixHex(bg0, bg1, 0.3), 0.985),
+			'--surface-panel-bg-soft': hexToRgba(mixHex(bg2, accent, 0.09 + a), 0.98),
+			'--surface-glass-stroke': hexToRgba(fg0, 0.08),
+			'--surface-search-bg': hexToRgba(mixHex(bg1, accent, 0.16 + a), 0.97),
+			'--shadow-floating': `0 18px 38px ${hexToRgba(shadowTint, 0.26)}`,
+			'--shadow-toolbar': `0 1px 0 ${hexToRgba(fg0, 0.028)}`,
+			'--shadow-pressed': `inset 0 1px 0 ${hexToRgba(fg0, 0.04)}`,
+			'--shadow-popover': `0 22px 52px ${hexToRgba(shadowTint, 0.36)}`,
+			'--shadow-accent': `0 14px 28px ${hexToRgba(accent, 0.22 + contrastBoost * 0.08)}`,
+			'--surface-popover-bg': hexToRgba(mixHex(bg0, bg1, 0.38), 0.985),
+			'--surface-control-bg': hexToRgba(mixHex(bg2, accent, 0.07 + a), 0.98),
+			'--surface-control-bg-hover': hexToRgba(mixHex(bg2, accent, 0.12 + a), 0.98),
+			'--surface-control-bg-active': hexToRgba(mixHex(bg2, accent, 0.16 + a), 0.98),
+			'--surface-code-bg': hexToRgba(mixHex(bg0, fg0, 0.05), 0.96),
+			'--surface-bubble-user': `linear-gradient(180deg, ${hexToRgba(mixHex(bg2, accent, 0.14 + a), 0.98)} 0%, ${hexToRgba(mixHex(bg1, accent, 0.08 + a), 0.98)} 100%)`,
+			'--surface-card-bg': `linear-gradient(180deg, ${hexToRgba(cardTop, 0.98)} 0%, ${hexToRgba(cardBot, 0.98)} 100%)`,
+			'--surface-card-bg-soft': `linear-gradient(180deg, ${hexToRgba(mixHex(bg2, accent, 0.06 + a), 0.98)} 0%, ${hexToRgba(mixHex(bg1, warm, 0.05 + a), 0.98)} 100%)`,
+			'--void-shadow-card': `0 20px 44px ${hexToRgba(shadowTint, 0.3)}`,
+			'--void-shadow-soft': `inset 0 1px 0 ${hexToRgba(fg0, 0.032)}`,
+			'--void-thought-meta': mixHex(fg2, accent, 0.08),
+			'--void-thought-body': mixHex(mixHex(fg0, bg0, 0.12), accent, 0.05),
+			'--void-thought-detail': mixHex(fg2, accent, 0.06),
+			'--void-git-untracked': mixHex('#4ade80', accent, 0.22),
+			'--void-git-modified': mixHex('#fbbf24', warm, 0.28),
+			'--void-git-added': mixHex('#4ade80', accent, 0.16),
+			'--void-git-deleted': mixHex('#f87171', warm, 0.15),
+			'--void-git-ignored': mixHex(fg3, accent, 0.1),
+		};
+	}
+	const cardTopL = mixHex(bg1, accent, 0.09 + a);
+	const cardBotL = mixHex(bg0, accent, 0.05 + a);
+	const shadowBlue = mixHex('#1e293b', accent, 0.45);
+	return {
+		'--surface-panel-bg': hexToRgba(mixHex(bg1, accent, 0.08 + a), 0.84),
+		'--surface-panel-bg-strong': hexToRgba(mixHex(bg0, accent, 0.05 + a), 0.92),
+		'--surface-panel-bg-soft': hexToRgba(mixHex(bg2, accent, 0.07 + a), 0.88),
+		'--surface-glass-stroke': hexToRgba(fg0, 0.14),
+		'--surface-search-bg': hexToRgba(mixHex(bg1, accent, 0.11 + a), 0.84),
+		'--shadow-floating': `0 24px 70px ${hexToRgba(shadowBlue, 0.14)}`,
+		'--shadow-toolbar': `0 1px 0 ${hexToRgba(fg0, 0.08)}, 0 16px 42px ${hexToRgba(shadowBlue, 0.12)}`,
+		'--shadow-pressed': `inset 0 1px 0 ${hexToRgba(fg0, 0.12)}`,
+		'--shadow-popover': `0 22px 52px ${hexToRgba(shadowBlue, 0.16)}`,
+		'--shadow-accent': `0 14px 28px ${hexToRgba(accent, 0.2)}`,
+		'--surface-popover-bg': hexToRgba(mixHex(bg1, fg0, 0.03), 0.95),
+		'--surface-control-bg': hexToRgba(mixHex(bg2, accent, 0.08 + a), 0.94),
+		'--surface-control-bg-hover': hexToRgba(mixHex(bg2, accent, 0.12 + a), 0.96),
+		'--surface-control-bg-active': hexToRgba(mixHex(bg2, accent, 0.15 + a), 0.98),
+		'--surface-code-bg': hexToRgba(mixHex(bg0, fg0, 0.03), 0.96),
+		'--surface-bubble-user': `linear-gradient(180deg, ${hexToRgba(mixHex(bg1, accent, 0.09 + a), 0.96)} 0%, ${hexToRgba(mixHex(bg2, accent, 0.06 + a), 0.96)} 100%)`,
+		'--surface-card-bg': `linear-gradient(180deg, ${hexToRgba(cardTopL, 0.96)} 0%, ${hexToRgba(cardBotL, 0.96)} 100%)`,
+		'--surface-card-bg-soft': `linear-gradient(180deg, ${hexToRgba(mixHex(bg2, accent, 0.06 + a), 0.96)} 0%, ${hexToRgba(mixHex(bg1, warm, 0.06 + a), 0.96)} 100%)`,
+		'--void-shadow-card': `0 24px 72px ${hexToRgba(shadowBlue, 0.14)}`,
+		'--void-shadow-soft': `inset 0 1px 0 ${hexToRgba(fg0, 0.22)}`,
+		'--void-thought-meta': mixHex(fg2, accent, 0.12),
+		'--void-thought-body': mixHex(fg0, accent, 0.08),
+		'--void-thought-detail': mixHex(fg2, accent, 0.1),
+		'--void-git-untracked': mixHex('#15803d', accent, 0.22),
+		'--void-git-modified': mixHex('#b45309', warm, 0.22),
+		'--void-git-added': mixHex('#15803d', accent, 0.16),
+		'--void-git-deleted': mixHex('#dc2626', warm, 0.14),
+		'--void-git-ignored': mixHex(fg3, accent, 0.12),
+	};
+}
+
+/**
+ * 将 CSS 颜色转为 Electron 可用的 #RRGGBB（rgba 按给定底色做不透明度混合）。
+ */
+function opaqueHexForNativeChrome(cssColor: string, blendOntoHex: string): string {
+	const t = cssColor.trim();
+	if (/^#[0-9a-fA-F]{6}$/i.test(t)) {
+		return normalizeHexColor(t, blendOntoHex);
+	}
+	const m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(t);
+	if (m) {
+		const r = Number(m[1]);
+		const g = Number(m[2]);
+		const b = Number(m[3]);
+		const a = m[4] !== undefined ? Number(m[4]) : 1;
+		const base = hexToRgb(normalizeHexColor(blendOntoHex, '#111111'));
+		const aa = Math.min(Math.max(a, 0), 1);
+		return rgbToHex({
+			r: Math.round(base.r * (1 - aa) + r * aa),
+			g: Math.round(base.g * (1 - aa) + g * aa),
+			b: Math.round(base.b * (1 - aa) + b * aa),
+		});
+	}
+	return normalizeHexColor(blendOntoHex, '#111111');
+}
+
+/**
+ * Windows 标题栏叠加层与窗口底色（与当前外观 token 对齐）。
+ */
+export function nativeWindowChromeFromAppearance(
+	settings: AppAppearanceSettings,
+	colorScheme: 'light' | 'dark'
+): { backgroundColor: string; titleBarColor: string; symbolColor: string } {
+	const vars = resolveAppearanceChromeColorVars(settings, colorScheme);
+	const bg0 = vars['--void-bg-0'] ?? '#11171c';
+	const menubar = vars['--ref-menubar-chrome-bg'] ?? bg0;
+	const fg1 = vars['--void-fg-1'] ?? '#ced7dc';
+	const bg0Hex = opaqueHexForNativeChrome(bg0, bg0);
+	const titleHex = opaqueHexForNativeChrome(menubar, bg0Hex);
+	const symbolHex = opaqueHexForNativeChrome(fg1, titleHex);
+	return {
+		backgroundColor: bg0Hex,
+		titleBarColor: titleHex,
+		symbolColor: symbolHex,
+	};
+}
+
 /**
  * 由外观配色推导出的 CSS 变量（与 applyAppearanceSettingsToDom 中颜色部分一致）。
  * 可用于局部作用域（例如设置里「导入前」预览）而不污染 document。
@@ -478,15 +679,33 @@ export function appearanceSettingsColorVars(settings: AppAppearanceSettings): Re
 	const bg0 = normalizeHexColor(settings.backgroundColor, '#111111');
 	const fg0 = normalizeHexColor(settings.foregroundColor, '#FCFCFC');
 	const accent = normalizeHexColor(settings.accentColor, '#0169CC');
-	const bg1 = mixHex(bg0, fg0, 0.03 + contrastBoost * 0.035);
-	const bg2 = mixHex(bg0, fg0, 0.06 + contrastBoost * 0.055);
-	const bg3 = mixHex(bg0, fg0, 0.1 + contrastBoost * 0.075);
+	const warm = accentWarmCompanion(accent);
+	const accentBias = 0.022 + contrastBoost * 0.045;
+	const baseB1 = mixHex(bg0, fg0, 0.03 + contrastBoost * 0.035);
+	const baseB2 = mixHex(bg0, fg0, 0.06 + contrastBoost * 0.055);
+	const baseB3 = mixHex(bg0, fg0, 0.1 + contrastBoost * 0.075);
+	const bg1 = mixHex(baseB1, accent, accentBias);
+	const bg2 = mixHex(baseB2, accent, accentBias * 1.45);
+	const bg3 = mixHex(baseB3, accent, accentBias * 1.85);
 	const fg1 = mixHex(fg0, bg0, 0.14 + (1 - contrastBoost) * 0.03);
 	const fg2 = mixHex(fg0, bg0, 0.34 + (1 - contrastBoost) * 0.08);
 	const fg3 = mixHex(fg0, bg0, 0.54 + (1 - contrastBoost) * 0.08);
 	const border = mixHex(bg0, fg0, 0.12 + contrastBoost * 0.1);
 	const borderSoft = hexToRgba(fg0, 0.06 + contrastBoost * 0.08);
 	const sidebarAlpha = settings.translucentSidebar ? 0.74 : 0.98;
+	const isLightChrome = relativeLuminance(bg0) > 0.44;
+	const semantic = macCodexSemanticSurfaceTokens(
+		isLightChrome,
+		bg0,
+		bg1,
+		bg2,
+		fg0,
+		fg2,
+		fg3,
+		accent,
+		warm,
+		contrastBoost
+	);
 	return {
 		'--void-bg-0': bg0,
 		'--void-bg-1': bg1,
@@ -500,15 +719,24 @@ export function appearanceSettingsColorVars(settings: AppAppearanceSettings): Re
 		'--void-accent-contrast': accentContrast(accent),
 		'--void-accent-glow': hexToRgba(accent, 0.22 + contrastBoost * 0.08),
 		'--void-accent-soft': hexToRgba(accent, 0.1 + contrastBoost * 0.04),
+		'--void-accent-cool': accent,
+		'--void-accent-warm': warm,
+		'--void-accent-assist': mixHex('#7696f8', accent, isLightChrome ? 0.14 : 0.26),
+		'--void-accent-cool-soft': hexToRgba(accent, 0.14 + contrastBoost * 0.03),
+		'--void-accent-warm-soft': hexToRgba(warm, 0.12 + contrastBoost * 0.03),
+		'--surface-tint-soft': hexToRgba(accent, 0.07 + contrastBoost * 0.035),
+		'--surface-tint-strong': hexToRgba(accent, 0.12 + contrastBoost * 0.04),
+		'--app-backdrop': buildAppBackdropLayers(bg0, bg1, accent, warm),
 		'--void-border': border,
 		'--void-border-soft': borderSoft,
 		'--void-ring': accent,
-		'--void-scrollbar-track': bg1,
+		'--void-scrollbar-track': isLightChrome ? hexToRgba(bg1, 0.78) : hexToRgba(bg0, 0.66),
 		'--void-scrollbar-thumb': mixHex(bg0, fg0, 0.2 + contrastBoost * 0.1),
 		'--void-scrollbar-thumb-hover': mixHex(bg0, fg0, 0.26 + contrastBoost * 0.1),
 		'--void-scrollbar-thumb-active': mixHex(bg0, fg0, 0.32 + contrastBoost * 0.1),
 		'--void-sidebar-fill': hexToRgba(bg1, sidebarAlpha),
 		'--ref-menubar-chrome-bg': mixHex(bg0, fg0, 0.07 + contrastBoost * 0.04),
+		...semantic,
 	};
 }
 

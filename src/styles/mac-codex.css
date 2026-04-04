@@ -137,7 +137,7 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='light'] .ref-quick-open-backdrop {
 	background:
 		radial-gradient(circle at top center, color-mix(in srgb, var(--color-accent) 10%, transparent) 0%, transparent 30%),
-		rgba(242, 244, 247, 0.52);
+		color-mix(in srgb, var(--void-bg-1) 52%, transparent);
 	backdrop-filter: blur(18px) saturate(120%);
 	-webkit-backdrop-filter: blur(18px) saturate(120%);
 }
@@ -195,7 +195,7 @@
 		linear-gradient(180deg, color-mix(in srgb, var(--surface-panel-bg-strong) 94%, transparent) 0%, color-mix(in srgb, var(--surface-panel-bg-soft) 92%, transparent) 100%);
 	border-color: color-mix(in srgb, var(--surface-glass-stroke) 88%, transparent);
 	box-shadow:
-		0 18px 42px rgba(0, 0, 0, 0.16),
+		0 18px 42px color-mix(in srgb, black 16%, transparent),
 		inset 0 1px 0 color-mix(in srgb, var(--color-text-primary) 5%, transparent);
 }
 
@@ -219,7 +219,7 @@
 }
 
 :root[data-ui-style='mac-codex'] .ref-layout-switch-loading {
-	background: rgba(6, 8, 12, 0.44);
+	background: color-mix(in srgb, var(--void-bg-0) 44%, transparent);
 	backdrop-filter: blur(18px) saturate(125%);
 	-webkit-backdrop-filter: blur(18px) saturate(125%);
 }
@@ -229,7 +229,7 @@
 		linear-gradient(180deg, color-mix(in srgb, var(--surface-panel-bg-strong) 94%, transparent) 0%, color-mix(in srgb, var(--surface-panel-bg-soft) 92%, transparent) 100%);
 	border-color: color-mix(in srgb, var(--surface-glass-stroke) 88%, transparent);
 	box-shadow:
-		0 22px 56px rgba(0, 0, 0, 0.18),
+		0 22px 56px color-mix(in srgb, black 18%, transparent),
 		inset 0 1px 0 color-mix(in srgb, var(--color-text-primary) 5%, transparent);
 }
 
@@ -283,7 +283,7 @@
 :root[data-ui-style='mac-codex'] .ref-quick-open-backdrop {
 	background:
 		radial-gradient(circle at top center, color-mix(in srgb, var(--color-accent) 18%, transparent) 0%, transparent 30%),
-		rgba(7, 10, 16, 0.38);
+		color-mix(in srgb, var(--void-bg-0) 38%, transparent);
 	backdrop-filter: blur(18px) saturate(125%);
 	-webkit-backdrop-filter: blur(18px) saturate(125%);
 }
@@ -446,7 +446,7 @@
 		linear-gradient(180deg, color-mix(in srgb, var(--surface-panel-bg-soft) 86%, transparent) 0%, color-mix(in srgb, var(--surface-panel-bg) 70%, transparent) 100%);
 	box-shadow:
 		inset 0 1px 0 color-mix(in srgb, var(--color-text-primary) 4%, transparent),
-		0 12px 24px rgba(0, 0, 0, 0.08);
+		0 12px 24px color-mix(in srgb, black 8%, transparent);
 }
 
 :root[data-ui-style='mac-codex'] .ref-thought-head:hover {
@@ -457,11 +457,11 @@
 }
 
 :root[data-ui-style='mac-codex'] .ref-thought-head-indicator--thinking {
-	background: color-mix(in srgb, var(--color-accent) 72%, #a5e9ff);
+	background: color-mix(in srgb, var(--color-accent) 72%, color-mix(in srgb, var(--void-accent-cool) 42%, var(--void-fg-0) 58%));
 }
 
 :root[data-ui-style='mac-codex'] .ref-thought-head-indicator--streaming {
-	background: color-mix(in srgb, #79d49b 88%, var(--color-accent));
+	background: color-mix(in srgb, var(--void-git-added) 88%, var(--color-accent));
 }
 
 :root[data-ui-style='mac-codex'] .ref-thought-head-indicator--done,
@@ -714,9 +714,15 @@
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-menubar {
-	background: linear-gradient(180deg, rgba(22, 29, 36, 0.98) 0%, rgba(18, 24, 30, 0.98) 100%);
-	border-bottom: 1px solid rgba(205, 217, 224, 0.05);
-	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.024), 0 18px 42px rgba(0, 0, 0, 0.24);
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--ref-menubar-chrome-bg) 96%, var(--void-bg-0)) 0%,
+		color-mix(in srgb, var(--void-bg-1) 94%, var(--void-bg-0)) 100%
+	);
+	border-bottom: 1px solid var(--void-border-soft);
+	box-shadow:
+		0 1px 0 color-mix(in srgb, var(--void-fg-0) 4%, transparent),
+		0 18px 42px color-mix(in srgb, black 24%, transparent);
 	backdrop-filter: none;
 	-webkit-backdrop-filter: none;
 }
@@ -738,39 +744,55 @@
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left {
 	background:
-		radial-gradient(circle at top left, rgba(55, 214, 212, 0.06) 0%, transparent 30%),
-		linear-gradient(180deg, #182028 0%, #131920 100%);
-	border-right: 1px solid rgba(205, 217, 224, 0.05);
+		radial-gradient(
+			circle at top left,
+			color-mix(in srgb, var(--void-accent-cool, var(--void-accent)) 12%, transparent) 0%,
+			transparent 30%
+		),
+		linear-gradient(180deg, var(--void-bg-2) 0%, var(--void-bg-1) 100%);
+	border-right: 1px solid var(--void-border-soft);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-center,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body.ref-body--editor-home,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-editor-welcome {
 	background:
-		radial-gradient(circle at top center, rgba(55, 214, 212, 0.04) 0%, transparent 30%),
-		radial-gradient(circle at 88% 10%, rgba(255, 157, 89, 0.05) 0%, transparent 20%),
-		#11171c;
+		radial-gradient(
+			circle at top center,
+			color-mix(in srgb, var(--void-accent-cool, var(--void-accent)) 9%, transparent) 0%,
+			transparent 30%
+		),
+		radial-gradient(
+			circle at 88% 10%,
+			color-mix(in srgb, var(--void-accent-warm) 10%, transparent) 0%,
+			transparent 20%
+		),
+		var(--void-bg-0);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-right {
 	background:
-		radial-gradient(circle at top right, rgba(255, 157, 89, 0.05) 0%, transparent 24%),
-		linear-gradient(180deg, #192028 0%, #141a20 100%);
-	border-left: 1px solid rgba(205, 217, 224, 0.05);
+		radial-gradient(
+			circle at top right,
+			color-mix(in srgb, var(--void-accent-warm) 9%, transparent) 0%,
+			transparent 24%
+		),
+		linear-gradient(180deg, var(--void-bg-2) 0%, var(--void-bg-1) 100%);
+	border-left: 1px solid var(--void-border-soft);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left-scroll {
 	padding: 10px 10px 14px;
-	background: linear-gradient(180deg, rgba(19, 25, 31, 0.48) 0%, rgba(19, 25, 31, 0) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 48%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-project-block--editor {
 	position: relative;
 	margin: 6px 6px 14px;
-	border: 1px solid rgba(82, 95, 105, 0.18);
+	border: 1px solid color-mix(in srgb, var(--void-fg-3) 18%, transparent);
 	border-radius: 20px;
-	background: linear-gradient(180deg, rgba(18, 24, 31, 0.98) 0%, rgba(13, 18, 24, 0.99) 100%);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 18px 36px rgba(0, 0, 0, 0.18);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 98%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 99%, transparent) 100%);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 3%, transparent), 0 18px 36px color-mix(in srgb, black 18%, transparent);
 	overflow: hidden;
 }
 
@@ -780,8 +802,8 @@
 	inset: 0 0 auto 0;
 	height: 72px;
 	background:
-		linear-gradient(180deg, rgba(55, 214, 212, 0.12) 0%, rgba(55, 214, 212, 0) 100%),
-		radial-gradient(circle at 85% 0%, rgba(255, 157, 89, 0.14) 0%, transparent 45%);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 12%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 0%, transparent) 100%),
+		radial-gradient(circle at 85% 0%, color-mix(in srgb, var(--void-accent-warm) 14%, transparent) 0%, transparent 45%);
 	pointer-events: none;
 	opacity: 0.8;
 }
@@ -790,16 +812,16 @@
 	padding: 12px 14px 0;
 	font-size: 10px;
 	letter-spacing: 0.14em;
-	color: #7b8b97;
+	color: var(--void-thought-meta);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-head--editor {
 	margin: 10px 10px 0;
 	padding: 12px 14px;
-	border: 1px solid rgba(92, 106, 117, 0.18);
+	border: 1px solid color-mix(in srgb, var(--void-fg-3) 18%, transparent);
 	border-radius: 16px;
-	background: linear-gradient(180deg, rgba(24, 31, 39, 0.92) 0%, rgba(18, 23, 29, 0.86) 100%);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 92%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 86%, transparent) 100%);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 3%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-title {
@@ -809,16 +831,16 @@
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-subtitle {
-	color: #6f808c;
+	color: var(--void-fg-3);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-body--workspace {
 	margin: 10px 10px 12px;
 	padding: 8px 0 12px;
-	border: 1px solid rgba(84, 97, 108, 0.18);
+	border: 1px solid color-mix(in srgb, var(--void-fg-3) 18%, transparent);
 	border-radius: 16px;
-	background: linear-gradient(180deg, rgba(15, 20, 26, 0.92) 0%, rgba(12, 16, 21, 0.98) 100%);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-0) 92%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 98%, transparent) 100%);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 2%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-tree-wrap {
@@ -833,7 +855,11 @@
 	top: 8px;
 	bottom: 8px;
 	width: 1px;
-	background: linear-gradient(180deg, rgba(55, 214, 212, 0.08) 0%, rgba(255, 157, 89, 0.04) 100%);
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--void-accent-cool, var(--void-accent)) 10%, transparent) 0%,
+		color-mix(in srgb, var(--void-accent-warm) 6%, transparent) 100%
+	);
 	pointer-events: none;
 	opacity: 0.8;
 }
@@ -846,20 +872,28 @@
 	padding-right: 10px;
 	border: 1px solid transparent;
 	border-radius: 12px;
-	background: linear-gradient(180deg, rgba(255, 255, 255, 0.012) 0%, rgba(255, 255, 255, 0.004) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-fg-0) 1%, transparent) 0%, color-mix(in srgb, var(--void-fg-0) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-row:hover {
-	background: linear-gradient(180deg, rgba(55, 214, 212, 0.08) 0%, rgba(55, 214, 212, 0.03) 100%);
-	border-color: rgba(55, 214, 212, 0.14);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--void-accent-cool, var(--void-accent)) 10%, transparent) 0%,
+		color-mix(in srgb, var(--void-accent-cool, var(--void-accent)) 4%, transparent) 100%
+	);
+	border-color: color-mix(in srgb, var(--void-accent-cool, var(--void-accent)) 16%, transparent);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 4%, transparent);
 	transform: translateX(1px);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-row.is-selected {
-	background: linear-gradient(90deg, rgba(55, 214, 212, 0.16) 0%, rgba(255, 157, 89, 0.08) 100%);
-	border-color: rgba(55, 214, 212, 0.18);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 20px rgba(0, 0, 0, 0.18);
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--void-accent-cool, var(--void-accent)) 18%, transparent) 0%,
+		color-mix(in srgb, var(--void-accent-warm) 10%, transparent) 100%
+	);
+	border-color: color-mix(in srgb, var(--void-accent-cool, var(--void-accent)) 20%, transparent);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 4%, transparent), 0 10px 20px color-mix(in srgb, black 18%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-row.is-selected::before {
@@ -870,8 +904,12 @@
 	bottom: 6px;
 	width: 3px;
 	border-radius: 999px;
-	background: linear-gradient(180deg, #37d6d4 0%, #ff9d59 100%);
-	box-shadow: 0 0 16px rgba(55, 214, 212, 0.3);
+	background: linear-gradient(
+		180deg,
+		var(--void-accent-cool, var(--void-accent)) 0%,
+		var(--void-accent-warm) 100%
+	);
+	box-shadow: 0 0 16px color-mix(in srgb, var(--void-accent-cool, var(--void-accent)) 35%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-row--nested-dirty .ref-explorer-chevron-btn {
@@ -887,13 +925,13 @@
 	width: 20px;
 	height: 20px;
 	border-radius: 8px;
-	color: #758692;
+	color: var(--void-fg-3);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-chevron-btn:hover,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-row:hover .ref-explorer-chevron-btn {
-	background: rgba(55, 214, 212, 0.1);
-	color: #d9f7f7;
+	background: color-mix(in srgb, var(--void-accent-cool, var(--void-accent)) 12%, transparent);
+	color: color-mix(in srgb, var(--void-fg-0) 88%, var(--void-accent-cool, var(--void-accent)) 12%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-icon-cell {
@@ -903,26 +941,26 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-icon-cell svg {
 	width: 16px;
 	height: 16px;
-	filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.24));
+	filter: drop-shadow(0 3px 10px color-mix(in srgb, black 24%, transparent));
 	opacity: 0.98;
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-row--dir .ref-explorer-icon-cell svg {
-	filter: drop-shadow(0 3px 10px rgba(255, 157, 89, 0.18));
+	filter: drop-shadow(0 3px 10px color-mix(in srgb, var(--void-accent-warm) 18%, transparent));
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-label {
 	padding: 5px 2px;
-	color: #a6b3bd;
+	color: var(--void-thought-detail);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-row--dir .ref-explorer-label {
-	color: #d4dde2;
+	color: var(--void-thought-body);
 	font-weight: 600;
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-row.is-selected .ref-explorer-label {
-	color: #f5f8fa;
+	color: var(--void-fg-0);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-name--git-m,
@@ -941,27 +979,27 @@
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-badge--u {
-	color: #6ce0bf;
-	background: rgba(92, 217, 184, 0.14);
-	border-color: rgba(92, 217, 184, 0.16);
+	color: color-mix(in srgb, var(--void-git-untracked) 82%, var(--void-fg-0) 18%);
+	background: color-mix(in srgb, var(--void-git-untracked) 14%, transparent);
+	border-color: color-mix(in srgb, var(--void-git-untracked) 16%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-badge--m {
-	color: #ffba73;
-	background: rgba(255, 157, 89, 0.14);
-	border-color: rgba(255, 157, 89, 0.16);
+	color: color-mix(in srgb, var(--void-accent-warm) 72%, var(--void-fg-0) 28%);
+	background: color-mix(in srgb, var(--void-accent-warm) 14%, transparent);
+	border-color: color-mix(in srgb, var(--void-accent-warm) 16%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-badge--a {
-	color: #7be0a8;
-	background: rgba(112, 216, 157, 0.14);
-	border-color: rgba(112, 216, 157, 0.16);
+	color: color-mix(in srgb, var(--void-git-added) 82%, var(--void-fg-0) 18%);
+	background: color-mix(in srgb, var(--void-git-added) 14%, transparent);
+	border-color: color-mix(in srgb, var(--void-git-added) 16%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-badge--d {
-	color: #ff8e97;
-	background: rgba(255, 123, 134, 0.14);
-	border-color: rgba(255, 123, 134, 0.16);
+	color: color-mix(in srgb, var(--void-git-deleted) 82%, var(--void-fg-0) 18%);
+	background: color-mix(in srgb, var(--void-git-deleted) 14%, transparent);
+	border-color: color-mix(in srgb, var(--void-git-deleted) 16%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-badge--i,
@@ -969,157 +1007,157 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-badge--c,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-badge--t,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-badge--misc {
-	color: #90a0ad;
-	background: rgba(255, 255, 255, 0.05);
-	border-color: rgba(255, 255, 255, 0.06);
+	color: var(--void-fg-2);
+	background: color-mix(in srgb, var(--void-fg-0) 5%, transparent);
+	border-color: color-mix(in srgb, var(--void-fg-0) 6%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-ctx-menu {
-	background: linear-gradient(180deg, rgba(19, 25, 31, 0.99) 0%, rgba(15, 20, 26, 0.995) 100%);
-	border-color: rgba(90, 104, 114, 0.2);
-	box-shadow: 0 24px 54px rgba(0, 0, 0, 0.34);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 99%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 100%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-3) 20%, transparent);
+	box-shadow: 0 24px 54px color-mix(in srgb, black 34%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-ctx-item {
-	color: #c4d0d7;
+	color: var(--void-fg-1);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-ctx-item:hover:not(.is-disabled):not(:disabled) {
-	background: linear-gradient(180deg, rgba(55, 214, 212, 0.1) 0%, rgba(55, 214, 212, 0.04) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 10%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 4%, transparent) 100%);
 	border-color: transparent;
-	color: #f3f8f9;
+	color: var(--void-fg-0);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-placeholder,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-empty {
 	margin: 12px;
 	padding: 14px 14px;
-	border: 1px dashed rgba(84, 97, 108, 0.2);
+	border: 1px dashed color-mix(in srgb, var(--void-fg-3) 20%, transparent);
 	border-radius: 14px;
-	background: rgba(255, 255, 255, 0.018);
+	background: color-mix(in srgb, var(--void-fg-0) 2%, transparent);
 	color: var(--void-fg-2);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-loading {
-	color: #7f8f9b;
+	color: var(--void-fg-3);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left-footer--editor {
 	padding: 10px 12px 12px;
-	background: linear-gradient(180deg, rgba(17, 23, 28, 0) 0%, rgba(17, 23, 28, 0.86) 44%, rgba(16, 22, 28, 0.98) 100%);
-	border-top: 1px solid rgba(205, 217, 224, 0.04);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-0) 0%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 86%, transparent) 44%, color-mix(in srgb, var(--void-bg-0) 98%, transparent) 100%);
+	border-top: 1px solid color-mix(in srgb, var(--void-fg-0) 4%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-open-workspace {
 	border-radius: 14px;
-	border-color: rgba(55, 214, 212, 0.22);
-	background: linear-gradient(180deg, rgba(55, 214, 212, 0.18) 0%, rgba(17, 113, 121, 0.26) 100%);
-	color: #e6fbfb;
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 24px rgba(8, 27, 31, 0.24);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 22%, transparent);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 18%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 26%, transparent) 100%);
+	color: color-mix(in srgb, var(--void-fg-0) 78%, var(--void-accent-cool) 22%);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 4%, transparent), 0 12px 24px color-mix(in srgb, var(--void-bg-0) 24%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-open-workspace:hover {
-	background: linear-gradient(180deg, rgba(55, 214, 212, 0.24) 0%, rgba(23, 133, 141, 0.3) 100%);
-	border-color: rgba(55, 214, 212, 0.28);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 24%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 30%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 28%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-ipc-hint {
-	color: #61717d;
+	color: var(--void-fg-3);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-icon-tile {
 	border: 1px solid transparent;
 	border-radius: 12px;
-	background: rgba(255, 255, 255, 0.015);
-	color: #82959f;
+	background: color-mix(in srgb, var(--void-fg-0) 2%, transparent);
+	color: var(--void-fg-2);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-icon-tile:hover {
-	background: rgba(55, 214, 212, 0.1);
-	border-color: rgba(55, 214, 212, 0.14);
-	color: #d8f6f7;
+	background: color-mix(in srgb, var(--void-accent-cool) 10%, transparent);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 14%, transparent);
+	color: color-mix(in srgb, var(--void-fg-0) 80%, var(--void-accent-cool) 20%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-settings-backdrop {
 	background:
-		radial-gradient(circle at top center, rgba(55, 214, 212, 0.08) 0%, transparent 26%),
-		radial-gradient(circle at 86% 10%, rgba(255, 157, 89, 0.05) 0%, transparent 18%),
-		linear-gradient(180deg, rgba(15, 20, 25, 0.995) 0%, rgba(11, 15, 19, 0.995) 100%);
+		radial-gradient(circle at top center, color-mix(in srgb, var(--void-accent-cool) 8%, transparent) 0%, transparent 26%),
+		radial-gradient(circle at 86% 10%, color-mix(in srgb, var(--void-accent-warm) 5%, transparent) 0%, transparent 18%),
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-0) 100%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 100%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-settings-root {
-	background: linear-gradient(180deg, rgba(20, 27, 33, 0.995) 0%, rgba(14, 19, 24, 0.995) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 100%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 100%, transparent) 100%);
 	border-color: transparent;
 	box-shadow: none;
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-settings-sidebar {
-	background: linear-gradient(180deg, rgba(24, 31, 38, 0.98) 0%, rgba(18, 24, 30, 0.98) 100%);
-	border-right: 1px solid rgba(205, 217, 224, 0.05);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 98%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 98%, transparent) 100%);
+	border-right: 1px solid color-mix(in srgb, var(--void-fg-0) 5%, transparent);
 	backdrop-filter: none;
 	-webkit-backdrop-filter: none;
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-settings-main {
 	background:
-		radial-gradient(circle at top center, rgba(55, 214, 212, 0.05) 0%, transparent 34%),
-		radial-gradient(circle at 84% 14%, rgba(255, 157, 89, 0.04) 0%, transparent 18%),
-		linear-gradient(180deg, rgba(21, 28, 34, 0.98) 0%, rgba(17, 23, 28, 0.98) 100%);
+		radial-gradient(circle at top center, color-mix(in srgb, var(--void-accent-cool) 5%, transparent) 0%, transparent 34%),
+		radial-gradient(circle at 84% 14%, color-mix(in srgb, var(--void-accent-warm) 4%, transparent) 0%, transparent 18%),
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 98%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 98%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-settings-open-loading {
 	background:
-		linear-gradient(180deg, rgba(27, 35, 42, 0.96) 0%, rgba(21, 27, 33, 0.96) 100%);
-	border-color: rgba(205, 217, 224, 0.08);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 96%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 96%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-0) 8%, transparent);
 	box-shadow:
-		0 18px 44px rgba(0, 0, 0, 0.28),
-		inset 0 1px 0 rgba(255, 255, 255, 0.04);
+		0 18px 44px color-mix(in srgb, black 28%, transparent),
+		inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 4%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-settings-nav-loading-spinner,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-settings-open-loading-spinner {
-	border-color: rgba(205, 217, 224, 0.12);
-	border-top-color: rgba(55, 214, 212, 0.95);
+	border-color: color-mix(in srgb, var(--void-fg-0) 12%, transparent);
+	border-top-color: color-mix(in srgb, var(--void-accent-cool) 95%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-settings-skeleton-card {
 	background:
-		linear-gradient(180deg, rgba(25, 33, 40, 0.96) 0%, rgba(19, 25, 31, 0.96) 100%);
-	border-color: rgba(205, 217, 224, 0.06);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 96%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 96%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-0) 6%, transparent);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 3%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-settings-skeleton-line {
 	background:
-		linear-gradient(90deg, rgba(35, 45, 54, 0.9) 0%, rgba(83, 95, 108, 0.35) 50%, rgba(35, 45, 54, 0.9) 100%);
+		linear-gradient(90deg, color-mix(in srgb, var(--void-bg-3) 90%, transparent) 0%, color-mix(in srgb, var(--void-fg-3) 35%, transparent) 50%, color-mix(in srgb, var(--void-bg-3) 90%, transparent) 100%);
 	background-size: 200% 100%;
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-layout-switch-loading {
-	background: rgba(4, 6, 9, 0.52);
+	background: color-mix(in srgb, var(--void-bg-0) 52%, transparent);
 	backdrop-filter: blur(20px) saturate(120%);
 	-webkit-backdrop-filter: blur(20px) saturate(120%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-layout-switch-loading-card {
 	background:
-		linear-gradient(180deg, rgba(27, 35, 42, 0.96) 0%, rgba(21, 27, 33, 0.96) 100%);
-	border-color: rgba(205, 217, 224, 0.08);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 96%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 96%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-0) 8%, transparent);
 	box-shadow:
-		0 20px 52px rgba(0, 0, 0, 0.3),
-		inset 0 1px 0 rgba(255, 255, 255, 0.04);
+		0 20px 52px color-mix(in srgb, black 30%, transparent),
+		inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 4%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-layout-switch-loading-spinner {
-	border-color: rgba(205, 217, 224, 0.12);
-	border-top-color: rgba(55, 214, 212, 0.95);
+	border-color: color-mix(in srgb, var(--void-fg-0) 12%, transparent);
+	border-top-color: color-mix(in srgb, var(--void-accent-cool) 95%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-quick-open-backdrop {
 	background:
-		radial-gradient(circle at top center, rgba(55, 214, 212, 0.12) 0%, transparent 28%),
-		radial-gradient(circle at 84% 12%, rgba(255, 157, 89, 0.08) 0%, transparent 18%),
-		rgba(5, 8, 12, 0.46);
+		radial-gradient(circle at top center, color-mix(in srgb, var(--void-accent-cool) 12%, transparent) 0%, transparent 28%),
+		radial-gradient(circle at 84% 12%, color-mix(in srgb, var(--void-accent-warm) 8%, transparent) 0%, transparent 18%),
+		color-mix(in srgb, var(--void-bg-0) 46%, transparent);
 	backdrop-filter: blur(18px) saturate(120%);
 	-webkit-backdrop-filter: blur(18px) saturate(120%);
 }
@@ -1151,54 +1189,54 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-color-control input[type='text'],
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-color-control input:not([type]),
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-number-control input {
-	background: linear-gradient(180deg, rgba(33, 42, 51, 0.96) 0%, rgba(28, 37, 45, 0.96) 100%);
-	border-color: rgba(205, 217, 224, 0.07);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-3) 96%, transparent) 0%, color-mix(in srgb, var(--void-bg-3) 96%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-0) 7%, transparent);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 4%, transparent);
 }
 
 /* 外观页大卡片：与模型设置里的 provider 卡片同一套青灰面板（index.css 里仅用 void 渐变，进不了上面控件条） */
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-shell-card,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-subcard {
-	background: linear-gradient(180deg, rgba(33, 42, 51, 0.96) 0%, rgba(28, 37, 45, 0.96) 100%);
-	border-color: rgba(205, 217, 224, 0.07);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-3) 96%, transparent) 0%, color-mix(in srgb, var(--void-bg-3) 96%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-0) 7%, transparent);
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.035),
-		0 12px 28px rgba(0, 0, 0, 0.18);
+		inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 4%, transparent),
+		0 12px 28px color-mix(in srgb, black 18%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-theme-editor-head {
 	background: color-mix(in srgb, var(--surface-panel-bg-soft) 56%, transparent);
-	border-bottom-color: rgba(205, 217, 224, 0.05);
+	border-bottom-color: color-mix(in srgb, var(--void-fg-0) 5%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-code-preview {
-	border-bottom-color: rgba(205, 217, 224, 0.06);
+	border-bottom-color: color-mix(in srgb, var(--void-fg-0) 6%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-code-pane {
-	background: linear-gradient(180deg, rgba(26, 34, 41, 0.98) 0%, rgba(22, 29, 36, 0.98) 100%);
-	border-color: rgba(205, 217, 224, 0.06);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 98%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 98%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-0) 6%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-code-gutter {
-	background: rgba(20, 27, 33, 0.88);
-	color: #80909c;
+	background: color-mix(in srgb, var(--void-bg-1) 88%, transparent);
+	color: var(--void-fg-2);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-theme-row:hover {
-	background: rgba(55, 214, 212, 0.06);
+	background: color-mix(in srgb, var(--void-accent-cool) 6%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-toolbar-btn:hover {
-	background: rgba(55, 214, 212, 0.1);
-	border-color: rgba(55, 214, 212, 0.16);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+	background: color-mix(in srgb, var(--void-accent-cool) 10%, transparent);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 16%, transparent);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 4%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-toolbar-btn:disabled:hover {
-	background: linear-gradient(180deg, rgba(33, 42, 51, 0.96) 0%, rgba(28, 37, 45, 0.96) 100%);
-	border-color: rgba(205, 217, 224, 0.07);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-3) 96%, transparent) 0%, color-mix(in srgb, var(--void-bg-3) 96%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-0) 7%, transparent);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 4%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-appearance-color-control input[type='text']:focus,
@@ -1211,24 +1249,24 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-project-header,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-thread-section-label,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-local-label {
-	color: #80909c;
+	color: var(--void-fg-2);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-agent-new-btn {
 	justify-content: flex-start;
 	padding: 10px 12px;
 	border-radius: 12px;
-	border-color: rgba(55, 214, 212, 0.22);
-	background: linear-gradient(180deg, rgba(55, 214, 212, 0.14) 0%, rgba(14, 102, 109, 0.28) 100%);
-	color: #e7fbfb;
+	border-color: color-mix(in srgb, var(--void-accent-cool) 22%, transparent);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 14%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 28%, transparent) 100%);
+	color: color-mix(in srgb, var(--void-fg-0) 78%, var(--void-accent-cool) 22%);
 	font-size: 13px;
 	font-weight: 600;
-	box-shadow: 0 10px 24px rgba(8, 33, 36, 0.2);
+	box-shadow: 0 10px 24px color-mix(in srgb, color-mix(in srgb, var(--void-accent-cool) 22%, var(--void-bg-0) 78%) 20%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-agent-new-btn:hover {
-	background: linear-gradient(180deg, rgba(55, 214, 212, 0.2) 0%, rgba(18, 121, 129, 0.34) 100%);
-	border-color: rgba(55, 214, 212, 0.28);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 20%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 34%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 28%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-thread-list {
@@ -1285,8 +1323,8 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-settings-remove-model:hover,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-settings-set-default:hover,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-plan-review-close:hover {
-	background: rgba(55, 214, 212, 0.08);
-	border-color: rgba(55, 214, 212, 0.14);
+	background: color-mix(in srgb, var(--void-accent-cool) 8%, transparent);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 14%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-thread-item.is-active,
@@ -1301,9 +1339,9 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-layout-btn.is-active,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-menu-item.is-active,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-right-icon-tab.is-active {
-	background: rgba(55, 214, 212, 0.12);
-	border-color: rgba(55, 214, 212, 0.18);
-	box-shadow: inset 0 0 0 1px rgba(55, 214, 212, 0.1);
+	background: color-mix(in srgb, var(--void-accent-cool) 12%, transparent);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 18%, transparent);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--void-accent-cool) 10%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-right-toolbar,
@@ -1318,7 +1356,7 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-skill-scope-head,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-plan-review-foot {
 	background: color-mix(in srgb, var(--surface-panel-bg-soft) 56%, transparent);
-	border-color: rgba(205, 217, 224, 0.05);
+	border-color: color-mix(in srgb, var(--void-fg-0) 5%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-editor-launchpad,
@@ -1337,8 +1375,8 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-capsule--stacked-chat,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-capsule--compact {
 	background: var(--surface-card-bg-soft);
-	border-color: rgba(205, 217, 224, 0.06);
-	box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+	border-color: color-mix(in srgb, var(--void-fg-0) 6%, transparent);
+	box-shadow: 0 12px 28px color-mix(in srgb, black 18%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-capsule,
@@ -1351,12 +1389,12 @@
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-msg-user {
 	background: var(--surface-bubble-user);
-	border-color: rgba(205, 217, 224, 0.06);
-	box-shadow: 0 10px 22px rgba(0, 0, 0, 0.14);
+	border-color: color-mix(in srgb, var(--void-fg-0) 6%, transparent);
+	box-shadow: 0 10px 22px color-mix(in srgb, black 14%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-msg-user:hover:not(:disabled) {
-	background: linear-gradient(180deg, rgba(41, 53, 63, 0.98) 0%, rgba(31, 42, 50, 0.98) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-3) 98%, transparent) 0%, color-mix(in srgb, var(--void-bg-3) 98%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-editor-welcome-inner {
@@ -1378,29 +1416,29 @@
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-welcome-action-card,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-welcome-recent-card {
-	background: linear-gradient(180deg, rgba(28, 37, 46, 0.94) 0%, rgba(20, 27, 33, 0.96) 100%);
-	border-color: rgba(205, 217, 224, 0.06);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 94%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 96%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-0) 6%, transparent);
 	box-shadow: none;
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-welcome-action-card:hover:not(:disabled),
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-welcome-recent-card:hover {
-	background: linear-gradient(180deg, rgba(33, 44, 54, 0.96) 0%, rgba(23, 31, 38, 0.98) 100%);
-	border-color: rgba(55, 214, 212, 0.12);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-3) 96%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 98%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 12%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-welcome-action-card--primary {
 	background:
-		radial-gradient(circle at top left, rgba(55, 214, 212, 0.16) 0%, transparent 38%),
-		radial-gradient(circle at 88% 0%, rgba(255, 157, 89, 0.12) 0%, transparent 28%),
-		linear-gradient(180deg, rgba(28, 37, 46, 0.96) 0%, rgba(20, 27, 33, 0.98) 100%);
-	border-color: rgba(55, 214, 212, 0.14);
+		radial-gradient(circle at top left, color-mix(in srgb, var(--void-accent-cool) 16%, transparent) 0%, transparent 38%),
+		radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--void-accent-warm) 12%, transparent) 0%, transparent 28%),
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 96%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 98%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 14%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-welcome-action-icon,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-welcome-recent-card-icon {
-	background: linear-gradient(180deg, rgba(55, 214, 212, 0.12) 0%, rgba(255, 157, 89, 0.08) 100%);
-	color: #effcfc;
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 12%, transparent) 0%, color-mix(in srgb, var(--void-accent-warm) 8%, transparent) 100%);
+	color: color-mix(in srgb, var(--void-fg-0) 80%, var(--void-accent-cool) 20%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-send-btn,
@@ -1410,10 +1448,14 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-skill-scope-btn--primary,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-plan-review-build,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-tool-approval-btn--allow {
-	background: linear-gradient(180deg, #42dbd8 0%, #20c1c3 100%);
-	border-color: rgba(90, 234, 231, 0.34);
-	color: #082325;
-	box-shadow: 0 12px 26px rgba(10, 94, 99, 0.24);
+	background: linear-gradient(
+		180deg,
+		var(--void-accent-cool) 0%,
+		color-mix(in srgb, var(--void-accent-cool) 72%, black 28%) 100%
+	);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 34%, transparent);
+	color: var(--void-accent-contrast);
+	box-shadow: 0 12px 26px color-mix(in srgb, var(--void-accent-cool) 24%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-send-btn:hover:not(:disabled),
@@ -1423,7 +1465,11 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-skill-scope-btn--primary:hover,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-plan-review-build:hover,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-tool-approval-btn--allow:hover {
-	background: linear-gradient(180deg, #54e3e0 0%, #2ccacc 100%);
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--void-accent-cool) 88%, white 12%) 0%,
+		color-mix(in srgb, var(--void-accent-cool) 78%, black 22%) 100%
+	);
 	filter: none;
 	transform: none;
 }
@@ -1629,7 +1675,7 @@
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left-scroll {
 	padding: 12px 10px 12px;
-	background: linear-gradient(180deg, rgba(19, 25, 31, 0.44) 0%, rgba(19, 25, 31, 0) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 44%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-project-block--editor {
@@ -1638,10 +1684,10 @@
 	flex-direction: column;
 	min-height: 100%;
 	margin: 0;
-	border: 1px solid rgba(82, 95, 105, 0.16);
+	border: 1px solid color-mix(in srgb, var(--void-fg-3) 16%, transparent);
 	border-radius: 22px;
-	background: linear-gradient(180deg, rgba(20, 27, 34, 0.98) 0%, rgba(14, 19, 25, 0.99) 100%);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.026), 0 14px 30px rgba(0, 0, 0, 0.14);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 98%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 99%, transparent) 100%);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 3%, transparent), 0 14px 30px color-mix(in srgb, black 14%, transparent);
 	overflow: hidden;
 }
 
@@ -1651,8 +1697,8 @@
 	inset: 0 0 auto 0;
 	height: 88px;
 	background:
-		linear-gradient(180deg, rgba(55, 214, 212, 0.11) 0%, rgba(55, 214, 212, 0) 100%),
-		radial-gradient(circle at 88% 0%, rgba(255, 157, 89, 0.12) 0%, transparent 44%);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 11%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 0%, transparent) 100%),
+		radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--void-accent-warm) 12%, transparent) 0%, transparent 44%);
 	pointer-events: none;
 	opacity: 0.75;
 }
@@ -1660,32 +1706,32 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-head--editor {
 	margin: 10px 10px 0;
 	padding: 12px 14px;
-	border: 1px solid rgba(92, 106, 117, 0.16);
+	border: 1px solid color-mix(in srgb, var(--void-fg-3) 16%, transparent);
 	border-radius: 16px;
-	background: linear-gradient(180deg, rgba(24, 31, 39, 0.9) 0%, rgba(18, 23, 29, 0.82) 100%);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.026);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 90%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 82%, transparent) 100%);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 3%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-body--workspace {
 	flex: 1;
 	margin: 10px 10px 12px;
 	padding: 8px 0 12px;
-	border: 1px solid rgba(84, 97, 108, 0.16);
+	border: 1px solid color-mix(in srgb, var(--void-fg-3) 16%, transparent);
 	border-radius: 16px;
-	background: linear-gradient(180deg, rgba(15, 20, 26, 0.9) 0%, rgba(12, 16, 21, 0.96) 100%);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.018);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-0) 90%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 96%, transparent) 100%);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 2%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-preview-tree {
-	background: linear-gradient(180deg, rgba(20, 27, 34, 0.98) 0%, rgba(14, 19, 25, 0.99) 100%);
-	border-color: rgba(82, 95, 105, 0.16);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.022), 0 14px 30px rgba(0, 0, 0, 0.14);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 98%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 99%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-3) 16%, transparent);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 2%, transparent), 0 14px 30px color-mix(in srgb, black 14%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-preview-tree .ref-explorer-head {
 	padding: 12px 14px;
-	border-bottom-color: rgba(84, 97, 108, 0.16);
-	background: linear-gradient(180deg, rgba(24, 31, 39, 0.88) 0%, rgba(18, 23, 29, 0.8) 100%);
+	border-bottom-color: color-mix(in srgb, var(--void-fg-3) 16%, transparent);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 88%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 80%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-preview-tree .ref-explorer-body {
@@ -1694,16 +1740,16 @@
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-preview-editor {
 	background:
-		radial-gradient(circle at top center, rgba(55, 214, 212, 0.045) 0%, transparent 28%),
-		linear-gradient(180deg, rgba(18, 24, 30, 0.98) 0%, rgba(12, 17, 22, 0.99) 100%);
-	border-color: rgba(82, 95, 105, 0.16);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.022), 0 16px 34px rgba(0, 0, 0, 0.16);
+		radial-gradient(circle at top center, color-mix(in srgb, var(--void-accent-cool) 5%, transparent) 0%, transparent 28%),
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 98%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 99%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-3) 16%, transparent);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 2%, transparent), 0 16px 34px color-mix(in srgb, black 16%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-editor-toolbar,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-editor-toolbar--workspace {
-	background: linear-gradient(180deg, rgba(24, 31, 39, 0.9) 0%, rgba(18, 23, 29, 0.8) 100%);
-	border-bottom-color: rgba(84, 97, 108, 0.16);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 90%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 80%, transparent) 100%);
+	border-bottom-color: color-mix(in srgb, var(--void-fg-3) 16%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-editor-canvas,
@@ -1711,13 +1757,13 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-editor-pane.ref-editor-pane--md-preview,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-monaco-fill,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-editor-empty {
-	background: linear-gradient(180deg, rgba(16, 22, 27, 0.98) 0%, rgba(13, 18, 23, 0.99) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-0) 98%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 99%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-editor-md-preview-scroll {
 	background:
-		radial-gradient(circle at top center, rgba(55, 214, 212, 0.05) 0%, transparent 28%),
-		linear-gradient(180deg, rgba(19, 25, 31, 0.96) 0%, rgba(14, 19, 24, 0.99) 100%);
+		radial-gradient(circle at top center, color-mix(in srgb, var(--void-accent-cool) 5%, transparent) 0%, transparent 28%),
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 96%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 99%, transparent) 100%);
 }
 
 /* Phase 7: lighter integrated explorer + stronger mode-chip feedback */
@@ -1747,7 +1793,7 @@
 	height: 78px;
 	background:
 		linear-gradient(180deg, color-mix(in srgb, var(--surface-tint-soft) 94%, transparent) 0%, transparent 100%),
-		radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--void-accent-warm, #ff9d59) 12%, transparent) 0%, transparent 42%);
+		radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--void-accent-warm) 12%, transparent) 0%, transparent 42%);
 	pointer-events: none;
 	opacity: 0.78;
 }
@@ -1951,48 +1997,48 @@
 	color: var(--mode-chip-text);
 	background: var(--mode-chip-bg);
 	border-color: var(--mode-chip-border);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 22px var(--mode-chip-glow);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 8%, transparent), 0 10px 22px var(--mode-chip-glow);
 }
 
 :root[data-ui-style='mac-codex'] .ref-mode-chip--agent {
-	--mode-chip-bg: linear-gradient(180deg, rgba(47, 184, 185, 0.14) 0%, rgba(19, 130, 135, 0.08) 100%);
-	--mode-chip-border: rgba(41, 170, 173, 0.24);
-	--mode-chip-text: #0f777c;
-	--mode-chip-glow: rgba(41, 170, 173, 0.12);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 14%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 8%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-accent-cool) 24%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-accent-cool) 50%, var(--void-fg-0) 50%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-accent-cool) 12%, transparent);
 }
 
 :root[data-ui-style='mac-codex'] .ref-mode-chip--plan {
-	--mode-chip-bg: linear-gradient(180deg, rgba(255, 177, 104, 0.16) 0%, rgba(222, 129, 59, 0.08) 100%);
-	--mode-chip-border: rgba(233, 146, 77, 0.24);
-	--mode-chip-text: #92501c;
-	--mode-chip-glow: rgba(233, 146, 77, 0.12);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-warm) 16%, transparent) 0%, color-mix(in srgb, var(--void-accent-warm) 8%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-accent-warm) 24%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-accent-warm) 54%, var(--void-fg-0) 46%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-accent-warm) 12%, transparent);
 }
 
 :root[data-ui-style='mac-codex'] .ref-mode-chip--debug {
-	--mode-chip-bg: linear-gradient(180deg, rgba(255, 121, 110, 0.16) 0%, rgba(202, 83, 85, 0.08) 100%);
-	--mode-chip-border: rgba(224, 95, 98, 0.24);
-	--mode-chip-text: #9e3441;
-	--mode-chip-glow: rgba(224, 95, 98, 0.12);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-git-deleted) 16%, transparent) 0%, color-mix(in srgb, var(--void-git-deleted) 8%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-git-deleted) 24%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-git-deleted) 56%, var(--void-fg-0) 44%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-git-deleted) 12%, transparent);
 }
 
 :root[data-ui-style='mac-codex'] .ref-mode-chip--ask {
-	--mode-chip-bg: linear-gradient(180deg, rgba(110, 160, 255, 0.16) 0%, rgba(75, 111, 214, 0.08) 100%);
-	--mode-chip-border: rgba(95, 138, 236, 0.22);
-	--mode-chip-text: #325aac;
-	--mode-chip-glow: rgba(95, 138, 236, 0.12);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-assist) 16%, transparent) 0%, color-mix(in srgb, var(--void-accent-assist) 8%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-accent-assist) 22%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-accent-assist) 58%, var(--void-fg-0) 42%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-accent-assist) 12%, transparent);
 }
 
 :root[data-ui-style='mac-codex'] .ref-mode-chip--opens-menu:hover {
 	background: var(--mode-chip-bg);
 	border-color: color-mix(in srgb, var(--mode-chip-border) 88%, white 12%);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.11), 0 12px 26px var(--mode-chip-glow);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 11%, transparent), 0 12px 26px var(--mode-chip-glow);
 	transform: translateY(-1px);
 }
 
 :root[data-ui-style='mac-codex'] .ref-mode-chip.is-active {
 	border-color: color-mix(in srgb, var(--mode-chip-border) 82%, white 12%);
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.1),
+		inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 10%, transparent),
 		0 0 0 1px color-mix(in srgb, var(--mode-chip-border) 42%, transparent),
 		0 12px 24px var(--mode-chip-glow);
 }
@@ -2007,7 +2053,7 @@
 :root[data-ui-style='mac-codex'] .ref-mode-chip--opens-menu[aria-expanded='true'] {
 	border-color: color-mix(in srgb, var(--mode-chip-border) 82%, white 18%);
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.12),
+		inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 12%, transparent),
 		0 0 0 1px color-mix(in srgb, var(--mode-chip-border) 58%, transparent),
 		0 14px 28px var(--mode-chip-glow);
 	transform: translateY(-1px);
@@ -2044,7 +2090,7 @@
 	border-color: color-mix(in srgb, var(--mode-chip-border) 82%, transparent);
 	background: var(--mode-chip-bg);
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.08),
+		inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 8%, transparent),
 		0 10px 22px var(--mode-chip-glow);
 }
 
@@ -2055,165 +2101,165 @@
 }
 
 :root[data-ui-style='mac-codex'] .ref-plus-menu-row--agent {
-	--mode-chip-bg: linear-gradient(180deg, rgba(47, 184, 185, 0.14) 0%, rgba(19, 130, 135, 0.08) 100%);
-	--mode-chip-border: rgba(41, 170, 173, 0.24);
-	--mode-chip-text: #0f777c;
-	--mode-chip-glow: rgba(41, 170, 173, 0.12);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 14%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 8%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-accent-cool) 24%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-accent-cool) 50%, var(--void-fg-0) 50%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-accent-cool) 12%, transparent);
 }
 
 :root[data-ui-style='mac-codex'] .ref-plus-menu-row--plan {
-	--mode-chip-bg: linear-gradient(180deg, rgba(255, 177, 104, 0.16) 0%, rgba(222, 129, 59, 0.08) 100%);
-	--mode-chip-border: rgba(233, 146, 77, 0.24);
-	--mode-chip-text: #92501c;
-	--mode-chip-glow: rgba(233, 146, 77, 0.12);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-warm) 16%, transparent) 0%, color-mix(in srgb, var(--void-accent-warm) 8%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-accent-warm) 24%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-accent-warm) 54%, var(--void-fg-0) 46%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-accent-warm) 12%, transparent);
 }
 
 :root[data-ui-style='mac-codex'] .ref-plus-menu-row--debug {
-	--mode-chip-bg: linear-gradient(180deg, rgba(255, 121, 110, 0.16) 0%, rgba(202, 83, 85, 0.08) 100%);
-	--mode-chip-border: rgba(224, 95, 98, 0.24);
-	--mode-chip-text: #9e3441;
-	--mode-chip-glow: rgba(224, 95, 98, 0.12);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-git-deleted) 16%, transparent) 0%, color-mix(in srgb, var(--void-git-deleted) 8%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-git-deleted) 24%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-git-deleted) 56%, var(--void-fg-0) 44%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-git-deleted) 12%, transparent);
 }
 
 :root[data-ui-style='mac-codex'] .ref-plus-menu-row--ask {
-	--mode-chip-bg: linear-gradient(180deg, rgba(110, 160, 255, 0.16) 0%, rgba(75, 111, 214, 0.08) 100%);
-	--mode-chip-border: rgba(95, 138, 236, 0.22);
-	--mode-chip-text: #325aac;
-	--mode-chip-glow: rgba(95, 138, 236, 0.12);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-assist) 16%, transparent) 0%, color-mix(in srgb, var(--void-accent-assist) 8%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-accent-assist) 22%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-accent-assist) 58%, var(--void-fg-0) 42%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-accent-assist) 12%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left-scroll {
-	background: linear-gradient(180deg, rgba(19, 25, 31, 0.34) 0%, rgba(19, 25, 31, 0) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 34%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-project-block--editor {
-	background: linear-gradient(180deg, rgba(21, 29, 36, 0.56) 0%, rgba(21, 29, 36, 0.08) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 56%, transparent) 0%, color-mix(in srgb, var(--void-bg-2) 8%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-project-block--editor::before {
 	background:
-		linear-gradient(180deg, rgba(55, 214, 212, 0.08) 0%, rgba(55, 214, 212, 0) 100%),
-		radial-gradient(circle at 88% 0%, rgba(255, 157, 89, 0.08) 0%, transparent 40%);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 8%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 0%, transparent) 100%),
+		radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--void-accent-warm) 8%, transparent) 0%, transparent 40%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-kicker {
-	color: #738390;
+	color: var(--void-fg-3);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-tree-wrap::before {
-	background: linear-gradient(180deg, rgba(205, 217, 224, 0.08) 0%, rgba(205, 217, 224, 0) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-fg-0) 8%, transparent) 0%, color-mix(in srgb, var(--void-fg-0) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-row:hover {
-	background: linear-gradient(180deg, rgba(31, 40, 48, 0.84) 0%, rgba(27, 35, 42, 0.78) 100%);
-	border-color: rgba(55, 214, 212, 0.1);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 84%, transparent) 0%, color-mix(in srgb, var(--void-bg-2) 78%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 10%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-row.is-selected {
-	background: linear-gradient(90deg, rgba(55, 214, 212, 0.11) 0%, rgba(28, 39, 47, 0.92) 84%);
-	border-color: rgba(55, 214, 212, 0.14);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+	background: linear-gradient(90deg, color-mix(in srgb, var(--void-accent-cool) 11%, transparent) 0%, color-mix(in srgb, var(--void-bg-2) 92%, transparent) 84%);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 14%, transparent);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 4%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-chevron-btn {
-	color: #75828d;
+	color: var(--void-fg-3);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-label {
-	color: #a5b2bc;
+	color: var(--void-thought-detail);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-row--dir .ref-explorer-label {
-	color: #d1dae0;
+	color: var(--void-thought-body);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-right-icon-tabs {
-	background: rgba(24, 31, 38, 0.92);
-	border-color: rgba(205, 217, 224, 0.07);
+	background: color-mix(in srgb, var(--void-bg-2) 92%, transparent);
+	border-color: color-mix(in srgb, var(--void-fg-0) 7%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-right-panel-view {
-	background: linear-gradient(180deg, rgba(19, 26, 32, 0.94) 0%, rgba(16, 22, 28, 0.9) 100%);
-	border-color: rgba(205, 217, 224, 0.07);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 94%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 90%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-0) 7%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-preview-tree {
-	border-right-color: rgba(205, 217, 224, 0.07);
+	border-right-color: color-mix(in srgb, var(--void-fg-0) 7%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-preview-tree .ref-explorer-head,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-editor-toolbar,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-editor-toolbar--workspace,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-right-toolbar {
-	border-bottom-color: rgba(205, 217, 224, 0.07);
+	border-bottom-color: color-mix(in srgb, var(--void-fg-0) 7%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-mode-chip--agent {
-	--mode-chip-bg: linear-gradient(180deg, rgba(55, 214, 212, 0.16) 0%, rgba(19, 114, 120, 0.16) 100%);
-	--mode-chip-border: rgba(55, 214, 212, 0.24);
-	--mode-chip-text: #ddfbfb;
-	--mode-chip-glow: rgba(12, 95, 101, 0.2);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 16%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 16%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-accent-cool) 24%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-fg-0) 76%, var(--void-accent-cool) 24%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-accent-cool) 20%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-mode-chip--plan {
-	--mode-chip-bg: linear-gradient(180deg, rgba(255, 173, 97, 0.16) 0%, rgba(150, 89, 42, 0.18) 100%);
-	--mode-chip-border: rgba(255, 163, 84, 0.22);
-	--mode-chip-text: #ffe0c3;
-	--mode-chip-glow: rgba(128, 76, 32, 0.2);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-warm) 16%, transparent) 0%, color-mix(in srgb, var(--void-accent-warm) 18%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-accent-warm) 22%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-fg-0) 78%, var(--void-accent-warm) 22%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-accent-warm) 20%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-mode-chip--debug {
-	--mode-chip-bg: linear-gradient(180deg, rgba(255, 122, 114, 0.16) 0%, rgba(130, 52, 61, 0.18) 100%);
-	--mode-chip-border: rgba(255, 126, 118, 0.22);
-	--mode-chip-text: #ffd4d1;
-	--mode-chip-glow: rgba(118, 40, 48, 0.22);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-git-deleted) 16%, transparent) 0%, color-mix(in srgb, var(--void-git-deleted) 18%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-git-deleted) 22%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-fg-0) 76%, var(--void-git-deleted) 24%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-git-deleted) 22%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-mode-chip--ask {
-	--mode-chip-bg: linear-gradient(180deg, rgba(118, 165, 255, 0.16) 0%, rgba(62, 84, 165, 0.18) 100%);
-	--mode-chip-border: rgba(120, 164, 255, 0.22);
-	--mode-chip-text: #dae6ff;
-	--mode-chip-glow: rgba(49, 74, 152, 0.22);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-assist) 16%, transparent) 0%, color-mix(in srgb, var(--void-accent-assist) 18%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-accent-assist) 22%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-fg-0) 76%, var(--void-accent-assist) 24%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-accent-assist) 22%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-plus-menu-row--agent {
-	--mode-chip-bg: linear-gradient(180deg, rgba(55, 214, 212, 0.16) 0%, rgba(19, 114, 120, 0.16) 100%);
-	--mode-chip-border: rgba(55, 214, 212, 0.24);
-	--mode-chip-text: #ddfbfb;
-	--mode-chip-glow: rgba(12, 95, 101, 0.2);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 16%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 16%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-accent-cool) 24%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-fg-0) 76%, var(--void-accent-cool) 24%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-accent-cool) 20%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-plus-menu-row--plan {
-	--mode-chip-bg: linear-gradient(180deg, rgba(255, 173, 97, 0.16) 0%, rgba(150, 89, 42, 0.18) 100%);
-	--mode-chip-border: rgba(255, 163, 84, 0.22);
-	--mode-chip-text: #ffe0c3;
-	--mode-chip-glow: rgba(128, 76, 32, 0.2);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-warm) 16%, transparent) 0%, color-mix(in srgb, var(--void-accent-warm) 18%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-accent-warm) 22%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-fg-0) 78%, var(--void-accent-warm) 22%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-accent-warm) 20%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-plus-menu-row--debug {
-	--mode-chip-bg: linear-gradient(180deg, rgba(255, 122, 114, 0.16) 0%, rgba(130, 52, 61, 0.18) 100%);
-	--mode-chip-border: rgba(255, 126, 118, 0.22);
-	--mode-chip-text: #ffd4d1;
-	--mode-chip-glow: rgba(118, 40, 48, 0.22);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-git-deleted) 16%, transparent) 0%, color-mix(in srgb, var(--void-git-deleted) 18%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-git-deleted) 22%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-fg-0) 76%, var(--void-git-deleted) 24%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-git-deleted) 22%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-plus-menu-row--ask {
-	--mode-chip-bg: linear-gradient(180deg, rgba(118, 165, 255, 0.16) 0%, rgba(62, 84, 165, 0.18) 100%);
-	--mode-chip-border: rgba(120, 164, 255, 0.22);
-	--mode-chip-text: #dae6ff;
-	--mode-chip-glow: rgba(49, 74, 152, 0.22);
+	--mode-chip-bg: linear-gradient(180deg, color-mix(in srgb, var(--void-accent-assist) 16%, transparent) 0%, color-mix(in srgb, var(--void-accent-assist) 18%, transparent) 100%);
+	--mode-chip-border: color-mix(in srgb, var(--void-accent-assist) 22%, transparent);
+	--mode-chip-text: color-mix(in srgb, var(--void-fg-0) 76%, var(--void-accent-assist) 24%);
+	--mode-chip-glow: color-mix(in srgb, var(--void-accent-assist) 22%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-mode-chip-clear {
-	background: rgba(32, 41, 50, 0.78);
-	border-color: rgba(205, 217, 224, 0.08);
-	color: #8f9ca8;
+	background: color-mix(in srgb, var(--void-bg-3) 78%, transparent);
+	border-color: color-mix(in srgb, var(--void-fg-0) 8%, transparent);
+	color: var(--void-fg-2);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-mode-chip-clear:hover {
-	background: rgba(39, 49, 59, 0.92);
-	border-color: rgba(55, 214, 212, 0.14);
-	color: #eff7fa;
+	background: color-mix(in srgb, var(--void-bg-3) 92%, transparent);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 14%, transparent);
+	color: var(--void-fg-0);
 }
 
 /* Phase 8: embed explorer into outer window + tighten dark titlebar harmony */
@@ -2286,14 +2332,14 @@
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left {
-	border-right-color: rgba(205, 217, 224, 0.04);
+	border-right-color: color-mix(in srgb, var(--void-fg-0) 4%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left::before {
 	background:
-		radial-gradient(circle at 0% 0%, rgba(55, 214, 212, 0.045) 0%, transparent 28%),
-		linear-gradient(180deg, rgba(20, 27, 34, 0.2) 0%, rgba(17, 23, 28, 0) 100%),
-		linear-gradient(90deg, rgba(20, 27, 34, 0.54) 0%, rgba(20, 27, 34, 0.18) 74%, rgba(20, 27, 34, 0) 100%);
+		radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--void-accent-cool) 5%, transparent) 0%, transparent 28%),
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 20%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 0%, transparent) 100%),
+		linear-gradient(90deg, color-mix(in srgb, var(--void-bg-1) 54%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 18%, transparent) 74%, color-mix(in srgb, var(--void-bg-1) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left-scroll {
@@ -2301,17 +2347,17 @@
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left-scroll::after {
-	border-color: rgba(205, 217, 224, 0.05);
+	border-color: color-mix(in srgb, var(--void-fg-0) 5%, transparent);
 	background:
-		radial-gradient(circle at top left, rgba(55, 214, 212, 0.04) 0%, transparent 26%),
-		linear-gradient(180deg, rgba(21, 29, 36, 0.44) 0%, rgba(18, 25, 31, 0.16) 100%);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.028);
+		radial-gradient(circle at top left, color-mix(in srgb, var(--void-accent-cool) 4%, transparent) 0%, transparent 26%),
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 44%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 16%, transparent) 100%);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 3%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-project-block--editor {
 	background:
-		radial-gradient(circle at top left, rgba(55, 214, 212, 0.05) 0%, transparent 30%),
-		linear-gradient(180deg, rgba(17, 23, 28, 0.18) 0%, rgba(17, 23, 28, 0.04) 100%);
+		radial-gradient(circle at top left, color-mix(in srgb, var(--void-accent-cool) 5%, transparent) 0%, transparent 30%),
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-0) 18%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 4%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-project-block--editor::before {
@@ -2455,54 +2501,54 @@
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-kicker {
-	color: #74838f;
+	color: var(--void-fg-3);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-kicker::before,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-head--editor::after,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left-footer--editor::before {
-	background: linear-gradient(90deg, rgba(205, 217, 224, 0.08) 0%, rgba(205, 217, 224, 0) 100%);
+	background: linear-gradient(90deg, color-mix(in srgb, var(--void-fg-0) 8%, transparent) 0%, color-mix(in srgb, var(--void-fg-0) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-title {
-	color: #e3eaee;
+	color: var(--void-fg-1);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-subtitle {
-	color: #7d8d99;
+	color: var(--void-fg-3);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-head--editor .ref-icon-tile {
-	background: rgba(26, 33, 40, 0.7);
-	border-color: rgba(205, 217, 224, 0.06);
-	color: #8ea1ac;
+	background: color-mix(in srgb, var(--void-bg-2) 70%, transparent);
+	border-color: color-mix(in srgb, var(--void-fg-0) 6%, transparent);
+	color: var(--void-fg-2);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-explorer-head--editor .ref-icon-tile:hover {
-	background: rgba(32, 41, 49, 0.94);
-	border-color: rgba(55, 214, 212, 0.1);
-	color: #ebf7f8;
+	background: color-mix(in srgb, var(--void-bg-2) 94%, transparent);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 10%, transparent);
+	color: color-mix(in srgb, var(--void-fg-0) 85%, var(--void-accent-cool) 15%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left-footer--editor .ref-open-workspace {
 	background:
-		linear-gradient(180deg, rgba(26, 34, 41, 0.92) 0%, rgba(20, 27, 34, 0.94) 100%);
-	border-color: rgba(205, 217, 224, 0.07);
-	color: #d4dde2;
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 92%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 94%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-fg-0) 7%, transparent);
+	color: var(--void-thought-body);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 3%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left-footer--editor .ref-open-workspace:hover {
 	background:
-		linear-gradient(180deg, rgba(31, 40, 48, 0.96) 0%, rgba(22, 30, 36, 0.98) 100%);
-	border-color: rgba(55, 214, 212, 0.1);
-	color: #f1f8fa;
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-2) 96%, transparent) 0%, color-mix(in srgb, var(--void-bg-2) 98%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 10%, transparent);
+	color: color-mix(in srgb, var(--void-fg-0) 88%, var(--void-accent-cool) 12%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-ipc-hint {
-	background: rgba(26, 34, 41, 0.78);
-	border-color: rgba(205, 217, 224, 0.06);
-	color: #758692;
+	background: color-mix(in srgb, var(--void-bg-2) 78%, transparent);
+	border-color: color-mix(in srgb, var(--void-fg-0) 6%, transparent);
+	color: var(--void-fg-3);
 }
 
 /* Phase 10: shift editor into one shared workspace shell so explorer feels embedded, not carded */
@@ -2720,51 +2766,51 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--editor-shell {
 	border: none;
 	background:
-		radial-gradient(circle at top center, rgba(55, 214, 212, 0.05) 0%, transparent 32%),
-		radial-gradient(circle at 92% 0%, rgba(255, 157, 89, 0.05) 0%, transparent 20%),
-		linear-gradient(180deg, rgba(15, 20, 25, 0.98) 0%, rgba(11, 15, 19, 0.98) 100%);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+		radial-gradient(circle at top center, color-mix(in srgb, var(--void-accent-cool) 5%, transparent) 0%, transparent 32%),
+		radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--void-accent-warm) 5%, transparent) 0%, transparent 20%),
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-0) 98%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 98%, transparent) 100%);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 3%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--editor-shell::before {
 	background:
-		radial-gradient(circle at 0% 0%, rgba(55, 214, 212, 0.05) 0%, transparent 24%),
-		radial-gradient(circle at 100% 0%, rgba(255, 157, 89, 0.045) 0%, transparent 20%);
+		radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--void-accent-cool) 5%, transparent) 0%, transparent 24%),
+		radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--void-accent-warm) 5%, transparent) 0%, transparent 20%);
 	opacity: 0.84;
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--editor-shell > .ref-left--editor-embedded {
-	background: linear-gradient(180deg, rgba(19, 25, 31, 0.34) 0%, rgba(19, 25, 31, 0) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 34%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--editor-shell > .ref-center--editor-shell {
-	background: linear-gradient(180deg, rgba(17, 23, 28, 0.18) 0%, rgba(17, 23, 28, 0) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-0) 18%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--editor-shell > .ref-right--editor-shell {
-	background: linear-gradient(180deg, rgba(18, 24, 30, 0.28) 0%, rgba(18, 24, 30, 0) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 28%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--editor-shell .ref-resize-handle::after {
 	background:
-		linear-gradient(180deg, transparent 0%, rgba(205, 217, 224, 0.08) 10%, rgba(205, 217, 224, 0.08) 90%, transparent 100%);
+		linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--void-fg-0) 8%, transparent) 10%, color-mix(in srgb, var(--void-fg-0) 8%, transparent) 90%, transparent 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left--editor-embedded .ref-project-block--editor::before {
 	background:
-		radial-gradient(circle at top left, rgba(55, 214, 212, 0.055) 0%, transparent 34%),
-		linear-gradient(180deg, rgba(55, 214, 212, 0.05) 0%, rgba(55, 214, 212, 0) 100%);
+		radial-gradient(circle at top left, color-mix(in srgb, var(--void-accent-cool) 6%, transparent) 0%, transparent 34%),
+		linear-gradient(180deg, color-mix(in srgb, var(--void-accent-cool) 5%, transparent) 0%, color-mix(in srgb, var(--void-accent-cool) 0%, transparent) 100%);
 	opacity: 0.26;
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left--editor-embedded .ref-explorer-tree-wrap::before {
-	background: linear-gradient(180deg, rgba(205, 217, 224, 0.07) 0%, rgba(205, 217, 224, 0) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-fg-0) 7%, transparent) 0%, color-mix(in srgb, var(--void-fg-0) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-center--editor-shell .ref-editor-split-bottom {
-	border-top-color: rgba(205, 217, 224, 0.07);
+	border-top-color: color-mix(in srgb, var(--void-fg-0) 7%, transparent);
 	background:
-		linear-gradient(180deg, rgba(17, 23, 28, 0.22) 0%, rgba(12, 17, 22, 0.42) 100%);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-0) 22%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 42%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-center--editor-shell .ref-editor-split-top > .ref-tab-bar,
@@ -2773,13 +2819,13 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-center--editor-shell .ref-editor-toolbar,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-center--editor-shell .ref-editor-toolbar--workspace,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-right--editor-shell .ref-editor-chat-tab-rail {
-	border-bottom-color: rgba(205, 217, 224, 0.07);
+	border-bottom-color: color-mix(in srgb, var(--void-fg-0) 7%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-right--editor-shell .ref-editor-chat-tab-shell.is-active {
 	background:
-		linear-gradient(180deg, rgba(30, 39, 47, 0.84) 0%, rgba(24, 31, 38, 0.76) 100%);
-	border-color: rgba(55, 214, 212, 0.12);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-3) 84%, transparent) 0%, color-mix(in srgb, var(--void-bg-2) 76%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 12%, transparent);
 }
 
 /* Phase 11: refit Agent mode to a Codex-like desktop structure without copying color */
@@ -2809,7 +2855,7 @@
 	inset: 0;
 	background:
 		radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--surface-tint-soft) 84%, transparent) 0%, transparent 24%),
-		radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--void-accent-warm, #ff9d59) 10%, transparent) 0%, transparent 18%);
+		radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--void-accent-warm) 10%, transparent) 0%, transparent 18%);
 	pointer-events: none;
 	opacity: 0.9;
 }
@@ -2936,7 +2982,7 @@
 		linear-gradient(180deg, color-mix(in srgb, var(--surface-panel-bg-soft) 92%, transparent) 0%, color-mix(in srgb, var(--surface-panel-bg) 88%, transparent) 100%);
 	box-shadow:
 		inset 0 1px 0 color-mix(in srgb, var(--color-text-primary) 4%, transparent),
-		0 16px 32px rgba(0, 0, 0, 0.12);
+		0 16px 32px color-mix(in srgb, black 12%, transparent);
 }
 
 :root[data-ui-style='mac-codex'] .ref-left--agent-layout .ref-agent-workspace-row {
@@ -3003,7 +3049,7 @@
 	background:
 		linear-gradient(180deg, color-mix(in srgb, var(--surface-panel-bg-strong) 94%, transparent) 0%, color-mix(in srgb, var(--surface-panel-bg) 92%, transparent) 100%);
 	box-shadow:
-		0 26px 44px rgba(0, 0, 0, 0.18),
+		0 26px 44px color-mix(in srgb, black 18%, transparent),
 		inset 0 1px 0 color-mix(in srgb, var(--color-text-primary) 5%, transparent);
 }
 
@@ -3082,7 +3128,7 @@
 		linear-gradient(180deg, color-mix(in srgb, var(--surface-tint-strong) 68%, transparent) 0%, color-mix(in srgb, var(--surface-panel-bg-soft) 82%, transparent) 100%);
 	box-shadow:
 		inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 20%, transparent),
-		0 10px 24px rgba(0, 0, 0, 0.14);
+		0 10px 24px color-mix(in srgb, black 14%, transparent);
 }
 
 :root[data-ui-style='mac-codex'] .ref-left--agent-layout .ref-thread-list--nested .ref-thread-row {
@@ -3141,7 +3187,7 @@
 	border-color: color-mix(in srgb, var(--surface-glass-stroke) 82%, transparent);
 	box-shadow:
 		inset 0 1px 0 color-mix(in srgb, var(--color-text-primary) 5%, transparent),
-		0 12px 24px rgba(0, 0, 0, 0.12);
+		0 12px 24px color-mix(in srgb, black 12%, transparent);
 }
 
 :root[data-ui-style='mac-codex'] .ref-center--agent-layout .ref-context-sub--agent {
@@ -3172,7 +3218,7 @@
 		linear-gradient(180deg, color-mix(in srgb, var(--surface-panel-bg-strong) 88%, transparent) 0%, color-mix(in srgb, var(--surface-panel-bg-soft) 78%, transparent) 100%);
 	color: var(--color-text-secondary);
 	box-shadow:
-		0 14px 34px rgba(0, 0, 0, 0.18),
+		0 14px 34px color-mix(in srgb, black 18%, transparent),
 		inset 0 1px 0 color-mix(in srgb, var(--color-text-primary) 6%, transparent);
 }
 
@@ -3258,78 +3304,78 @@
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--agent-shell {
 	border: none;
 	background:
-		radial-gradient(circle at top center, rgba(55, 214, 212, 0.045) 0%, transparent 34%),
-		radial-gradient(circle at 96% 0%, rgba(255, 157, 89, 0.04) 0%, transparent 18%),
-		linear-gradient(180deg, rgba(15, 20, 25, 0.98) 0%, rgba(11, 15, 19, 0.98) 100%);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+		radial-gradient(circle at top center, color-mix(in srgb, var(--void-accent-cool) 5%, transparent) 0%, transparent 34%),
+		radial-gradient(circle at 96% 0%, color-mix(in srgb, var(--void-accent-warm) 4%, transparent) 0%, transparent 18%),
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-0) 98%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 98%, transparent) 100%);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 3%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-agent-rail-toggle {
-	border-color: rgba(205, 217, 224, 0.08);
+	border-color: color-mix(in srgb, var(--void-fg-0) 8%, transparent);
 	background:
-		linear-gradient(180deg, rgba(22, 29, 35, 0.92) 0%, rgba(16, 22, 28, 0.88) 100%);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 92%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 88%, transparent) 100%);
 	box-shadow:
-		0 18px 42px rgba(0, 0, 0, 0.34),
-		inset 0 1px 0 rgba(255, 255, 255, 0.04);
+		0 18px 42px color-mix(in srgb, black 34%, transparent),
+		inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 4%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-agent-rail-toggle:hover {
 	background:
-		linear-gradient(180deg, rgba(35, 45, 55, 0.96) 0%, rgba(22, 29, 35, 0.92) 100%);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-3) 96%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 92%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-agent-rail-toggle.is-open {
 	background:
-		linear-gradient(180deg, rgba(36, 68, 93, 0.94) 0%, rgba(22, 34, 46, 0.96) 100%);
-	border-color: rgba(55, 214, 212, 0.24);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-accent-assist) 94%, transparent) 0%, color-mix(in srgb, var(--void-bg-2) 96%, transparent) 100%);
+	border-color: color-mix(in srgb, var(--void-accent-cool) 24%, transparent);
 	box-shadow:
-		0 18px 44px rgba(18, 34, 51, 0.44),
-		inset 0 0 0 1px rgba(55, 214, 212, 0.18);
+		0 18px 44px color-mix(in srgb, var(--void-accent-assist) 44%, transparent),
+		inset 0 0 0 1px color-mix(in srgb, var(--void-accent-cool) 18%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--agent-shell::before {
 	background:
-		radial-gradient(circle at 0% 0%, rgba(55, 214, 212, 0.05) 0%, transparent 24%),
-		radial-gradient(circle at 100% 0%, rgba(255, 157, 89, 0.045) 0%, transparent 18%);
+		radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--void-accent-cool) 5%, transparent) 0%, transparent 24%),
+		radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--void-accent-warm) 5%, transparent) 0%, transparent 18%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--agent-shell > .ref-left--agent-layout {
-	background: linear-gradient(180deg, rgba(19, 25, 31, 0.34) 0%, rgba(19, 25, 31, 0) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 34%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--agent-shell > .ref-center--agent-layout {
-	background: linear-gradient(180deg, rgba(17, 23, 28, 0.16) 0%, rgba(17, 23, 28, 0) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-0) 16%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--agent-shell > .ref-right--agent-layout {
-	background: linear-gradient(180deg, rgba(18, 24, 30, 0.26) 0%, rgba(18, 24, 30, 0) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 26%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 0%, transparent) 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-body--agent-shell .ref-resize-handle::after {
 	background:
-		linear-gradient(180deg, transparent 0%, rgba(205, 217, 224, 0.08) 12%, rgba(205, 217, 224, 0.08) 88%, transparent 100%);
+		linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--void-fg-0) 8%, transparent) 12%, color-mix(in srgb, var(--void-fg-0) 8%, transparent) 88%, transparent 100%);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-left--agent-layout .ref-agent-empty-workspace,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-center--agent-layout .ref-agent-context-pill,
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-right--agent-layout .ref-right-panel-view--agent {
-	border-color: rgba(205, 217, 224, 0.07);
+	border-color: color-mix(in srgb, var(--void-fg-0) 7%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-center--agent-layout .ref-agent-context-pill {
-	background: linear-gradient(180deg, rgba(29, 37, 45, 0.86) 0%, rgba(22, 28, 35, 0.78) 100%);
+	background: linear-gradient(180deg, color-mix(in srgb, var(--void-bg-3) 86%, transparent) 0%, color-mix(in srgb, var(--void-bg-1) 78%, transparent) 100%);
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.028),
-		0 12px 28px rgba(0, 0, 0, 0.22);
+		inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 3%, transparent),
+		0 12px 28px color-mix(in srgb, black 22%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-right--agent-layout .ref-right-panel-view--agent {
 	background:
-		linear-gradient(180deg, rgba(20, 27, 34, 0.9) 0%, rgba(15, 20, 25, 0.84) 100%);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.026);
+		linear-gradient(180deg, color-mix(in srgb, var(--void-bg-1) 90%, transparent) 0%, color-mix(in srgb, var(--void-bg-0) 84%, transparent) 100%);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 3%, transparent);
 }
 
 :root[data-ui-style='mac-codex'][data-color-scheme='dark'] .ref-right--editor-shell .ref-editor-chat-icon-btn.is-active {
-	background: rgba(28, 36, 43, 0.9);
-	box-shadow: inset 0 0 0 1px rgba(55, 214, 212, 0.12);
+	background: color-mix(in srgb, var(--void-bg-2) 90%, transparent);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--void-accent-cool) 12%, transparent);
 }

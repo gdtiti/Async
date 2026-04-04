@@ -64,16 +64,12 @@ function applyColorSchemeWithTransition(
 	return Promise.resolve();
 }
 
-type Shell = NonNullable<Window['asyncShell']>;
-
 type Options = {
 	colorMode: AppColorMode;
-	shell: Shell | undefined;
 };
 
 export function useAppColorScheme({
 	colorMode,
-	shell,
 }: Options): {
 	effectiveScheme: 'light' | 'dark';
 	setTransitionOrigin: (origin?: ThemeTransitionOrigin) => void;
@@ -127,13 +123,6 @@ export function useAppColorScheme({
 			}, THEME_SWITCH_SETTLE_MS);
 		});
 	}, [effectiveScheme]);
-
-	useEffect(() => {
-		if (!shell) {
-			return;
-		}
-		void shell.invoke('theme:applyChrome', { scheme: effectiveScheme });
-	}, [shell, effectiveScheme]);
 
 	return {
 		effectiveScheme,
