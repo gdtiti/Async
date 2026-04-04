@@ -8600,7 +8600,7 @@ html[data-theme-switching='true'] .ref-editor-welcome-panel {
 }
 
 .ref-settings-resize-handle:hover {
-	background: rgba(129, 140, 248, 0.15);
+	background: color-mix(in srgb, var(--void-accent-soft) 85%, transparent);
 }
 
 .ref-settings-sidebar-tools {
@@ -8944,7 +8944,7 @@ html[data-theme-switching='true'] .ref-editor-welcome-panel {
 .ref-appearance-seg-btn.is-active {
 	color: var(--void-fg-0);
 	background: var(--void-bg-3);
-	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+	box-shadow: 0 1px 2px color-mix(in srgb, var(--void-fg-0) 14%, transparent);
 }
 
 .ref-appearance-seg-ico {
@@ -8997,10 +8997,14 @@ html[data-theme-switching='true'] .ref-editor-welcome-panel {
 
 .ref-appearance-code-preview {
 	display: grid;
-	grid-template-columns: 1fr 1fr;
+	grid-template-columns: 1fr;
 	gap: 12px;
 	padding: 14px 16px 16px;
 	border-bottom: 1px solid var(--void-border-soft);
+}
+
+.ref-appearance-code-preview-scope {
+	min-width: 0;
 }
 
 .ref-appearance-code-pane {
@@ -9026,7 +9030,7 @@ html[data-theme-switching='true'] .ref-editor-welcome-panel {
 
 .ref-appearance-code-pane--after {
 	box-shadow:
-		inset 3px 0 0 color-mix(in srgb, var(--void-accent) 86%, white 14%),
+		inset 3px 0 0 color-mix(in srgb, var(--void-accent) 86%, var(--void-fg-0) 14%),
 		0 0 0 1px color-mix(in srgb, var(--void-accent-soft) 30%, transparent);
 }
 
@@ -9122,6 +9126,17 @@ html[data-theme-switching='true'] .ref-editor-welcome-panel {
 	background: color-mix(in srgb, var(--void-accent-soft) 66%, var(--void-bg-3));
 	border-color: color-mix(in srgb, var(--void-accent) 34%, var(--void-border));
 	color: var(--void-fg-0);
+}
+
+.ref-appearance-toolbar-btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.ref-appearance-toolbar-btn:disabled:hover {
+	background: var(--void-bg-2);
+	border-color: var(--void-border);
+	color: var(--void-fg-1);
 }
 
 .ref-appearance-preset-wrap {
@@ -9712,7 +9727,7 @@ select.ref-settings-native-select:focus {
 }
 
 .ref-void-select-option.is-selected {
-	background: rgba(129, 140, 248, 0.12);
+	background: color-mix(in srgb, var(--void-accent) 14%, transparent);
 	color: var(--void-fg-0);
 }
 

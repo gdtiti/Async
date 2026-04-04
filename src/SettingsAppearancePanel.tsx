@@ -1,15 +1,15 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import type { AppColorMode, ThemeTransitionOrigin } from './colorMode';
 import {
 	APPLE_UI_FONT_STACK,
-	APPEARANCE_THEME_PRESETS,
 	JETBRAINS_CODE_FONT_STACK,
 	MONOSPACE_CODE_FONT_STACK,
 	SFMONO_CODE_FONT_STACK,
-	applyThemePreset,
+	resolveAppearanceChromeColorVars,
+	defaultAppearanceSettingsForScheme,
+	isAppearanceFactoryDefault,
 	type AppAppearanceSettings,
 	type CodeFontPresetId,
-	type ThemePresetId,
 	type UiFontPresetId,
 } from './appearanceSettings';
 import { useI18n } from './i18n';
@@ -41,25 +41,6 @@ function IconMonitor({ className }: { className?: string }) {
 	);
 }
 
-function IconPalette({ className }: { className?: string }) {
-	return (
-		<svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-			<path d="M12 3a9 9 0 1 0 0 18h1.2a2.8 2.8 0 1 0 0-5.6H12a2 2 0 0 1 0-4h1a4 4 0 0 0 0-8h-1Z" strokeLinecap="round" strokeLinejoin="round" />
-			<circle cx="6.5" cy="11.5" r="1" fill="currentColor" stroke="none" />
-			<circle cx="8.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
-			<circle cx="12.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-		</svg>
-	);
-}
-
-function IconImport({ className }: { className?: string }) {
-	return (
-		<svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-			<path d="M12 3v12M7 10l5 5 5-5M5 21h14" strokeLinecap="round" strokeLinejoin="round" />
-		</svg>
-	);
-}
-
 function IconCopy({ className }: { className?: string }) {
 	return (
 		<svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -69,9 +50,20 @@ function IconCopy({ className }: { className?: string }) {
 	);
 }
 
+function IconRotateCcw({ className }: { className?: string }) {
+	return (
+		<svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+			<path d="M3 12a9 9 0 1 0 3-7.1" strokeLinecap="round" strokeLinejoin="round" />
+			<path d="M3 4v4h4" strokeLinecap="round" strokeLinejoin="round" />
+		</svg>
+	);
+}
+
 type Props = {
 	value: AppColorMode;
 	onChange: (next: AppColorMode, origin?: ThemeTransitionOrigin) => void | Promise<void>;
+	/** 当前有效亮/暗（含「跟随系统」解析结果），用于恢复默认配色与内置 CSS 对齐 */
+	effectiveColorScheme: 'light' | 'dark';
 	appearance: AppAppearanceSettings;
 	onChangeAppearance: (next: AppAppearanceSettings) => void | Promise<void>;
 };
@@ -111,9 +103,8 @@ function normalizeHexInput(value: string, fallback: string): string {
 	return fallback;
 }
 
-export function SettingsAppearancePanel({ value, onChange, appearance, onChangeAppearance }: Props) {
+export function SettingsAppearancePanel({ value, onChange, effectiveColorScheme, appearance, onChangeAppearance }: Props) {
 	const { t } = useI18n();
-	const [presetChoice, setPresetChoice] = useState<ThemePresetId>('codex');
 	const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle');
 	const modes: { id: AppColorMode; label: string; icon: ReactNode }[] = [
 		{ id: 'light', label: t('settings.appearance.light'), icon: <IconSun className="ref-appearance-seg-ico" /> },
@@ -130,27 +121,25 @@ export function SettingsAppearancePanel({ value, onChange, appearance, onChangeA
 		{ id: 'monospace', label: t('settings.appearance.codeFont.monospace'), stack: MONOSPACE_CODE_FONT_STACK },
 		{ id: 'jetbrains', label: t('settings.appearance.codeFont.jetbrains'), stack: JETBRAINS_CODE_FONT_STACK },
 	];
-	const previewTheme = useMemo(() => APPEARANCE_THEME_PRESETS[presetChoice], [presetChoice]);
+	const appliedPreviewStyle = useMemo(
+		() => resolveAppearanceChromeColorVars(appearance, effectiveColorScheme) as CSSProperties,
+		[appearance, effectiveColorScheme]
+	);
 
-	const patch = (partial: Partial<AppAppearanceSettings>, options?: { markCustom?: boolean }) => {
-		void onChangeAppearance({
-			...appearance,
-			...partial,
-			themePreset: options?.markCustom === false ? appearance.themePreset : 'custom',
-		});
+	const patch = (partial: Partial<AppAppearanceSettings>) => {
+		void onChangeAppearance({ ...appearance, ...partial });
 	};
 
 	const handleColorChange = (key: 'accentColor' | 'backgroundColor' | 'foregroundColor', next: string) => {
 		patch({ [key]: normalizeHexInput(next, appearance[key]) } as Partial<AppAppearanceSettings>);
 	};
 
-	const handleImportPreset = () => {
-		void onChangeAppearance(applyThemePreset(appearance, presetChoice));
+	const handleResetFactoryDefaults = () => {
+		void onChangeAppearance(defaultAppearanceSettingsForScheme(effectiveColorScheme));
 	};
 
 	const handleCopyTheme = async () => {
 		const payload = {
-			themePreset: appearance.themePreset,
 			accentColor: appearance.accentColor,
 			backgroundColor: appearance.backgroundColor,
 			foregroundColor: appearance.foregroundColor,
@@ -199,30 +188,19 @@ export function SettingsAppearancePanel({ value, onChange, appearance, onChangeA
 					</div>
 
 					<div className="ref-appearance-code-preview" aria-hidden>
-						<div className="ref-appearance-code-pane ref-appearance-code-pane--before">
-							<div className="ref-appearance-code-gutter">
-								<span>1</span>
-								<span className="is-hot">2</span>
-								<span className="is-hot">3</span>
-								<span>4</span>
-							</div>
-							<div className="ref-appearance-code-content">
-								<div><span className="token-key">surface</span>: <span className="token-string">"sidebar"</span>,</div>
-								<div><span className="token-key">accent</span>: <span className="token-string">"{previewTheme.accentColor}"</span>,</div>
-								<div><span className="token-key">contrast</span>: <span className="token-number">{previewTheme.contrast}</span></div>
-							</div>
-						</div>
-						<div className="ref-appearance-code-pane ref-appearance-code-pane--after" style={{ borderColor: appearance.accentColor }}>
-							<div className="ref-appearance-code-gutter">
-								<span>1</span>
-								<span className="is-cool">2</span>
-								<span className="is-cool">3</span>
-								<span>4</span>
-							</div>
-							<div className="ref-appearance-code-content">
-								<div><span className="token-key">surface</span>: <span className="token-string">"sidebar-elevated"</span>,</div>
-								<div><span className="token-key">accent</span>: <span className="token-string">"{appearance.accentColor}"</span>,</div>
-								<div><span className="token-key">contrast</span>: <span className="token-number">{appearance.contrast}</span></div>
+						<div className="ref-appearance-code-preview-scope" style={appliedPreviewStyle}>
+							<div className="ref-appearance-code-pane ref-appearance-code-pane--after">
+								<div className="ref-appearance-code-gutter">
+									<span>1</span>
+									<span className="is-cool">2</span>
+									<span className="is-cool">3</span>
+									<span>4</span>
+								</div>
+								<div className="ref-appearance-code-content">
+									<div><span className="token-key">surface</span>: <span className="token-string">"sidebar-elevated"</span>,</div>
+									<div><span className="token-key">accent</span>: <span className="token-string">"{appearance.accentColor}"</span>,</div>
+									<div><span className="token-key">contrast</span>: <span className="token-number">{appearance.contrast}</span></div>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -234,28 +212,21 @@ export function SettingsAppearancePanel({ value, onChange, appearance, onChangeA
 								<p className="ref-appearance-theme-editor-desc">{t('settings.appearance.themeEditorDesc')}</p>
 							</div>
 							<div className="ref-appearance-theme-editor-actions">
-								<button type="button" className="ref-appearance-toolbar-btn" onClick={handleImportPreset}>
-									<IconImport />
-									{t('settings.appearance.importTheme')}
-								</button>
 								<button type="button" className="ref-appearance-toolbar-btn" onClick={() => void handleCopyTheme()}>
 									<IconCopy />
 									{copyState === 'copied' ? t('settings.appearance.copiedTheme') : t('settings.appearance.copyTheme')}
 								</button>
-								<div className="ref-appearance-preset-wrap">
-									<span className="ref-appearance-preset-icon"><IconPalette /></span>
-									<VoidSelect
-										ariaLabel={t('settings.appearance.themePreset')}
-										value={presetChoice}
-										onChange={(next) => setPresetChoice(next as ThemePresetId)}
-										options={[
-											{ value: 'codex', label: t('settings.appearance.preset.codex') },
-											{ value: 'graphite', label: t('settings.appearance.preset.graphite') },
-											{ value: 'midnight', label: t('settings.appearance.preset.midnight') },
-										]}
-										variant="compact"
-									/>
-								</div>
+								<button
+									type="button"
+									className="ref-appearance-toolbar-btn"
+									onClick={handleResetFactoryDefaults}
+									disabled={isAppearanceFactoryDefault(appearance, effectiveColorScheme)}
+									title={t('settings.appearance.resetDefaultsTitle')}
+									aria-label={t('settings.appearance.resetDefaultsTitle')}
+								>
+									<IconRotateCcw />
+									{t('settings.appearance.resetDefaults')}
+								</button>
 							</div>
 						</div>
 

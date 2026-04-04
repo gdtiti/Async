@@ -54,13 +54,17 @@ import {
 	applyAppearanceSettingsToDom,
 	defaultAppearanceSettings,
 	normalizeAppearanceSettings,
+	replaceBuiltinChromeColorsForScheme,
+	shouldMigrateChromeWhenLeavingScheme,
 	type AppAppearanceSettings,
 } from './appearanceSettings';
 import { useAppColorScheme } from './useAppColorScheme';
 import {
 	type AppColorMode,
 	getVoidMonacoTheme,
+	readPrefersDark,
 	readStoredColorMode,
+	resolveEffectiveScheme,
 	type ThemeTransitionOrigin,
 	writeStoredColorMode,
 } from './colorMode';
@@ -851,10 +855,41 @@ export default function App() {
 	const [appearanceSettings, setAppearanceSettings] = useState<AppAppearanceSettings>(() => defaultAppearanceSettings());
 	const { effectiveScheme, setTransitionOrigin } = useAppColorScheme({ colorMode, shell: shell ?? undefined });
 	const monacoChromeTheme = getVoidMonacoTheme(effectiveScheme);
+	const effectiveSchemePrevRef = useRef(effectiveScheme);
+	const shellRef = useRef(shell);
+	shellRef.current = shell;
 
 	useEffect(() => {
-		applyAppearanceSettingsToDom(appearanceSettings);
-	}, [appearanceSettings]);
+		const prevScheme = effectiveSchemePrevRef.current;
+		if (prevScheme !== effectiveScheme) {
+			effectiveSchemePrevRef.current = effectiveScheme;
+			setAppearanceSettings((cur) => {
+				if (!shouldMigrateChromeWhenLeavingScheme(cur, prevScheme)) {
+					return cur;
+				}
+				const next = replaceBuiltinChromeColorsForScheme(cur, effectiveScheme);
+				const s = shellRef.current;
+				if (s) {
+					queueMicrotask(() => {
+						void s.invoke('settings:set', {
+							ui: {
+								accentColor: next.accentColor,
+								backgroundColor: next.backgroundColor,
+								foregroundColor: next.foregroundColor,
+								contrast: next.contrast,
+								translucentSidebar: next.translucentSidebar,
+							},
+						});
+					});
+				}
+				return next;
+			});
+		}
+	}, [effectiveScheme]);
+
+	useEffect(() => {
+		applyAppearanceSettingsToDom(appearanceSettings, effectiveScheme);
+	}, [appearanceSettings, effectiveScheme]);
 	const { t, setLocale, locale } = useI18n();
 	const [ipcOk, setIpcOk] = useState<string>('…');
 	const [workspace, setWorkspace] = useState<string | null>(null);
@@ -2011,7 +2046,6 @@ export default function App() {
 					ui?: {
 						sidebarLayout?: { left?: unknown; right?: unknown };
 						colorMode?: string;
-						themePreset?: unknown;
 						fontPreset?: unknown;
 						uiFontPreset?: unknown;
 						codeFontPreset?: unknown;
@@ -2086,14 +2120,13 @@ export default function App() {
 					setEditorSettings({ ...defaultEditorSettings(), ...st.editor });
 				}
 				setIndexingSettings(normalizeIndexingSettings(st.indexing));
-				setAppearanceSettings(normalizeAppearanceSettings(st.ui));
-				const cm = st.ui?.colorMode;
-				if (cm === 'light' || cm === 'dark' || cm === 'system') {
-					setColorMode(cm);
-					writeStoredColorMode(cm);
-				} else {
-					setColorMode(readStoredColorMode());
-				}
+				const cmRaw = st.ui?.colorMode;
+				const nextColorMode: AppColorMode =
+					cmRaw === 'light' || cmRaw === 'dark' || cmRaw === 'system' ? cmRaw : readStoredColorMode();
+				setColorMode(nextColorMode);
+				writeStoredColorMode(nextColorMode);
+				const appearanceScheme = resolveEffectiveScheme(nextColorMode, readPrefersDark());
+				setAppearanceSettings(normalizeAppearanceSettings(st.ui, appearanceScheme));
 				// Load MCP servers
 				const mcpSt = (await shell.invoke('mcp:getServers')) as { servers?: McpServerConfig[] } | undefined;
 				setMcpServers(mcpSt?.servers ?? []);
@@ -3710,7 +3743,6 @@ export default function App() {
 			mcp: { servers: mcpServers },
 			ui: {
 				colorMode,
-				themePreset: appearanceSettings.themePreset,
 				fontPreset: appearanceSettings.uiFontPreset,
 				uiFontPreset: appearanceSettings.uiFontPreset,
 				codeFontPreset: appearanceSettings.codeFontPreset,
@@ -8872,6 +8904,7 @@ export default function App() {
 								onDeleteWorkspaceSkillDisk={handleDeleteWorkspaceSkillDisk}
 								colorMode={colorMode}
 								onChangeColorMode={(m, origin) => void onChangeColorMode(m, origin)}
+								effectiveColorScheme={effectiveScheme}
 								appearanceSettings={appearanceSettings}
 								onChangeAppearanceSettings={setAppearanceSettings}
 								layoutMode={layoutMode}

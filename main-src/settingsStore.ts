@@ -54,7 +54,6 @@ export type ShellUiFontPreset = 'apple' | 'inter' | 'segoe';
 export type ShellUiSettings = {
 	sidebarLayout?: SidebarLayoutPx;
 	colorMode?: ShellColorMode;
-	themePreset?: 'codex' | 'graphite' | 'midnight' | 'custom';
 	fontPreset?: ShellUiFontPreset;
 	uiFontPreset?: ShellUiFontPreset;
 	codeFontPreset?: 'sfmono' | 'monospace' | 'jetbrains';

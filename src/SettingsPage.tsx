@@ -337,6 +337,8 @@ type Props = {
 	workspaceOpen: boolean;
 	colorMode: AppColorMode;
 	onChangeColorMode: (next: AppColorMode, origin?: ThemeTransitionOrigin) => void | Promise<void>;
+	/** 当前有效亮/暗，用于外观「恢复默认」与内置主题对齐 */
+	effectiveColorScheme: 'light' | 'dark';
 	appearanceSettings: AppAppearanceSettings;
 	onChangeAppearanceSettings: (next: AppAppearanceSettings) => void | Promise<void>;
 	layoutMode: ShellLayoutMode;
@@ -374,6 +376,7 @@ export function SettingsPage({
 	workspaceOpen,
 	colorMode,
 	onChangeColorMode,
+	effectiveColorScheme,
 	appearanceSettings,
 	onChangeAppearanceSettings,
 	layoutMode,
@@ -681,6 +684,7 @@ export function SettingsPage({
 								<SettingsAppearancePanel
 									value={colorMode}
 									onChange={onChangeColorMode}
+									effectiveColorScheme={effectiveColorScheme}
 									appearance={appearanceSettings}
 									onChangeAppearance={onChangeAppearanceSettings}
 								/>
