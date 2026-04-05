@@ -133,21 +133,33 @@ export function AgentFilePreviewPanel({
 		if (!root) {
 			return;
 		}
+		const scrollBlockIntoView = (block: HTMLElement) => {
+			const desiredTop = Math.max(0, block.offsetTop - Math.round(root.clientHeight * 0.2));
+			root.scrollTo({ top: desiredTop });
+		};
 		const target = root.querySelector<HTMLElement>('.ref-agent-file-preview-row.is-target');
+		const targetBlock = target?.closest<HTMLElement>('.ref-agent-file-preview-hunk-block') ?? null;
+		if (targetBlock) {
+			scrollBlockIntoView(targetBlock);
+			return;
+		}
 		if (target) {
 			target.scrollIntoView({ block: 'center' });
-		} else {
-			const firstChanged = root.querySelector<HTMLElement>(
-				'.ref-agent-file-preview-row--add, .ref-agent-file-preview-row--del'
-			);
-			if (firstChanged) {
-				firstChanged.scrollIntoView({ block: 'center' });
-				return;
-			}
+			return;
 		}
-		if (!target) {
-			root.scrollTop = 0;
+		const firstChanged = root.querySelector<HTMLElement>(
+			'.ref-agent-file-preview-row--add, .ref-agent-file-preview-row--del'
+		);
+		const firstChangedBlock = firstChanged?.closest<HTMLElement>('.ref-agent-file-preview-hunk-block') ?? null;
+		if (firstChangedBlock) {
+			scrollBlockIntoView(firstChangedBlock);
+			return;
 		}
+		if (firstChanged) {
+			firstChanged.scrollIntoView({ block: 'center' });
+			return;
+		}
+		root.scrollTop = 0;
 	}, [filePath, loading, rows, revealLine, revealEndLine]);
 
 	const renderRow = (row: AgentFilePreviewRow, index: number, inHunkBlock: boolean) => {
@@ -252,16 +264,6 @@ export function AgentFilePreviewPanel({
 									{onAcceptHunk || onRevertHunk ? (
 										<div className="ref-agent-file-preview-hunk-bar ref-agent-file-preview-hunk-bar--floating">
 											<div className="ref-agent-file-preview-hunk-actions ref-agent-file-preview-hunk-actions--floating">
-												{onAcceptHunk ? (
-													<button
-														type="button"
-														className="ref-agent-file-preview-hunk-btn ref-agent-file-preview-hunk-btn--primary"
-														disabled={hunkBusy}
-														onClick={() => onAcceptHunk(block.hunk.patch)}
-													>
-														{t('app.filePreviewAcceptChange')}
-													</button>
-												) : null}
 												{onRevertHunk ? (
 													<button
 														type="button"
@@ -270,6 +272,16 @@ export function AgentFilePreviewPanel({
 														onClick={() => onRevertHunk(block.hunk.patch)}
 													>
 														{t('app.filePreviewRevertChange')}
+													</button>
+												) : null}
+												{onAcceptHunk ? (
+													<button
+														type="button"
+														className="ref-agent-file-preview-hunk-btn ref-agent-file-preview-hunk-btn--primary"
+														disabled={hunkBusy}
+														onClick={() => onAcceptHunk(block.hunk.patch)}
+													>
+														{t('app.filePreviewAcceptChange')}
 													</button>
 												) : null}
 											</div>

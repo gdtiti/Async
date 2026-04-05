@@ -39,6 +39,7 @@ import { AgentFileChangesPanel } from './AgentFileChanges';
 import { AgentFilePreviewPanel } from './AgentFilePreviewPanel';
 import { buildAgentFilePreviewHunks } from './agentFilePreviewDiff';
 import {
+	agentChangeKeyFromDiff,
 	assistantMessageUsesAgentToolProtocol,
 	segmentAssistantContentUnified,
 	collectFileChanges,
@@ -243,7 +244,7 @@ function stripMarkdownSection(markdown: string, headingPattern: string): string 
 }
 type EditorPtySession = { id: string; title: string };
 type DiffPreview = { diff: string; isBinary: boolean; additions: number; deletions: number };
-type AgentConversationFileOpenOptions = { diff?: string | null };
+type AgentConversationFileOpenOptions = { diff?: string | null; allowReviewActions?: boolean };
 type AgentFilePreviewState = {
 	relPath: string;
 	revealLine?: number;
@@ -1019,8 +1020,16 @@ export default function App() {
 	const [agentReviewBusy, setAgentReviewBusy] = useState(false);
 	const [fileChangesDismissed, setFileChangesDismissed] = useState(false);
 	const [dismissedFiles, setDismissedFiles] = useState<Set<string>>(new Set());
+	const [revertedFiles, setRevertedFiles] = useState<Set<string>>(new Set());
+	const [revertedChangeKeys, setRevertedChangeKeys] = useState<Set<string>>(new Set());
 	const fileChangesDismissedRef = useRef(fileChangesDismissed);
 	fileChangesDismissedRef.current = fileChangesDismissed;
+	const dismissedFilesRef = useRef(dismissedFiles);
+	dismissedFilesRef.current = dismissedFiles;
+	const revertedFilesRef = useRef(revertedFiles);
+	revertedFilesRef.current = revertedFiles;
+	const revertedChangeKeysRef = useRef(revertedChangeKeys);
+	revertedChangeKeysRef.current = revertedChangeKeys;
 	/** Plan 模式 — 结构化问题弹窗 */
 	const [planQuestion, setPlanQuestion] = useState<PlanQuestion | null>(null);
 	/** 若来自 ask_plan_question 工具，需在 IPC 中回传主进程以解除 execute 阻塞 */
@@ -4153,12 +4162,16 @@ export default function App() {
 					? Math.floor(revealEndLine)
 					: undefined;
 			const sourceDiff = typeof options?.diff === 'string' ? options.diff.trim() : '';
+			const sourceAllowsReviewActions = options?.allowReviewActions === true;
+			const useSourceReadonlyFallback = !gitStatusOk && sourceDiff.length > 0;
 			voidShellDebugLog('agent-file-preview:open:start', {
 				relPath: normalizedRel,
 				revealLine: safeRevealLine ?? null,
 				revealEndLine: safeRevealEndLine ?? null,
 				sourceDiffLength: sourceDiff.length,
 				sourceDiffHead: sourceDiff ? debugDiffHead(sourceDiff) : '',
+				allowReviewActions: sourceAllowsReviewActions,
+				useSourceReadonlyFallback,
 				layoutMode,
 				currentId: currentId ?? '',
 			});
@@ -4171,12 +4184,15 @@ export default function App() {
 				revealEndLine: safeRevealEndLine,
 				loading: true,
 				content: prev?.relPath === normalizedRel ? prev.content : '',
-				diff: sourceDiff,
+				diff: sourceAllowsReviewActions || useSourceReadonlyFallback ? sourceDiff : '',
 				isBinary: false,
 				readError: null,
 				additions: 0,
 				deletions: 0,
-				reviewMode: prev?.relPath === normalizedRel ? prev.reviewMode : 'readonly',
+				reviewMode:
+					prev?.relPath === normalizedRel && sourceAllowsReviewActions
+						? prev.reviewMode
+						: 'readonly',
 			}));
 
 			const requestId = ++agentFilePreviewRequestRef.current;
@@ -4191,7 +4207,7 @@ export default function App() {
 				readError = err instanceof Error ? err.message : String(err);
 			}
 
-			let previewDiff = sourceDiff;
+			let previewDiff = sourceAllowsReviewActions || useSourceReadonlyFallback ? sourceDiff : '';
 			let isBinary = false;
 			let additions = 0;
 			let deletions = 0;
@@ -4204,7 +4220,7 @@ export default function App() {
 				gitChangedHead: gitChangedPaths.slice(0, 12).join(' | '),
 			});
 
-			if (currentId) {
+			if (currentId && sourceAllowsReviewActions) {
 				try {
 					const snapshotResult = (await shell.invoke('agent:getFileSnapshot', currentId, normalizedRel)) as
 						| { ok: true; hasSnapshot: false }
@@ -4237,7 +4253,53 @@ export default function App() {
 				}
 			}
 
-			if (!previewDiff && gitStatusOk && isGitChanged) {
+			let authoritativeGitPreviewLoaded = false;
+			if (gitStatusOk) {
+				try {
+					const fullDiffResult = (await shell.invoke('git:diffPreview', {
+						relPath: normalizedRel,
+						full: true,
+					})) as
+						| { ok: true; preview: DiffPreview }
+						| { ok: false; error?: string };
+					if (fullDiffResult.ok && fullDiffResult.preview) {
+						authoritativeGitPreviewLoaded = true;
+						const gitPreviewDiff = String(fullDiffResult.preview.diff ?? '');
+						const gitPreviewIsBinary = fullDiffResult.preview.isBinary === true;
+						const gitPreviewAdditions = fullDiffResult.preview.additions ?? 0;
+						const gitPreviewDeletions = fullDiffResult.preview.deletions ?? 0;
+						const gitPreviewHead = debugDiffHead(gitPreviewDiff);
+						if (!sourceAllowsReviewActions || reviewMode !== 'snapshot') {
+							previewDiff = gitPreviewDiff;
+							isBinary = gitPreviewIsBinary;
+							additions = gitPreviewAdditions;
+							deletions = gitPreviewDeletions;
+							reviewMode = 'readonly';
+						} else if (!gitPreviewDiff.trim()) {
+							// Snapshot exists but git shows clean: trust git and hide stale inline diff.
+							previewDiff = '';
+							isBinary = gitPreviewIsBinary;
+							additions = gitPreviewAdditions;
+							deletions = gitPreviewDeletions;
+							reviewMode = 'readonly';
+						}
+						voidShellDebugLog('agent-file-preview:open:git-authoritative', {
+							relPath: normalizedRel,
+							diffLength: gitPreviewDiff.length,
+							hunkCount: buildAgentFilePreviewHunks(gitPreviewDiff).length,
+							isBinary: gitPreviewIsBinary,
+							additions: gitPreviewAdditions,
+							deletions: gitPreviewDeletions,
+							reviewMode,
+							diffHead: gitPreviewHead,
+						});
+					}
+				} catch {
+					/* fall back to cached preview/status heuristics below */
+				}
+			}
+
+			if (!authoritativeGitPreviewLoaded && !previewDiff && gitStatusOk && isGitChanged) {
 				const cachedPreview = Object.entries(diffPreviews).find(
 					([path]) => workspaceRelPathsEqual(path, normalizedRel)
 				)?.[1];
@@ -4296,7 +4358,13 @@ export default function App() {
 				}
 			}
 
-			if (previewDiff && !isBinary && reviewMode === 'readonly' && buildAgentFilePreviewHunks(previewDiff).length === 0) {
+			if (
+				!authoritativeGitPreviewLoaded &&
+				previewDiff &&
+				!isBinary &&
+				reviewMode === 'readonly' &&
+				buildAgentFilePreviewHunks(previewDiff).length === 0
+			) {
 				try {
 					const fullDiffResult = (await shell.invoke('git:diffPreview', {
 						relPath: normalizedRel,
@@ -4331,6 +4399,38 @@ export default function App() {
 				readError = null;
 			}
 
+			const previewHunks = !isBinary ? buildAgentFilePreviewHunks(previewDiff) : [];
+			if (
+				currentId &&
+				sourceAllowsReviewActions &&
+				previewDiff &&
+				!isBinary &&
+				reviewMode === 'readonly' &&
+				previewHunks.length > 0
+			) {
+				try {
+					const seedResult = (await shell.invoke('agent:seedFileSnapshot', {
+						threadId: currentId,
+						relPath: normalizedRel,
+						content,
+						diff: previewDiff,
+					})) as { ok?: boolean; seeded?: boolean; previousLength?: number; error?: string };
+					if (seedResult?.ok && seedResult.seeded) {
+						reviewMode = 'snapshot';
+						voidShellDebugLog('agent-file-preview:open:seeded-snapshot', {
+							relPath: normalizedRel,
+							contentLength: content.length,
+							previousLength: seedResult.previousLength ?? 0,
+							diffLength: previewDiff.length,
+							hunkCount: previewHunks.length,
+							diffHead: debugDiffHead(previewDiff),
+						});
+					}
+				} catch {
+					/* derived snapshot seeding failed; keep readonly preview */
+				}
+			}
+
 			if (requestId !== agentFilePreviewRequestRef.current) {
 				voidShellDebugLog('agent-file-preview:open:stale', {
 					relPath: normalizedRel,
@@ -4345,7 +4445,7 @@ export default function App() {
 				reviewMode,
 				contentLength: content.length,
 				diffLength: previewDiff.length,
-				hunkCount: buildAgentFilePreviewHunks(previewDiff).length,
+				hunkCount: previewHunks.length,
 				isBinary,
 				additions,
 				deletions,
@@ -4504,6 +4604,20 @@ export default function App() {
 			revealEndLine?: number,
 			options?: AgentConversationFileOpenOptions
 		) => {
+			const normalizedRel = normalizeWorkspaceRelPath(rel);
+			const pathReverted = normalizedRel
+				? [...revertedFilesRef.current].some((path) => workspaceRelPathsEqual(path, normalizedRel))
+				: false;
+			if (pathReverted) {
+				return;
+			}
+			const changeKey =
+				typeof options?.diff === 'string' && options.diff.trim()
+					? agentChangeKeyFromDiff(options.diff)
+					: '';
+			if (changeKey && revertedChangeKeysRef.current.has(changeKey)) {
+				return;
+			}
 			if (layoutMode === 'agent') {
 				await openAgentSidebarFilePreview(rel, revealLine, revealEndLine, options);
 				return;
@@ -4520,9 +4634,43 @@ export default function App() {
 		setDismissedFiles((prev) => {
 			const next = new Set(prev).add(relPath);
 			const last = [...messagesRef.current].reverse().find((m) => m.role === 'assistant');
-			writePersistedAgentFileChanges(currentId, last?.content ?? '', fileChangesDismissedRef.current, next);
+			writePersistedAgentFileChanges(
+				currentId,
+				last?.content ?? '',
+				fileChangesDismissedRef.current,
+				next,
+				revertedFilesRef.current,
+				revertedChangeKeysRef.current
+			);
 			return next;
 		});
+	}, [currentId]);
+
+	const markAgentConversationChangeReverted = useCallback((changeKey: string | null, relPath?: string) => {
+		if (!currentId) {
+			return;
+		}
+		const normalizedPath = typeof relPath === 'string' ? normalizeWorkspaceRelPath(relPath) : '';
+		const normalizedKey = typeof changeKey === 'string' ? changeKey.trim() : '';
+		const last = [...messagesRef.current].reverse().find((m) => m.role === 'assistant');
+		let nextPaths = revertedFilesRef.current;
+		let nextKeys = revertedChangeKeysRef.current;
+		if (normalizedPath) {
+			nextPaths = new Set(revertedFilesRef.current).add(normalizedPath);
+			setRevertedFiles(nextPaths);
+		}
+		if (normalizedKey) {
+			nextKeys = new Set(revertedChangeKeysRef.current).add(normalizedKey);
+			setRevertedChangeKeys(nextKeys);
+		}
+		writePersistedAgentFileChanges(
+			currentId,
+			last?.content ?? '',
+			fileChangesDismissedRef.current,
+			dismissedFilesRef.current,
+			nextPaths,
+			nextKeys
+		);
 	}, [currentId]);
 
 	const onAcceptAgentFilePreviewHunk = useCallback(
@@ -4579,6 +4727,13 @@ export default function App() {
 					flashComposerAttachErr(result?.error ?? 'Unable to revert this change.');
 					return;
 				}
+				const revertedPatchKey = agentChangeKeyFromDiff(patch);
+				const previewDiffKey = agentChangeKeyFromDiff(agentFilePreview.diff);
+				const revertedRelPath = result.cleared ? agentFilePreview.relPath : undefined;
+				markAgentConversationChangeReverted(revertedPatchKey, revertedRelPath);
+				if (previewDiffKey && previewDiffKey !== revertedPatchKey) {
+					markAgentConversationChangeReverted(previewDiffKey, revertedRelPath);
+				}
 				if (result.cleared) {
 					dismissAgentChangedFile(agentFilePreview.relPath);
 				}
@@ -4597,6 +4752,7 @@ export default function App() {
 			currentId,
 			dismissAgentChangedFile,
 			flashComposerAttachErr,
+			markAgentConversationChangeReverted,
 			openAgentSidebarFilePreview,
 			refreshGit,
 			shell,
@@ -5731,6 +5887,16 @@ export default function App() {
 		return [...messages, { role: 'assistant' as const, content: streaming }];
 	}, [messages, streaming, awaitingReply]);
 
+	const lastAssistantMessageIndex = useMemo(() => {
+		let idx = -1;
+		for (let j = 0; j < displayMessages.length; j++) {
+			if (displayMessages[j]!.role === 'assistant') {
+				idx = j;
+			}
+		}
+		return idx;
+	}, [displayMessages]);
+
 	/** 中间消息区滚动时，最后一条用户消息 sticky 在视口顶部（参考 Cursor） */
 	const lastUserMessageIndex = useMemo(() => {
 		let idx = -1;
@@ -5762,12 +5928,16 @@ export default function App() {
 		if (!currentId) {
 			setFileChangesDismissed(false);
 			setDismissedFiles(new Set());
+			setRevertedFiles(new Set());
+			setRevertedChangeKeys(new Set());
 			return;
 		}
 		if (messagesThreadId !== currentId) {
 			/* 切线程后、loadMessages 完成前：勿用旧线程的 messages 去对本线程的 persist 做哈希比对 */
 			setFileChangesDismissed(false);
 			setDismissedFiles(new Set());
+			setRevertedFiles(new Set());
+			setRevertedChangeKeys(new Set());
 			return;
 		}
 		const last = [...messages].reverse().find((m) => m.role === 'assistant');
@@ -5775,6 +5945,8 @@ export default function App() {
 		if (!content.trim()) {
 			setFileChangesDismissed(false);
 			setDismissedFiles(new Set());
+			setRevertedFiles(new Set());
+			setRevertedChangeKeys(new Set());
 			return;
 		}
 		const hash = hashAgentAssistantContent(content);
@@ -5782,16 +5954,22 @@ export default function App() {
 		if (!stored) {
 			setFileChangesDismissed(false);
 			setDismissedFiles(new Set());
+			setRevertedFiles(new Set());
+			setRevertedChangeKeys(new Set());
 			return;
 		}
 		if (stored.contentHash !== hash) {
 			setFileChangesDismissed(false);
 			setDismissedFiles(new Set());
+			setRevertedFiles(new Set());
+			setRevertedChangeKeys(new Set());
 			clearPersistedAgentFileChanges(currentId);
 			return;
 		}
 		setFileChangesDismissed(stored.fileChangesDismissed);
 		setDismissedFiles(new Set(stored.dismissedPaths));
+		setRevertedFiles(new Set(stored.revertedPaths));
+		setRevertedChangeKeys(new Set(stored.revertedChangeKeys));
 	}, [currentId, messages, messagesThreadId]);
 
 	/** Plan：切回线程或 loadMessages 完成后，若最后一条仍是带 QUESTIONS 的助手消息则恢复弹窗 */
@@ -5860,11 +6038,19 @@ export default function App() {
 		setDismissedFiles(new Set());
 		setFileChangesDismissed(true);
 		const last = [...messagesRef.current].reverse().find((m) => m.role === 'assistant');
-		writePersistedAgentFileChanges(currentId, last?.content ?? '', true, new Set());
+		writePersistedAgentFileChanges(
+			currentId,
+			last?.content ?? '',
+			true,
+			new Set(),
+			revertedFilesRef.current,
+			revertedChangeKeysRef.current
+		);
 	}, [shell, currentId]);
 
 	const onRevertAllEdits = useCallback(async () => {
 		if (!shell || composerMode !== 'agent' || !currentId) return;
+		const revertedPaths = new Set(agentFileChanges.map((file) => file.path));
 		try {
 			const result = (await shell.invoke('agent:revertLastTurn', currentId)) as { ok?: boolean; reverted?: number };
 			if ((result.reverted ?? 0) > 0) {
@@ -5873,11 +6059,20 @@ export default function App() {
 		} catch {
 			/* IPC error — still dismiss panel to unblock the user */
 		}
+		setRevertedFiles(revertedPaths);
+		setRevertedChangeKeys(new Set());
 		setDismissedFiles(new Set());
 		setFileChangesDismissed(true);
 		const last = [...messagesRef.current].reverse().find((m) => m.role === 'assistant');
-		writePersistedAgentFileChanges(currentId, last?.content ?? '', true, new Set());
-	}, [shell, composerMode, currentId, refreshGit]);
+		writePersistedAgentFileChanges(
+			currentId,
+			last?.content ?? '',
+			true,
+			new Set(),
+			revertedPaths,
+			new Set()
+		);
+	}, [shell, composerMode, currentId, refreshGit, agentFileChanges]);
 
 	const onKeepFileEdit = useCallback(async (relPath: string) => {
 		if (!shell || !currentId) return;
@@ -5893,8 +6088,9 @@ export default function App() {
 			await shell.invoke('agent:revertFile', currentId, relPath);
 			void refreshGit();
 		} catch { /* ignore */ }
+		markAgentConversationChangeReverted(null, relPath);
 		dismissAgentChangedFile(relPath);
-	}, [dismissAgentChangedFile, shell, currentId, refreshGit]);
+	}, [dismissAgentChangedFile, markAgentConversationChangeReverted, shell, currentId, refreshGit]);
 
 	const syncMessagesScrollIndicators = useCallback(() => {
 		const el = messagesViewportRef.current;
@@ -6695,6 +6891,11 @@ export default function App() {
 								showAgentWorking={agentOrPlanStreaming}
 								liveAgentBlocksState={agentOrPlanStreaming ? liveAssistantBlocks : null}
 								liveThoughtMeta={agentOrPlanStreaming ? liveThoughtMeta : null}
+								revertedPaths={revertedFiles}
+								revertedChangeKeys={revertedChangeKeys}
+								allowAgentFileActions={
+									composerMode === 'agent' && !awaitingReply && i === lastAssistantMessageIndex
+								}
 							/>
 						)}
 					</div>
@@ -6852,7 +7053,10 @@ export default function App() {
 						workspaceRoot={workspace}
 						busy={agentReviewBusy}
 						onOpenFile={(rel, line, end, options) =>
-							void onAgentConversationOpenFile(rel, line, end, options)
+							void onAgentConversationOpenFile(rel, line, end, {
+								...options,
+								allowReviewActions: true,
+							})
 						}
 						onApplyOne={(id) => void onApplyAgentPatchOne(id)}
 						onApplyAll={() => void onApplyAgentPatchesAll()}
@@ -6969,7 +7173,10 @@ export default function App() {
 					<AgentFileChangesPanel
 						files={agentFileChanges}
 						onOpenFile={(rel, line, end, options) =>
-							void onAgentConversationOpenFile(rel, line, end, options)
+							void onAgentConversationOpenFile(rel, line, end, {
+								...options,
+								allowReviewActions: true,
+							})
 						}
 						onKeepAll={onKeepAllEdits}
 						onRevertAll={() => void onRevertAllEdits()}

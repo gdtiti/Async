@@ -10,6 +10,7 @@ import { AgentResultCard } from './AgentResultCard';
 import { ComposerThoughtBlock } from './ComposerThoughtBlock';
 import {
 	buildStreamingToolSegments,
+	fileEditChangeKey,
 	segmentAssistantContentUnified,
 	type AssistantSegment,
 	type StreamingToolPreview,
@@ -65,7 +66,7 @@ type Props = {
 		relPath: string,
 		revealLine?: number,
 		revealEndLine?: number,
-		options?: { diff?: string | null }
+		options?: { diff?: string | null; allowReviewActions?: boolean }
 	) => void;
 	onRunCommand?: (cmd: string) => void;
 	streamingToolPreview?: StreamingToolPreview | null;
@@ -80,6 +81,9 @@ type Props = {
 		streamingThinking?: string;
 		tokenUsage?: TurnTokenUsage | null;
 	} | null;
+	revertedPaths?: ReadonlySet<string>;
+	revertedChangeKeys?: ReadonlySet<string>;
+	allowAgentFileActions?: boolean;
 };
 
 export function ChatMarkdown({
@@ -94,6 +98,9 @@ export function ChatMarkdown({
 	liveAgentBlocksState = null,
 	liveThoughtMeta = null,
 	assistantBubbleVariant = 'default',
+	revertedPaths,
+	revertedChangeKeys,
+	allowAgentFileActions = false,
 }: Props) {
 	const { t } = useI18n();
 
@@ -266,10 +273,16 @@ export function ChatMarkdown({
 					case 'streaming_code':
 						return <AgentStreamingFenceCard key={i} lang={seg.lang} body={seg.body} />;
 					case 'file_edit':
+						const changeKey = fileEditChangeKey(seg);
+						const isReverted =
+							Boolean(revertedPaths?.has(seg.path)) ||
+							Boolean(changeKey && revertedChangeKeys?.has(changeKey));
 						return (
 							<AgentEditCard
 								key={i}
 								edit={seg}
+								isReverted={isReverted}
+								allowReviewActions={allowAgentFileActions}
 								onOpenFile={onOpenAgentFile}
 							/>
 						);

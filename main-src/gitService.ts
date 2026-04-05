@@ -312,23 +312,10 @@ export async function getDiffPreview(relPath: string, options?: DiffPreviewOptio
 
 	const buf = fs.readFileSync(full);
 	if (isBinaryBuffer(buf)) {
-		return { diff: 'Binary file not shown.', isBinary: true, additions: 0, deletions: 0 };
+		return { diff: '', isBinary: false, additions: 0, deletions: 0 };
 	}
 
-	const text = buf.toString('utf8');
-	const lines = text.split(/\r?\n/);
-	const previewAll = !Number.isFinite(maxChars) || !maxChars || maxChars <= 0;
-	const chunk = previewAll ? lines : lines.slice(0, 56);
-	const previewText = chunk.join('\n');
-	const synthetic = createTwoFilesPatch('/dev/null', `b/${relPath.replace(/\\/g, '/')}`, '', previewText, '', '', {
-		context: 3,
-	});
-	return {
-		diff: clipDiff(synthetic, maxChars),
-		isBinary: false,
-		additions: chunk.length,
-		deletions: 0,
-	};
+	return { diff: '', isBinary: false, additions: 0, deletions: 0 };
 }
 
 /** Read file at repo-relative path for diff preview (must stay in workspace). */

@@ -219,8 +219,8 @@ export const messagesEn: Record<string, string> = {
 	'explorer.errDelete': 'Could not delete.',
 	'app.filePreview': 'File preview',
 	'app.filePreviewChangeLabel': 'AI change',
-	'app.filePreviewAcceptChange': 'Accept',
-	'app.filePreviewRevertChange': 'Revert',
+	'app.filePreviewAcceptChange': 'Keep',
+	'app.filePreviewRevertChange': 'Undo',
 	'app.noFileSelected': 'No file selected',
 	'app.editorEmptyTitle': 'Open a file to start editing',
 	'app.editorEmptyDescription':
@@ -505,6 +505,7 @@ export const messagesEn: Record<string, string> = {
 	'agent.revertAll': 'Revert all',
 	'agent.keepFile': 'Keep this file',
 	'agent.revertFile': 'Revert this file',
+	'agent.edit.reverted': 'Reverted',
 	'agent.edit.expand': 'Expand preview ({{lines}} lines)',
 	'agent.edit.collapse': 'Collapse preview',
 	'agent.edit.streamingPlaceholder': 'Streaming patch…',

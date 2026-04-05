@@ -1331,6 +1331,27 @@ function normalizeSnippetLines(text: string | undefined): string[] {
 	return normalized.split('\n');
 }
 
+function normalizeChangeKeyInput(text: string): string {
+	return text.replace(/\r\n?/g, '\n').trim();
+}
+
+function hashChangeKeySource(text: string): string {
+	let h = 2166136261;
+	for (let i = 0; i < text.length; i++) {
+		h ^= text.charCodeAt(i);
+		h = Math.imul(h, 16777619);
+	}
+	return `${(h >>> 0).toString(16)}:${text.length}`;
+}
+
+export function agentChangeKeyFromDiff(diff: string | null | undefined): string | null {
+	const normalized = normalizeChangeKeyInput(String(diff ?? ''));
+	if (!normalized) {
+		return null;
+	}
+	return `diff:${hashChangeKeySource(normalized)}`;
+}
+
 export function buildFileEditPreviewDiff(edit: {
 	path: string;
 	startLine?: number;
@@ -1393,6 +1414,10 @@ export function collectFileChanges(segments: AssistantSegment[]): FileChangeSumm
 		}
 	}
 	return Array.from(map.values());
+}
+
+export function fileEditChangeKey(edit: Pick<FileEditSegment, 'path' | 'startLine' | 'oldStr' | 'newStr' | 'isNew'>): string | null {
+	return agentChangeKeyFromDiff(buildFileEditPreviewDiff(edit));
 }
 
 // ─── Main entry ─────────────────────────────────────────────────────────

@@ -505,6 +505,7 @@ export const messagesZhCN: Record<string, string> = {
 	'agent.revertAll': '全部撤销',
 	'agent.keepFile': '保留此文件改动',
 	'agent.revertFile': '撤销此文件改动',
+	'agent.edit.reverted': '已撤销',
 	'agent.edit.expand': '展开预览（{{lines}} 行）',
 	'agent.edit.collapse': '收起预览',
 	'agent.edit.streamingPlaceholder': '正在流式接收补丁…',
@@ -1023,6 +1024,6 @@ export const messagesZhCN: Record<string, string> = {
 	'common.edit': '编辑',
 	'common.loading': '加载中…',
 	'app.filePreviewChangeLabel': 'AI 改动',
-	'app.filePreviewAcceptChange': '接受',
-	'app.filePreviewRevertChange': '回退',
+	'app.filePreviewAcceptChange': '保留',
+	'app.filePreviewRevertChange': '撤销',
 };

@@ -1659,21 +1659,54 @@ export function registerIpc(): void {
 		return { ok: true as const };
 	});
 
-	ipcMain.handle('agent:getFileSnapshot', (_e, threadId: string, relPath: string) => {
-		const snapshots = agentRevertSnapshotsByThread.get(String(threadId ?? ''));
-		if (!snapshots || !snapshots.has(relPath)) {
-			return { ok: true as const, hasSnapshot: false as const };
-		}
+ipcMain.handle('agent:getFileSnapshot', (_e, threadId: string, relPath: string) => {
+	const snapshots = agentRevertSnapshotsByThread.get(String(threadId ?? ''));
+	if (!snapshots || !snapshots.has(relPath)) {
+		return { ok: true as const, hasSnapshot: false as const };
+	}
 		return {
 			ok: true as const,
 			hasSnapshot: true as const,
-			previousContent: snapshots.get(relPath) ?? null,
-		};
-	});
+		previousContent: snapshots.get(relPath) ?? null,
+	};
+});
 
-	ipcMain.handle(
-		'agent:acceptFileHunk',
-		(_e, payload: { threadId?: string; relPath?: string; chunk?: string }) => {
+ipcMain.handle(
+	'agent:seedFileSnapshot',
+	(_e, payload: { threadId?: string; relPath?: string; content?: string; diff?: string }) => {
+		const threadId = String(payload?.threadId ?? '');
+		const relPath = String(payload?.relPath ?? '');
+		const diff = normalizePatchChunk(payload?.diff ?? '');
+		const currentContent = typeof payload?.content === 'string' ? payload.content : '';
+		if (!threadId || !relPath || !diff) {
+			return { ok: false as const, error: 'invalid-payload' as const };
+		}
+		const reversed = reverseUnifiedPatch(diff);
+		if (!reversed) {
+			return { ok: false as const, error: 'reverse-failed' as const };
+		}
+		const baseline = applyPatch(currentContent, reversed, { fuzzFactor: 3 });
+		if (baseline === false) {
+			return { ok: false as const, error: 'apply-failed' as const };
+		}
+		const previousContent =
+			/^new file mode\s/m.test(diff) || /^---\s+\/dev\/null$/m.test(diff)
+				? null
+				: baseline;
+		const snapshots = agentRevertSnapshotsByThread.get(threadId) ?? new Map<string, string | null>();
+		snapshots.set(relPath, previousContent);
+		agentRevertSnapshotsByThread.set(threadId, snapshots);
+		return {
+			ok: true as const,
+			seeded: true as const,
+			previousLength: (previousContent ?? '').length,
+		};
+	}
+);
+
+ipcMain.handle(
+	'agent:acceptFileHunk',
+	(_e, payload: { threadId?: string; relPath?: string; chunk?: string }) => {
 			const threadId = String(payload?.threadId ?? '');
 			const relPath = String(payload?.relPath ?? '');
 			const chunk = normalizePatchChunk(payload?.chunk ?? '');

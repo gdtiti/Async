@@ -10,6 +10,8 @@ export type PersistedAgentFileChanges = {
 	contentHash: string;
 	fileChangesDismissed: boolean;
 	dismissedPaths: string[];
+	revertedPaths: string[];
+	revertedChangeKeys: string[];
 };
 
 function storageKey(threadId: string): string {
@@ -37,6 +39,10 @@ export function readPersistedAgentFileChanges(threadId: string): PersistedAgentF
 			contentHash: d.contentHash,
 			fileChangesDismissed: !!d.fileChangesDismissed,
 			dismissedPaths: Array.isArray(d.dismissedPaths) ? d.dismissedPaths.filter((p) => typeof p === 'string') : [],
+			revertedPaths: Array.isArray(d.revertedPaths) ? d.revertedPaths.filter((p) => typeof p === 'string') : [],
+			revertedChangeKeys: Array.isArray(d.revertedChangeKeys)
+				? d.revertedChangeKeys.filter((p) => typeof p === 'string')
+				: [],
 		};
 	} catch {
 		return null;
@@ -47,7 +53,9 @@ export function writePersistedAgentFileChanges(
 	threadId: string,
 	lastAssistantContent: string,
 	fileChangesDismissed: boolean,
-	dismissedPaths: Set<string>
+	dismissedPaths: Set<string>,
+	revertedPaths?: Set<string>,
+	revertedChangeKeys?: Set<string>
 ): void {
 	try {
 		if (!lastAssistantContent.trim()) {
@@ -59,6 +67,8 @@ export function writePersistedAgentFileChanges(
 			contentHash: hashAgentAssistantContent(lastAssistantContent),
 			fileChangesDismissed,
 			dismissedPaths: [...dismissedPaths],
+			revertedPaths: [...(revertedPaths ?? new Set<string>())],
+			revertedChangeKeys: [...(revertedChangeKeys ?? new Set<string>())],
 		};
 		localStorage.setItem(storageKey(threadId), JSON.stringify(payload));
 	} catch {

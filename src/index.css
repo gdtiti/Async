@@ -7257,8 +7257,9 @@ html[data-theme-switching='true'] .ref-editor-welcome-panel {
 
 .ref-agent-file-preview-hunk-bar--floating {
 	position: absolute;
-	top: 12px;
-	right: 14px;
+	top: auto;
+	right: 0;
+	bottom: -14px;
 	z-index: 3;
 	justify-content: flex-end;
 	padding: 0;
@@ -7291,28 +7292,35 @@ html[data-theme-switching='true'] .ref-editor-welcome-panel {
 }
 
 .ref-agent-file-preview-hunk-actions--floating {
-	padding: 4px;
-	border-radius: 14px;
-	border: 1px solid color-mix(in srgb, var(--void-border-soft) 78%, transparent);
-	background: color-mix(in srgb, var(--void-bg-1) 94%, transparent);
-	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+	padding: 3px;
+	border-radius: 8px;
+	border: 1px solid color-mix(in srgb, var(--void-border-soft) 88%, transparent);
+	background: color-mix(in srgb, var(--void-bg-1) 90%, var(--void-bg-0) 10%);
+	box-shadow:
+		0 10px 28px color-mix(in srgb, black 24%, transparent),
+		inset 0 1px 0 color-mix(in srgb, var(--void-fg-0) 5%, transparent);
 	backdrop-filter: blur(20px);
 }
 
 .ref-agent-file-preview-hunk-btn {
-	padding: 5px 10px;
-	border-radius: 999px;
-	border: 1px solid color-mix(in srgb, var(--void-border-soft) 80%, transparent);
-	background: color-mix(in srgb, var(--void-bg-1) 82%, transparent);
-	color: var(--void-fg-1);
+	padding: 4px 10px;
+	border-radius: 6px;
+	border: 1px solid color-mix(in srgb, var(--void-border-soft) 76%, transparent);
+	background: color-mix(in srgb, var(--void-bg-2) 82%, var(--void-bg-0) 18%);
+	color: color-mix(in srgb, var(--void-fg-0) 92%, var(--void-fg-1) 8%);
 	font: inherit;
-	font-size: 11px;
+	font-size: 10.5px;
 	font-weight: 600;
 	cursor: pointer;
+	transition:
+		background-color 0.12s ease,
+		border-color 0.12s ease,
+		color 0.12s ease;
 }
 
 .ref-agent-file-preview-hunk-btn:hover:not(:disabled) {
-	background: color-mix(in srgb, var(--void-bg-2) 92%, transparent);
+	background: color-mix(in srgb, var(--void-bg-3) 86%, var(--void-bg-1) 14%);
+	border-color: color-mix(in srgb, var(--void-ring) 22%, var(--void-border-soft));
 	color: var(--void-fg-0);
 }
 
@@ -7322,18 +7330,25 @@ html[data-theme-switching='true'] .ref-editor-welcome-panel {
 }
 
 .ref-agent-file-preview-hunk-btn--primary {
-	border-color: color-mix(in srgb, var(--void-accent) 42%, transparent);
-	background: color-mix(in srgb, var(--void-accent) 16%, transparent);
-	color: var(--void-fg-0);
+	border-color: color-mix(in srgb, var(--void-git-added) 42%, var(--void-border-soft));
+	background: color-mix(in srgb, var(--void-git-added) 26%, var(--void-bg-1) 74%);
+	color: color-mix(in srgb, var(--void-git-added) 72%, var(--void-fg-0) 28%);
 }
 
 .ref-agent-file-preview-hunk-btn--ghost {
-	background: transparent;
+	background: color-mix(in srgb, var(--void-bg-2) 82%, var(--void-bg-0) 18%);
+	color: color-mix(in srgb, var(--void-fg-0) 92%, var(--void-fg-1) 8%);
+}
+
+.ref-agent-file-preview-hunk-btn--primary:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--void-git-added) 34%, var(--void-bg-1) 66%);
+	border-color: color-mix(in srgb, var(--void-git-added) 58%, var(--void-border-soft));
+	color: color-mix(in srgb, var(--void-git-added) 84%, var(--void-fg-0) 16%);
 }
 
 .ref-agent-file-preview-hunk-block {
 	position: relative;
-	margin: 12px 10px 18px 0;
+	margin: 12px 10px 28px 0;
 	padding-top: 2px;
 }
 
@@ -13183,6 +13198,11 @@ select.ref-settings-native-select:focus {
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--void-fg-0) 5%, transparent);
 }
 
+.ref-edit-card--reverted {
+	border-color: color-mix(in srgb, var(--void-danger) 30%, var(--void-border-soft));
+	background: color-mix(in srgb, var(--void-danger) 4%, var(--void-bg-1));
+}
+
 .ref-edit-card-file {
 	display: flex;
 	align-items: center;
@@ -13207,6 +13227,14 @@ select.ref-settings-native-select:focus {
 	opacity: 0.92;
 }
 
+.ref-edit-card--reverted .ref-edit-card-file {
+	color: color-mix(in srgb, var(--void-fg-2) 82%, var(--void-danger) 18%);
+}
+
+.ref-edit-card--reverted .ref-edit-card-file:hover {
+	background: none;
+}
+
 .ref-edit-card-icon {
 	flex-shrink: 0;
 	width: 16px;
@@ -13224,9 +13252,28 @@ select.ref-settings-native-select:focus {
 .ref-edit-card-stats {
 	flex-shrink: 0;
 	display: flex;
+	align-items: center;
 	gap: 6px;
 	font-size: 12px;
 	font-variant-numeric: tabular-nums;
+}
+
+.ref-edit-card-status {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1px 8px;
+	border-radius: 999px;
+	font-size: 11px;
+	line-height: 1.5;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+}
+
+.ref-edit-card-status--reverted {
+	color: color-mix(in srgb, var(--void-danger) 76%, var(--void-fg-1));
+	background: color-mix(in srgb, var(--void-danger) 12%, transparent);
+	border: 1px solid color-mix(in srgb, var(--void-danger) 22%, transparent);
 }
 
 .ref-edit-card-streaming-pulse {

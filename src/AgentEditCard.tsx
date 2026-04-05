@@ -6,11 +6,13 @@ import { sliceAgentEditPreviewLines } from './pretextLayout';
 
 type Props = {
 	edit: FileEditSegment;
+	isReverted?: boolean;
+	allowReviewActions?: boolean;
 	onOpenFile?: (
 		relPath: string,
 		revealLine?: number,
 		revealEndLine?: number,
-		options?: { diff?: string | null }
+		options?: { diff?: string | null; allowReviewActions?: boolean }
 	) => void;
 };
 
@@ -43,7 +45,7 @@ function buildPreviewLines(edit: FileEditSegment): PreviewLine[] {
 	return lines;
 }
 
-export function AgentEditCard({ edit, onOpenFile }: Props) {
+export function AgentEditCard({ edit, isReverted = false, allowReviewActions = false, onOpenFile }: Props) {
 	const { t } = useI18n();
 	const name = basename(edit.path) || t('agent.review.unknownPath');
 	const previewLines = useMemo(() => buildPreviewLines(edit), [edit]);
@@ -117,19 +119,22 @@ export function AgentEditCard({ edit, onOpenFile }: Props) {
 			: collapsedHead;
 	/** JSON 尚未解析出 old/new 时预览区为空，仍要占位避免「整块空白像卡住」 */
 	const showStreamingEmptyHint = edit.isStreaming && visibleLines.length === 0;
-	const canOpenFile = edit.path.trim().length > 0;
+	const canOpenFile = edit.path.trim().length > 0 && !isReverted;
 	const expandRemainingLines = Math.max(0, previewLines.length - collapsedHead.length);
 	const previewDiff = useMemo(() => buildFileEditPreviewDiff(edit), [edit]);
 
 	return (
-		<div className={`ref-edit-card ${edit.isStreaming ? 'ref-edit-card--streaming' : ''}`}>
+		<div className={`ref-edit-card ${edit.isStreaming ? 'ref-edit-card--streaming' : ''} ${isReverted ? 'ref-edit-card--reverted' : ''}`}>
 			<button
 				type="button"
 				className="ref-edit-card-file"
-				title={edit.path}
+				title={isReverted ? t('agent.edit.reverted') : edit.path}
 				onClick={() => {
 					if (canOpenFile) {
-						onOpenFile?.(edit.path, edit.startLine, undefined, { diff: previewDiff || null });
+						onOpenFile?.(edit.path, edit.startLine, undefined, {
+							diff: previewDiff || null,
+							allowReviewActions,
+						});
 					}
 				}}
 				disabled={!canOpenFile}
@@ -147,6 +152,11 @@ export function AgentEditCard({ edit, onOpenFile }: Props) {
 					/>
 				) : (
 					<span className="ref-edit-card-stats">
+						{isReverted ? (
+							<span className="ref-edit-card-status ref-edit-card-status--reverted">
+								{t('agent.edit.reverted')}
+							</span>
+						) : null}
 						{edit.additions > 0 && (
 							<span className="ref-fc-add">+{edit.additions}</span>
 						)}
