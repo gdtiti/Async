@@ -7,7 +7,10 @@ import {
 	type PlanQuestion,
 	type ParsedPlan,
 } from '../planParser';
-import { flattenAssistantTextPartsForSearch } from '../agentStructuredMessage';
+import {
+	flattenAssistantTextPartsForSearch,
+	isStructuredAssistantMessage,
+} from '../agentStructuredMessage';
 import { hashAgentAssistantContent } from '../agentFileChangesPersist';
 import { planExecutedKey } from '../planExecutedKey';
 
@@ -36,6 +39,17 @@ function stripMarkdownSection(markdown: string, headingPattern: string): string 
 	}
 	const regex = new RegExp(`^##\\s+(?:${headingPattern})\\s*$[\\s\\S]*?(?=^##\\s+|\\s*$)`, 'm');
 	return markdown.replace(regex, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** 与下方 `^#\\s+Plan:` 行匹配一致（多行、大小写不敏感）。非结构化流式正文若无此行则不必跑 flatten。 */
+export function streamingMayContainAgentPlanHeading(raw: string): boolean {
+	if (!raw) {
+		return false;
+	}
+	if (isStructuredAssistantMessage(raw)) {
+		return true;
+	}
+	return /^#\s+plan\s*:/im.test(raw);
 }
 
 export function usePlanSystem(
@@ -84,6 +98,9 @@ export function usePlanSystem(
 
 	const agentPlanPreviewMarkdown = useMemo(() => {
 		if (parsedPlan) return planBodyWithTodos(parsedPlan);
+		if (!streamingMayContainAgentPlanHeading(streaming)) {
+			return latestPersistedAgentPlanMarkdown;
+		}
 		const streamingText = flattenAssistantTextPartsForSearch(streaming);
 		const heading = streamingText.match(/^#\s+Plan:\s*.+$/m);
 		const streamingPreview = heading && heading.index !== undefined
@@ -134,10 +151,12 @@ export function usePlanSystem(
 	// ── Callbacks ──
 	const getLatestAgentPlan = useCallback((): ParsedPlan | null => {
 		if (parsedPlan) return parsedPlan;
-		const streamingText = flattenAssistantTextPartsForSearch(streaming);
-		const heading = streamingText.match(/^#\s+Plan:\s*.+$/m);
-		if (heading && heading.index !== undefined) {
-			return parsePlanDocument(streamingText.slice(heading.index).trim());
+		if (streamingMayContainAgentPlanHeading(streaming)) {
+			const streamingText = flattenAssistantTextPartsForSearch(streaming);
+			const heading = streamingText.match(/^#\s+Plan:\s*.+$/m);
+			if (heading && heading.index !== undefined) {
+				return parsePlanDocument(streamingText.slice(heading.index).trim());
+			}
 		}
 		const msgs = messagesRef.current;
 		for (let i = msgs.length - 1; i >= 0; i--) {

@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import type { EditorMainPanelProps } from '../EditorMainPanel';
 import type { EditorTab } from '../EditorTabBar';
 
@@ -28,7 +28,7 @@ export function useEditorMainPanelProps({
 	setEditorValue,
 	setOpenTabs,
 	onSelectTab: onSelectTabIn,
-	...editorRest
+	...er
 }: UseEditorMainPanelPropsParams): EditorMainPanelProps {
 	const openWorkspacePicker = useCallback(() => setWorkspacePickerOpen(true), [setWorkspacePickerOpen]);
 
@@ -54,19 +54,67 @@ export function useEditorMainPanelProps({
 	const onEditorValueChange = useCallback(
 		(value: string) => {
 			setEditorValue(value);
-			const fp = editorRest.filePath.trim();
+			const fp = er.filePath.trim();
 			setOpenTabs((prev) => prev.map((tab) => (tab.filePath === fp ? { ...tab, dirty: true } : tab)));
 		},
-		[setEditorValue, setOpenTabs, editorRest.filePath]
+		[setEditorValue, setOpenTabs, er.filePath]
 	);
 
-	return {
-		...editorRest,
-		openWorkspacePicker,
-		onLoadFile,
-		onSaveFile,
-		appendEditorTerminal,
-		onSelectTab,
-		onEditorValueChange,
-	};
+	return useMemo(
+		() => ({
+			...er,
+			openWorkspacePicker,
+			onLoadFile,
+			onSaveFile,
+			appendEditorTerminal,
+			onSelectTab,
+			onEditorValueChange,
+		}),
+		[
+			appendEditorTerminal,
+			onEditorValueChange,
+			onLoadFile,
+			onSaveFile,
+			onSelectTab,
+			openWorkspacePicker,
+			er.activeEditorInlineDiff,
+			er.activeTabId,
+			er.awaitingReply,
+			er.beginResizeEditorTerminal,
+			er.closeEditorTerminalPanel,
+			er.closeEditorTerminalSession,
+			er.editorCenterPlanCanBuild,
+			er.editorCenterPlanMarkdown,
+			er.editorPlanBuildModelId,
+			er.editorPlanFileIsBuilt,
+			er.editorSettings,
+			er.editorTerminalHeightPx,
+			er.editorTerminalSessions,
+			er.editorTerminalVisible,
+			er.editorValue,
+			er.filePath,
+			er.markdownPaneMode,
+			er.markdownPreviewContent,
+			er.modelPickerItems,
+			er.monacoChromeTheme,
+			er.monacoDocumentPath,
+			er.monacoOriginalDocumentPath,
+			er.onCloseTab,
+			er.onEditorTerminalSessionExit,
+			er.onExecutePlanFromEditor,
+			er.onMonacoDiffMount,
+			er.onMonacoMount,
+			er.onPlanBuild,
+			er.openTabs,
+			er.planFilePath,
+			er.planFileRelPath,
+			er.planReviewIsBuilt,
+			er.setActiveEditorTerminalId,
+			er.setEditorPlanBuildModelId,
+			er.setMarkdownPaneMode,
+			er.showEditorPlanDocumentInCenter,
+			er.showPlanFileEditorChrome,
+			er.t,
+		]
+	);
 }

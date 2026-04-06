@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import type { AgentRightSidebarProps } from '../AgentRightSidebar';
 
 export type UseAgentRightSidebarPropsParams = Omit<
@@ -29,10 +29,63 @@ export function useAgentRightSidebarProps(p: UseAgentRightSidebarPropsParams): A
 		[onExplorerOpenFile]
 	);
 
-	return {
-		...rest,
-		openView: openAgentRightSidebarView,
-		closeSidebar,
-		onOpenGitDiff,
-	};
+	return useMemo(
+		() => ({
+			...rest,
+			openView: openAgentRightSidebarView,
+			closeSidebar,
+			onOpenGitDiff,
+		}),
+		[
+			closeSidebar,
+			onOpenGitDiff,
+			openAgentRightSidebarView,
+			rest.t,
+			rest.open,
+			rest.view,
+			rest.hasAgentPlanSidebarContent,
+			rest.planPreviewTitle,
+			rest.planPreviewMarkdown,
+			rest.planDocumentMarkdown,
+			rest.planFileRelPath,
+			rest.planFilePath,
+			rest.agentPlanBuildModelId,
+			rest.setAgentPlanBuildModelId,
+			rest.modelPickerItems,
+			rest.awaitingReply,
+			rest.agentPlanEffectivePlan,
+			rest.onPlanBuild,
+			rest.planReviewIsBuilt,
+			rest.agentPlanTodoDoneCount,
+			rest.agentPlanTodos,
+			rest.onPlanAddTodo,
+			rest.planTodoDraftOpen,
+			rest.planTodoDraftInputRef,
+			rest.planTodoDraftText,
+			rest.setPlanTodoDraftText,
+			rest.onPlanAddTodoSubmit,
+			rest.onPlanAddTodoCancel,
+			rest.onPlanTodoToggle,
+			rest.agentFilePreview,
+			rest.openFileInTab,
+			rest.onAcceptAgentFilePreviewHunk,
+			rest.onRevertAgentFilePreviewHunk,
+			rest.agentFilePreviewBusyPatch,
+			rest.changeCount,
+			rest.gitUnavailableReason,
+			rest.gitLines,
+			rest.refreshGit,
+			rest.gitBranch,
+			rest.diffTotals,
+			rest.gitChangedPaths,
+			rest.diffPreviews,
+			rest.gitPathStatus,
+			rest.diffLoading,
+			rest.commitMsg,
+			rest.setCommitMsg,
+			rest.onCommitOnly,
+			rest.onCommitAndPush,
+			rest.gitActionError,
+		]
+	);
 }

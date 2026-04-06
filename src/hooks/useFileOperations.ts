@@ -10,6 +10,7 @@ import {
 	type EditorInlineDiffState,
 	type EditorPtySession,
 } from './useEditorTabs';
+import type { ShellLayoutMode } from '../app/shellLayoutStorage';
 
 export type AgentConversationFileOpenOptions = {
 	diff?: string | null;
@@ -18,14 +19,12 @@ export type AgentConversationFileOpenOptions = {
 
 type DiffPreview = { diff: string; isBinary: boolean; additions: number; deletions: number };
 
-type LayoutMode = 'agent' | 'editor';
-
 export type UseFileOperationsParams = {
 	shell: NonNullable<Window['asyncShell']> | undefined;
 	t: TFunction;
 	workspace: string | null;
-	layoutMode: LayoutMode;
-	setLayoutMode: (mode: LayoutMode) => void;
+	layoutMode: ShellLayoutMode;
+	setLayoutMode: (mode: ShellLayoutMode) => void;
 	currentId: string | null;
 	gitChangedPaths: string[];
 	gitStatusOk: boolean;

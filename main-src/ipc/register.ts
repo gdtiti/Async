@@ -2260,11 +2260,10 @@ ipcMain.handle(
 						return { ok: false as const, error: probe.message };
 					}
 					const gitTop = probe.topLevel;
-					const [porcelain, branch, branchListOut, fullDiffRaw] = await Promise.all([
+					const [porcelain, branch, branchListOut] = await Promise.all([
 						gitService.gitStatusPorcelain(),
 						gitService.gitBranch(),
 						gitService.gitListLocalBranches(),
-						gitService.gitDiffHeadUnified(root),
 					]);
 					const lines = porcelain ? porcelain.split('\n').filter(Boolean) : [];
 					const rawPathStatus = gitService.parseGitPathStatus(lines);
@@ -2285,7 +2284,6 @@ ipcMain.handle(
 							changedPaths.push(wsRel);
 						}
 					}
-					const previews = await gitService.buildDiffPreviewsMap(changedPaths, fullDiffRaw, root, gitTop);
 					return {
 						ok: true as const,
 						branch,
@@ -2294,7 +2292,6 @@ ipcMain.handle(
 						changedPaths,
 						branches: branchListOut.branches,
 						current: branchListOut.current,
-						previews,
 					};
 				} catch (e) {
 					return {

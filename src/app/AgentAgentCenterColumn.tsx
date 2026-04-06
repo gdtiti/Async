@@ -1,0 +1,86 @@
+import { memo, type KeyboardEvent } from 'react';
+import { AgentChatPanel, type AgentChatPanelProps } from '../AgentChatPanel';
+import { IconDoc, IconGitSCM } from '../icons';
+import type { TFunction } from '../i18n';
+
+export type AgentRightSidebarView = 'git' | 'plan' | 'file';
+
+export type AgentAgentCenterColumnProps = {
+	t: TFunction;
+	hasConversation: boolean;
+	workspace: string | null;
+	workspaceBasename: string;
+	currentThreadTitle: string;
+	onPlanNewIdea: (e: KeyboardEvent) => void;
+	hasAgentPlanSidebarContent: boolean;
+	agentRightSidebarOpen: boolean;
+	agentRightSidebarView: AgentRightSidebarView;
+	toggleAgentRightSidebarView: (view: AgentRightSidebarView) => void;
+	chatPanelProps: Omit<AgentChatPanelProps, 'layout'>;
+};
+
+/** Agent 布局中间列：上下文条 + 右侧栏切换 + 对话面板；memo 以便在 Git 等兄弟域重渲染时跳过本列 reconciliation */
+export const AgentAgentCenterColumn = memo(function AgentAgentCenterColumn({
+	t,
+	hasConversation,
+	workspace,
+	workspaceBasename,
+	currentThreadTitle,
+	onPlanNewIdea,
+	hasAgentPlanSidebarContent,
+	agentRightSidebarOpen,
+	agentRightSidebarView,
+	toggleAgentRightSidebarView,
+	chatPanelProps,
+}: AgentAgentCenterColumnProps) {
+	return (
+		<main
+			className={`ref-center ref-center--agent-layout ${hasConversation ? 'ref-center--chat' : 'ref-center--empty-agent'}`}
+			aria-label={t('app.commandCenter')}
+			onKeyDown={onPlanNewIdea}
+		>
+			<div className="ref-context-block ref-context-block--agent">
+				<div className="ref-context-line">
+					<span className="ref-agent-context-pill">
+						<IconDoc className="ref-context-icon" />
+						<span className="ref-context-title">{workspace ? workspaceBasename : t('app.noWorkspace')}</span>
+					</span>
+				</div>
+				{hasConversation ? (
+					<div className="ref-context-sub ref-context-sub--agent" title={currentThreadTitle}>
+						{currentThreadTitle}
+					</div>
+				) : null}
+			</div>
+
+			<div className="ref-agent-rail-toggle-group" aria-label={t('app.rightSidebarViews')}>
+				{hasAgentPlanSidebarContent ? (
+					<button
+						type="button"
+						className={`ref-agent-rail-toggle ${agentRightSidebarOpen && agentRightSidebarView === 'plan' ? 'is-open' : ''}`}
+						onClick={() => toggleAgentRightSidebarView('plan')}
+						title={t('app.tabPlan')}
+						aria-label={t('app.tabPlan')}
+						aria-pressed={agentRightSidebarOpen && agentRightSidebarView === 'plan'}
+						aria-controls="agent-right-sidebar"
+					>
+						<IconDoc />
+					</button>
+				) : null}
+				<button
+					type="button"
+					className={`ref-agent-rail-toggle ${agentRightSidebarOpen && agentRightSidebarView === 'git' ? 'is-open' : ''}`}
+					onClick={() => toggleAgentRightSidebarView('git')}
+					title={t('app.tabGit')}
+					aria-label={t('app.tabGit')}
+					aria-pressed={agentRightSidebarOpen && agentRightSidebarView === 'git'}
+					aria-controls="agent-right-sidebar"
+				>
+					<IconGitSCM />
+				</button>
+			</div>
+
+			<AgentChatPanel layout="agent-center" {...chatPanelProps} />
+		</main>
+	);
+});
