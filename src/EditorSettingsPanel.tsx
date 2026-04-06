@@ -33,9 +33,10 @@ export const defaultEditorSettings = (): EditorSettings => ({
 	autoSave: 'off',
 });
 
-/** 将 EditorSettings 映射为 Monaco IEditorOptions */
+/** 将 EditorSettings 映射为 Monaco IEditorOptions（主编辑区为只读预览器） */
 export function editorSettingsToMonacoOptions(s: EditorSettings): Record<string, unknown> {
 	return {
+		readOnly: true,
 		tabSize: s.tabSize,
 		insertSpaces: s.insertSpaces,
 		wordWrap: s.wordWrap,
@@ -70,41 +71,9 @@ export function EditorSettingsPanel({ value, onChange }: Props) {
 				{t('editorSettings.lead')}
 			</p>
 
-			{/* ─── Text & Formatting ─── */}
+			{/* ─── Text & Formatting（只读预览：隐藏 Tab/空格等编辑相关项）── */}
 			<section className="ref-settings-agent-section" aria-labelledby="editor-text-h">
 				<h2 id="editor-text-h" className="ref-settings-agent-section-title">{t('editorSettings.textFormatting')}</h2>
-
-				<label className="ref-settings-field ref-settings-field--compact">
-					<span>{t('editorSettings.tabSize')}</span>
-					<VoidSelect
-						ariaLabel={t('editorSettings.tabSize')}
-						value={String(v.tabSize)}
-						onChange={(s) => patch({ tabSize: Number(s) })}
-						options={[
-							{ value: '2', label: '2' },
-							{ value: '4', label: '4' },
-							{ value: '8', label: '8' },
-						]}
-					/>
-				</label>
-
-				<div className="ref-settings-agent-card">
-					<div className="ref-settings-agent-card-row">
-						<div>
-							<div className="ref-settings-agent-card-title">{t('editorSettings.insertSpaces')}</div>
-							<p className="ref-settings-agent-card-desc">{t('editorSettings.insertSpacesDesc')}</p>
-						</div>
-						<button
-							type="button"
-							className={`ref-settings-toggle ${v.insertSpaces ? 'is-on' : ''}`}
-							role="switch"
-							aria-checked={v.insertSpaces}
-							onClick={() => patch({ insertSpaces: !v.insertSpaces })}
-						>
-							<span className="ref-settings-toggle-knob" />
-						</button>
-					</div>
-				</div>
 
 				<label className="ref-settings-field ref-settings-field--compact">
 					<span>{t('editorSettings.wordWrap')}</span>
@@ -182,20 +151,6 @@ export function EditorSettingsPanel({ value, onChange }: Props) {
 					/>
 				</label>
 
-				<label className="ref-settings-field ref-settings-field--compact">
-					<span>{t('editorSettings.cursorStyle')}</span>
-					<VoidSelect
-						ariaLabel={t('editorSettings.cursorStyle')}
-						value={v.cursorStyle}
-						onChange={(s) => patch({ cursorStyle: s as EditorSettings['cursorStyle'] })}
-						options={[
-							{ value: 'line', label: 'Line' },
-							{ value: 'block', label: 'Block' },
-							{ value: 'underline', label: 'Underline' },
-						]}
-					/>
-				</label>
-
 				<div className="ref-settings-agent-card">
 					<div className="ref-settings-agent-card-row">
 						<div>
@@ -250,42 +205,6 @@ export function EditorSettingsPanel({ value, onChange }: Props) {
 				</div>
 			</section>
 
-			{/* ─── Save Behavior ─── */}
-			<section className="ref-settings-agent-section" aria-labelledby="editor-save-h">
-				<h2 id="editor-save-h" className="ref-settings-agent-section-title">{t('editorSettings.saveBehavior')}</h2>
-
-				<div className="ref-settings-agent-card">
-					<div className="ref-settings-agent-card-row">
-						<div>
-							<div className="ref-settings-agent-card-title">{t('editorSettings.formatOnSave')}</div>
-							<p className="ref-settings-agent-card-desc">{t('editorSettings.formatOnSaveDesc')}</p>
-						</div>
-						<button
-							type="button"
-							className={`ref-settings-toggle ${v.formatOnSave ? 'is-on' : ''}`}
-							role="switch"
-							aria-checked={v.formatOnSave}
-							onClick={() => patch({ formatOnSave: !v.formatOnSave })}
-						>
-							<span className="ref-settings-toggle-knob" />
-						</button>
-					</div>
-				</div>
-
-				<label className="ref-settings-field ref-settings-field--compact">
-					<span>{t('editorSettings.autoSave')}</span>
-					<VoidSelect
-						ariaLabel={t('editorSettings.autoSave')}
-						value={v.autoSave}
-						onChange={(s) => patch({ autoSave: s as EditorSettings['autoSave'] })}
-						options={[
-							{ value: 'off', label: 'Off' },
-							{ value: 'afterDelay', label: 'After Delay' },
-							{ value: 'onFocusChange', label: 'On Focus Change' },
-						]}
-					/>
-				</label>
-			</section>
 		</div>
 	);
 }

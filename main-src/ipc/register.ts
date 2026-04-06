@@ -119,7 +119,6 @@ import { registerTerminalPtyIpc } from '../terminalPty.js';
 import {
 	getTsLspSessionForWebContents,
 	disposeTsLspSessionForWebContents,
-	disposeAllTsLspSessions,
 } from '../lspSessionsByWebContents.js';
 import { setDelegateContext, clearDelegateContext } from '../agent/toolExecutor.js';
 import {
@@ -955,9 +954,6 @@ export function registerIpc(): void {
 		}
 		if (idx?.semanticIndexEnabled === false) {
 			clearWorkspaceSemanticIndex();
-		}
-		if (idx?.tsLspEnabled === false) {
-			void disposeAllTsLspSessions();
 		}
 		const syncedColorMode = next.ui?.colorMode;
 		if (syncedColorMode === 'light' || syncedColorMode === 'dark' || syncedColorMode === 'system') {

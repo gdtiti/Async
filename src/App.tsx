@@ -111,8 +111,6 @@ import { isPlanMdPath, planExecutedKey } from './planExecutedKey';
 import { MenubarFileMenu } from './MenubarFileMenu';
 import { MenubarWindowMenu } from './MenubarWindowMenu';
 import { QuickOpenPalette, quickOpenPrimaryShortcutLabel, saveShortcutLabel } from './quickOpenPalette';
-import { registerTsLspMonacoOnce } from './tsLspMonaco';
-import { monacoWorkspaceRootRef } from './tsLspWorkspaceRef';
 import { workspaceRelativeFileUrl } from './workspaceUri';
 import { voidShellDebugLog } from './tabCloseDebug';
 import {
@@ -168,32 +166,12 @@ import {
 	type AppLocale,
 	type TFunction,
 } from './i18n';
-import './monacoSetup';
-
-
-function debugDiffHead(diff: string, max = 160): string {
-	return diff.replace(/\s+/g, ' ').slice(0, max);
-}
-
-function diffCreatesNewFile(diff: string | null | undefined): boolean {
-	const text = String(diff ?? '');
-	return /^new file mode\s/m.test(text) || /^---\s+\/dev\/null$/m.test(text);
-}
+import { hideBootSplash } from './bootSplash';
+import { debugDiffHead, diffCreatesNewFile, sameStringArray } from './appDiffUtils';
 
 type DiffPreview = { diff: string; isBinary: boolean; additions: number; deletions: number };
 const DEFAULT_SIDEBAR_LAYOUT_KEY = 'async:sidebar-widths-v1';
 const DEFAULT_SHELL_LAYOUT_MODE_KEY = 'async:shell-layout-mode-v1';
-function sameStringArray(a: string[], b: string[]): boolean {
-	if (a.length !== b.length) {
-		return false;
-	}
-	for (let i = 0; i < a.length; i += 1) {
-		if (a[i] !== b[i]) {
-			return false;
-		}
-	}
-	return true;
-}
 
 
 const RESIZE_HANDLE_PX = 5;
@@ -465,7 +443,6 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 	const { t, setLocale, locale } = useI18n();
 	const [ipcOk, setIpcOk] = useState<string>('…');
 
-	// indexingSettings 前置声明，供 useWorkspaceManager 的 tsLspEnabled 使用
 	// 初始值为默认值，init effect 加载完 settings:get 后会 setIndexingSettings 更新
 	const [indexingSettings, setIndexingSettings] = useState<IndexingSettingsState>(() => normalizeIndexingSettings());
 
@@ -484,8 +461,9 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 		setHiddenAgentWorkspacePaths,
 		collapsedAgentWorkspacePaths,
 		setCollapsedAgentWorkspacePaths,
-		tsLspStatus,
-	} = useWorkspaceManager(shell, indexingSettings.tsLspEnabled);
+	} = useWorkspaceManager(shell, {
+		deferWorkspaceFileList: layoutPinnedBySurface && appSurface === 'agent',
+	});
 
 	const {
 		gitBranch,
@@ -1501,6 +1479,7 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 	useEffect(() => {
 		if (!shell) {
 			setIpcOk(t('app.ipcBrowserOnly'));
+			hideBootSplash();
 			return;
 		}
 		void (async () => {
@@ -1513,27 +1492,13 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 					typeof window !== 'undefined' &&
 					(window.location.search.includes('blank=1') || window.location.hash.includes('blank'));
 
-				// 第一批：互不依赖的 IPC 并行发送
-				const [p, w, paths] = await Promise.all([
+				// 首屏：ping / workspace / paths / settings / threads 一次并行，减少串行等待
+				const [p, w, paths, st] = await Promise.all([
 					shell.invoke('async-shell:ping') as Promise<{ ok: boolean; message: string }>,
 					isBlankWindow
 						? Promise.resolve({ root: null } as { root: string | null })
 						: (shell.invoke('workspace:get') as Promise<{ root: string | null }>),
 					shell.invoke('app:getPaths') as Promise<{ home?: string }>,
-				]);
-				_lap('batch1 (ping/workspace/paths)');
-				setIpcOk(p.ok ? t('app.ipcReady', { message: p.message }) : t('app.ipcError'));
-				if (!isBlankWindow) {
-					setWorkspace(w.root);
-				}
-				if (paths.home) {
-					setHomePath(paths.home);
-				}
-
-				// 第二批：threads 与 settings 并行加载
-				_lap('batch2 start');
-				const [, st] = await Promise.all([
-					refreshThreads(),
 					shell.invoke('settings:get') as Promise<{
 						language?: string;
 						defaultModel?: string;
@@ -1565,10 +1530,18 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 						indexing?: {
 							symbolIndexEnabled?: boolean;
 							semanticIndexEnabled?: boolean;
-							tsLspEnabled?: boolean;
 						};
 					}>,
+					refreshThreads(),
 				]);
+				_lap('batch1 (ping/workspace/paths/settings/threads)');
+				setIpcOk(p.ok ? t('app.ipcReady', { message: p.message }) : t('app.ipcError'));
+				if (!isBlankWindow) {
+					setWorkspace(w.root);
+				}
+				if (paths.home) {
+					setHomePath(paths.home);
+				}
 
 				setLocale(normalizeLocale(st.language));
 				const sl = st.ui?.sidebarLayout;
@@ -1607,20 +1580,38 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 				writeStoredColorMode(nextColorMode);
 				const appearanceScheme = resolveEffectiveScheme(nextColorMode, readPrefersDark());
 				setAppearanceSettings(normalizeAppearanceSettings(st.ui, appearanceScheme));
-				_lap('batch2 (threads/settings + state apply)');
+				_lap('settings state applied');
 
-				// 第三批：MCP 服务器状态与 Git 状态并行加载
-				const [mcpSt, mcpStatusRes] = await Promise.all([
-					shell.invoke('mcp:getServers') as Promise<{ servers?: McpServerConfig[] } | undefined>,
-					shell.invoke('mcp:getStatuses') as Promise<{ statuses?: McpServerStatus[] } | undefined>,
-				]);
-				setMcpServers(mcpSt?.servers ?? []);
-				setMcpStatuses(mcpStatusRes?.statuses ?? []);
-				_lap('batch3 (mcp)');
+				hideBootSplash();
+
+				// MCP：非首屏关键路径，空闲时再拉取，避免与首屏渲染抢主线程
+				const deferNonCritical = (fn: () => void) => {
+					if (typeof requestIdleCallback === 'function') {
+						requestIdleCallback(() => fn(), { timeout: 4000 });
+					} else {
+						window.setTimeout(fn, 0);
+					}
+				};
+				deferNonCritical(() => {
+					void (async () => {
+						try {
+							const [mcpSt, mcpStatusRes] = await Promise.all([
+								shell.invoke('mcp:getServers') as Promise<{ servers?: McpServerConfig[] } | undefined>,
+								shell.invoke('mcp:getStatuses') as Promise<{ statuses?: McpServerStatus[] } | undefined>,
+							]);
+							setMcpServers(mcpSt?.servers ?? []);
+							setMcpStatuses(mcpStatusRes?.statuses ?? []);
+							_lap('mcp (deferred)');
+						} catch {
+							/* optional */
+						}
+					})();
+				});
 				// refreshGit 不阻塞 UI 渲染，fire-and-forget
 				void refreshGit();
 				_lap('init complete');
 			} catch (e) {
+				hideBootSplash();
 				setIpcOk(String(e));
 			}
 		})();
@@ -1675,10 +1666,6 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 		}
 		void loadMessages(currentId);
 	}, [shell, currentId, loadMessages]);
-
-	useEffect(() => {
-		monacoWorkspaceRootRef.current = workspace;
-	}, [workspace]);
 
 	const applyWorkspacePath = useCallback(
 		async (next: string) => {
@@ -1737,42 +1724,27 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 
 	const runMonacoEditCommand = useCallback(
 		async (kind: 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'selectAll') => {
+			/* 主编辑区为只读预览器：仅允许复制与全选 */
+			if (kind === 'undo' || kind === 'redo' || kind === 'cut' || kind === 'paste') {
+				return false;
+			}
 			const ed = monacoEditorRef.current;
 			if (!ed || !(ed.hasTextFocus?.() || ed.hasWidgetFocus?.())) {
 				return false;
 			}
 			ed.focus();
-			if (kind === 'undo' || kind === 'redo' || kind === 'selectAll') {
+			if (kind === 'selectAll') {
 				ed.trigger('menu', kind, null);
 				return true;
 			}
-			if (kind === 'copy' || kind === 'cut') {
-				const actionId = kind === 'copy' ? 'editor.action.clipboardCopyAction' : 'editor.action.clipboardCutAction';
-				const action = ed.getAction(actionId);
-				if (action) {
-					await action.run();
-					return true;
-				}
-				return false;
+			const action = ed.getAction('editor.action.clipboardCopyAction');
+			if (action) {
+				await action.run();
+				return true;
 			}
-			const text = await readClipboardText();
-			const sels = ed.getSelections();
-			if (!sels || sels.length === 0) {
-				return false;
-			}
-			ed.pushUndoStop();
-			ed.executeEdits(
-				'menu-paste',
-				sels.map((sel) => ({
-					range: sel,
-					text,
-					forceMoveMarkers: true,
-				}))
-			);
-			ed.pushUndoStop();
-			return true;
+			return false;
 		},
-		[readClipboardText]
+		[]
 	);
 
 	const runDomEditCommand = useCallback(
@@ -2425,7 +2397,6 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 			indexing: {
 				symbolIndexEnabled: indexingSettings.symbolIndexEnabled,
 				semanticIndexEnabled: indexingSettings.semanticIndexEnabled,
-				tsLspEnabled: indexingSettings.tsLspEnabled,
 			},
 			mcp: { servers: mcpServers },
 			ui: {
@@ -2972,18 +2943,6 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 		}
 	}, [shell]);
 
-	// Cmd+S / Ctrl+S keyboard shortcut
-	useEffect(() => {
-		const handler = (e: KeyboardEvent) => {
-			if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-				e.preventDefault();
-				void onSaveFile();
-			}
-		};
-		window.addEventListener('keydown', handler);
-		return () => window.removeEventListener('keydown', handler);
-	});
-
 	const onAgentConversationOpenFile = useCallback(
 		async (
 			rel: string,
@@ -3328,38 +3287,17 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 			setAgentRightSidebarView(hasAgentPlanSidebarContent ? 'plan' : 'git');
 		}
 	}, [agentFilePreview, agentRightSidebarView, hasAgentPlanSidebarContent, workspace]);
-	const onMonacoMount = useCallback(
-		(ed: MonacoEditorNS.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
-			monacoDiffChangeDisposableRef.current?.dispose();
-			monacoDiffChangeDisposableRef.current = null;
-			monacoEditorRef.current = ed;
-			if (shell) {
-				registerTsLspMonacoOnce(monaco, shell, workspace);
-			}
-		},
-		[shell, workspace]
-	);
+	const onMonacoMount = useCallback((ed: MonacoEditorNS.IStandaloneCodeEditor) => {
+		monacoDiffChangeDisposableRef.current?.dispose();
+		monacoDiffChangeDisposableRef.current = null;
+		monacoEditorRef.current = ed;
+	}, []);
 
-	const onMonacoDiffMount = useCallback(
-		(diffEditor: MonacoEditorNS.IStandaloneDiffEditor, monaco: typeof import('monaco-editor')) => {
-			const modifiedEditor = diffEditor.getModifiedEditor();
-			const modifiedModel = modifiedEditor.getModel();
-			monacoDiffChangeDisposableRef.current?.dispose();
-			monacoDiffChangeDisposableRef.current =
-				modifiedModel?.onDidChangeContent(() => {
-					const nextValue = modifiedEditor.getValue();
-					setEditorValue(nextValue);
-					setOpenTabs((prev) =>
-						prev.map((tab) => (tab.filePath === filePath.trim() ? { ...tab, dirty: true } : tab))
-					);
-				}) ?? null;
-			monacoEditorRef.current = modifiedEditor;
-			if (shell) {
-				registerTsLspMonacoOnce(monaco, shell, workspace);
-			}
-		},
-		[filePath, setEditorValue, setOpenTabs, shell, workspace]
-	);
+	const onMonacoDiffMount = useCallback((diffEditor: MonacoEditorNS.IStandaloneDiffEditor) => {
+		monacoDiffChangeDisposableRef.current?.dispose();
+		monacoDiffChangeDisposableRef.current = null;
+		monacoEditorRef.current = diffEditor.getModifiedEditor();
+	}, []);
 
 	const searchWorkspaceSymbolsFn = useCallback(
 		async (query: string) => {
@@ -3374,31 +3312,6 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 		},
 		[shell]
 	);
-
-	const tsLspPillTitle = useMemo(() => {
-		if (!workspace) {
-			return t('app.lspSoon');
-		}
-		if (tsLspStatus === 'starting') {
-			return t('app.lspStarting');
-		}
-		if (tsLspStatus === 'ready') {
-			return t('app.lspReady');
-		}
-		if (tsLspStatus === 'error') {
-			return t('app.lspUnavailable');
-		}
-		return t('app.lspSoon');
-	}, [workspace, tsLspStatus, t]);
-
-	const tsLspPillClassName =
-		tsLspStatus === 'ready'
-			? 'ref-lsp-pill ref-lsp-pill--ready'
-			: tsLspStatus === 'starting'
-				? 'ref-lsp-pill ref-lsp-pill--starting'
-				: tsLspStatus === 'error'
-					? 'ref-lsp-pill ref-lsp-pill--error'
-					: 'ref-lsp-pill';
 
 	const openQuickOpen = useCallback((seed = '') => {
 		setQuickOpenSeed(seed);
@@ -5157,8 +5070,6 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 		filePath: filePath.trim(),
 		markdownPaneMode,
 		setMarkdownPaneMode,
-		tsLspPillClassName,
-		tsLspPillTitle,
 		showPlanFileEditorChrome,
 		editorPlanFileIsBuilt,
 		onExecutePlanFromEditor,
@@ -5227,7 +5138,7 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 									isDesktopShell={!!shell}
 									hasWorkspace={!!workspace}
 									folderRecents={folderRecents}
-									canSave={!!shell && !!workspace && !!filePath.trim()}
+									canSave={false}
 									canEditorClose={!!activeTabId}
 									canCloseFolder={!!shell && !!workspace}
 									shortcutSave={saveShortcutLabel()}

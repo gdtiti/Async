@@ -25,12 +25,20 @@ function writeJsonStorage(key: string, value: unknown) {
 	}
 }
 
+export type UseWorkspaceManagerOpts = {
+	/**
+	 * Agent 专用窗口首帧优先对话区：工作区文件列表稍后在空闲时拉取，减轻与首屏 IPC/React 争用。
+	 */
+	deferWorkspaceFileList?: boolean;
+};
+
 /**
- * 管理工作区核心状态：路径、文件列表、最近列表、别名、TS LSP 状态。
+ * 管理工作区核心状态：路径、文件列表、最近列表、别名。
  * Action callbacks（applyWorkspacePath 等）由调用方用返回的 setters 自行组合，
  * 避免与 clearWorkspaceConversationState / refreshThreads 产生循环依赖。
  */
-export function useWorkspaceManager(shell: Shell | undefined, tsLspEnabled: boolean) {
+export function useWorkspaceManager(shell: Shell | undefined, opts?: UseWorkspaceManagerOpts) {
+	const deferFileList = opts?.deferWorkspaceFileList === true;
 	const [workspace, setWorkspace] = useState<string | null>(null);
 	const [workspaceFileList, setWorkspaceFileList] = useState<string[]>([]);
 	const [homeRecents, setHomeRecents] = useState<string[]>([]);
@@ -45,7 +53,6 @@ export function useWorkspaceManager(shell: Shell | undefined, tsLspEnabled: bool
 	const [collapsedAgentWorkspacePaths, setCollapsedAgentWorkspacePaths] = useState<string[]>(() =>
 		readJsonStorage<string[]>(AGENT_WORKSPACE_COLLAPSED_KEY, [])
 	);
-	const [tsLspStatus, setTsLspStatus] = useState<'off' | 'starting' | 'ready' | 'error'>('off');
 
 	// ── 持久化 ────────────────────────────────────────────────────────────────
 
@@ -69,17 +76,41 @@ export function useWorkspaceManager(shell: Shell | undefined, tsLspEnabled: bool
 			return;
 		}
 		let cancelled = false;
-		void (async () => {
-			const r = (await shell.invoke('workspace:listFiles')) as
-				| { ok: true; paths: string[] }
-				| { ok: false; error?: string };
-			if (cancelled) return;
-			setWorkspaceFileList(r.ok && Array.isArray(r.paths) ? r.paths : []);
-		})();
+		const loadList = () => {
+			void (async () => {
+				const r = (await shell.invoke('workspace:listFiles')) as
+					| { ok: true; paths: string[] }
+					| { ok: false; error?: string };
+				if (cancelled) return;
+				setWorkspaceFileList(r.ok && Array.isArray(r.paths) ? r.paths : []);
+			})();
+		};
+		if (!deferFileList) {
+			loadList();
+			return () => {
+				cancelled = true;
+			};
+		}
+		if (typeof requestIdleCallback === 'function') {
+			const idleId = requestIdleCallback(
+				() => {
+					if (!cancelled) loadList();
+				},
+				{ timeout: 2500 }
+			);
+			return () => {
+				cancelled = true;
+				cancelIdleCallback(idleId);
+			};
+		}
+		const t = window.setTimeout(() => {
+			if (!cancelled) loadList();
+		}, 0);
 		return () => {
 			cancelled = true;
+			window.clearTimeout(t);
 		};
-	}, [shell, workspace]);
+	}, [shell, workspace, deferFileList]);
 
 	// ── 最近工作区 ────────────────────────────────────────────────────────────
 
@@ -118,25 +149,12 @@ export function useWorkspaceManager(shell: Shell | undefined, tsLspEnabled: bool
 	}, [workspace]);
 
 	// ── TS LSP ────────────────────────────────────────────────────────────────
+	// 不在渲染进程自动启动 language server。关闭工作区时通知主进程停止会话。
 
 	useEffect(() => {
-		if (!shell) return;
-		if (!workspace || !tsLspEnabled) {
-			setTsLspStatus('off');
-			void shell.invoke('lsp:ts:stop').catch(() => {});
-			return;
-		}
-		let cancelled = false;
-		setTsLspStatus('starting');
-		void shell.invoke('lsp:ts:start', workspace).then((r: unknown) => {
-			if (cancelled) return;
-			const ok = (r as { ok?: boolean })?.ok;
-			setTsLspStatus(ok ? 'ready' : 'error');
-		});
-		return () => {
-			cancelled = true;
-		};
-	}, [shell, workspace, tsLspEnabled]);
+		if (!shell || workspace) return;
+		void shell.invoke('lsp:ts:stop').catch(() => {});
+	}, [shell, workspace]);
 
 	return {
 		workspace,
@@ -152,7 +170,5 @@ export function useWorkspaceManager(shell: Shell | undefined, tsLspEnabled: bool
 		setHiddenAgentWorkspacePaths,
 		collapsedAgentWorkspacePaths,
 		setCollapsedAgentWorkspacePaths,
-		tsLspStatus,
-		setTsLspStatus,
 	};
 }

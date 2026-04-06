@@ -70,13 +70,13 @@ export type ShellUiSettings = {
 	layoutMode?: 'agent' | 'editor';
 };
 
-/** 工作区索引与语言服务（未设置字段视为开启，与旧 settings.json 兼容） */
+/** 工作区索引（未设置字段视为开启，与旧 settings.json 兼容） */
 export type ShellIndexingSettings = {
 	/** 导出符号索引：Quick Open @、search_files(symbol) */
 	symbolIndexEnabled?: boolean;
 	/** 本地 TF-IDF 语义块：构建索引并注入 Agent/Plan/Debug 对话上下文 */
 	semanticIndexEnabled?: boolean;
-	/** TypeScript/JavaScript 语言服务（跳转定义等） */
+	/** @deprecated 已废弃；始终视为开启，按需为 Agent 工具启动 LSP */
 	tsLspEnabled?: boolean;
 	/** 在 Agent/Plan/Debug 对话中注入当前 git 分支、状态和最近提交摘要 */
 	gitContextEnabled?: boolean;
@@ -387,6 +387,18 @@ function migrateProviderModelLayout(settings: ShellSettings): { next: ShellSetti
 	};
 }
 
+/** 旧版「关闭 TS LSP」开关已移除；读入时统一视为开启 */
+function migrateIndexingTsLspAlwaysOn(settings: ShellSettings): { next: ShellSettings; didMutate: boolean } {
+	const idx = settings.indexing;
+	if (idx?.tsLspEnabled === false) {
+		return {
+			next: { ...settings, indexing: { ...idx, tsLspEnabled: true } },
+			didMutate: true,
+		};
+	}
+	return { next: settings, didMutate: false };
+}
+
 function migrateDefaultModelRemoveAuto(settings: ShellSettings): { next: ShellSettings; didMutate: boolean } {
 	const dm = settings.defaultModel;
 	if (typeof dm !== 'string') {
@@ -418,7 +430,9 @@ export function initSettingsStore(userData: string): void {
 	cached = migratedPm.next;
 	const migrated = migrateThinkingByModel(cached);
 	cached = migrated.next;
-	if (migratedDm.didMutate || migratedPm.didMutate || migrated.didMutate) {
+	const migratedLsp = migrateIndexingTsLspAlwaysOn(cached);
+	cached = migratedLsp.next;
+	if (migratedDm.didMutate || migratedPm.didMutate || migrated.didMutate || migratedLsp.didMutate) {
 		save();
 	} else if (!fs.existsSync(settingsPath)) {
 		save();
@@ -451,7 +465,7 @@ export function patchSettings(partial: Partial<ShellSettings>): ShellSettings {
 
 	const mergedIndexing =
 		partialIndexing !== undefined
-			? { ...INDEXING_DEFAULTS, ...(cached.indexing ?? {}), ...partialIndexing }
+			? { ...INDEXING_DEFAULTS, ...(cached.indexing ?? {}), ...partialIndexing, tsLspEnabled: true }
 			: cached.indexing;
 
 	const nextModels =

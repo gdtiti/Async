@@ -13,6 +13,9 @@ export default defineConfig({
 			output: {
 				manualChunks: {
 					monaco: ['monaco-editor'],
+					xterm: ['@xterm/xterm', '@xterm/addon-fit'],
+					markdown: ['react-markdown', 'remark-gfm'],
+					charts: ['recharts'],
 				},
 			},
 		},

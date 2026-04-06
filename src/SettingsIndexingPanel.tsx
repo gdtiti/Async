@@ -129,21 +129,6 @@ export function SettingsIndexingPanel({ value, onChange, onPersistPatch, shell, 
 			<div className="ref-settings-agent-card">
 				<div className="ref-settings-agent-card-row">
 					<div>
-						<div className="ref-settings-agent-card-title">{t('settings.indexing.tsLsp')}</div>
-						<p className="ref-settings-agent-card-desc">{t('settings.indexing.tsLspDesc')}</p>
-					</div>
-					<button
-						type="button"
-						className={`ref-settings-toggle ${value.tsLspEnabled ? 'is-on' : ''}`}
-						role="switch"
-						aria-checked={value.tsLspEnabled}
-						onClick={() => patchToggle('tsLspEnabled', !value.tsLspEnabled)}
-					>
-						<span className="ref-settings-toggle-knob" />
-					</button>
-				</div>
-				<div className="ref-settings-agent-card-row" style={{ marginTop: 12 }}>
-					<div>
 						<div className="ref-settings-agent-card-title">{t('settings.indexing.symbolIndex')}</div>
 						<p className="ref-settings-agent-card-desc">{t('settings.indexing.symbolIndexDesc')}</p>
 					</div>

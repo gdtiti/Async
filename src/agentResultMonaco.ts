@@ -2,9 +2,24 @@
  * 用 Monaco 的 colorize 为 Agent 结果卡片生成行级 HTML（与主编辑器主题一致）。
  *
  * 全局最多并发 2 次 Monaco colorize，避免多卡片同时抢主线程 / worker。
+ *
+ * Monaco 通过动态 import() 延迟加载：只有当卡片首次需要语法着色时才拉取 monaco chunk，
+ * 避免 Agent 窗口在首屏就同步加载 3MB+ 的 monaco-editor 包。
  */
-import * as monaco from 'monaco-editor';
 import { getVoidMonacoThemeFromDom } from './colorMode';
+
+let _monacoModule: typeof import('monaco-editor') | null = null;
+
+async function getMonaco(): Promise<typeof import('monaco-editor')> {
+	if (_monacoModule) return _monacoModule;
+	// 动态加载时先确保主题已注册（monacoSetup 是幂等的，多次 import 安全）
+	const [monacoMod] = await Promise.all([
+		import('monaco-editor'),
+		import('./monacoSetup'),
+	]);
+	_monacoModule = monacoMod;
+	return monacoMod;
+}
 
 const COLORIZE_MAX_PARALLEL = 2;
 let colorizeActive = 0;
@@ -107,6 +122,7 @@ async function colorizeJoinedLinesDirect(
 	if (lines.length === 0) return [];
 	const text = lines.join('\n');
 	try {
+		const monaco = await getMonaco();
 		monaco.editor.setTheme(getVoidMonacoThemeFromDom());
 		const html = await monaco.editor.colorize(text, languageId, { tabSize: 2 });
 		let out = splitMonacoColorizedHtml(html);
@@ -135,6 +151,7 @@ async function colorizeSearchMatchLinesDirect(
 ): Promise<(string | null)[] | null> {
 	if (lines.length === 0) return [];
 	try {
+		const monaco = await getMonaco();
 		monaco.editor.setTheme(getVoidMonacoThemeFromDom());
 		type Bucket = { indices: number[]; texts: string[] };
 		const buckets = new Map<string, Bucket>();

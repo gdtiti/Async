@@ -86,6 +86,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@chenglou/pretext": "^0.0.3",
+    "@fontsource/inter": "^5.2.5",
     "@google/generative-ai": "^0.21.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@monaco-editor/react": "^4.6.0",

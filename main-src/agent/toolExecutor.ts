@@ -12,7 +12,7 @@ import { formatSymbolSearchResults, searchWorkspaceSymbols, ensureSymbolIndexLoa
 import type { ToolCall, ToolResult } from './agentTools.js';
 import { TsLspSession } from '../lsp/tsLspSession.js';
 import type { AgentLoopOptions, AgentLoopHandlers } from './agentLoop.js';
-import type { ShellSettings } from '../settingsStore.js';
+import { getSettings, type ShellSettings } from '../settingsStore.js';
 import { getMcpManager } from '../mcp/index.js';
 import type { McpToolResult } from '../mcp/mcpTypes.js';
 import type { NestedAgentStreamEmit } from '../ipc/nestedAgentStream.js';
@@ -881,13 +881,27 @@ async function executeGetDiagnostics(call: ToolCall, execCtx: ToolExecutionConte
 	}
 
 	const lsp = execCtx.toolLspSession;
-	if (!lsp?.isRunning) {
+	if (!lsp) {
 		return {
 			toolCallId: call.id,
 			name: call.name,
-			content: 'TypeScript language server is not running. Open a workspace with TypeScript files to start it.',
+			content: 'TypeScript language server session is not available.',
 			isError: true,
 		};
+	}
+
+	if (!lsp.isRunning) {
+		try {
+			const root = requireWorkspace(execCtx);
+			await lsp.start(root);
+		} catch (e) {
+			return {
+				toolCallId: call.id,
+				name: call.name,
+				content: `Could not start TypeScript language server: ${e instanceof Error ? e.message : String(e)}`,
+				isError: true,
+			};
+		}
 	}
 
 	const full = safePath(relPath, execCtx);

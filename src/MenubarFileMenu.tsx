@@ -174,7 +174,7 @@ export function MenubarFileMenu({
 				type="button"
 				role="menuitem"
 				className="ref-menu-dropdown-item ref-menu-dropdown-item--row"
-				disabled={needWs}
+				disabled={needWs || !canSave}
 				onClick={() => {
 					onSaveAs();
 					onClose();

@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { APP_UI_STYLE, readPrefersDark, readStoredColorMode, resolveEffectiveScheme } from './colorMode';
 import { I18nProvider } from './i18n';
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter/700.css';
 import './index.css';
 import './styles/tokens.css';
 import './styles/theme-dark.css';
@@ -39,13 +43,3 @@ createRoot(document.getElementById('root')!).render(
 		</I18nProvider>
 	</StrictMode>
 );
-
-const bootSplash = document.getElementById('boot-splash');
-if (bootSplash) {
-	requestAnimationFrame(() => {
-		requestAnimationFrame(() => {
-			bootSplash.classList.add('is-hidden');
-			window.setTimeout(() => bootSplash.remove(), 320);
-		});
-	});
-}

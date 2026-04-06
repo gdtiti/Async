@@ -1,3 +1,5 @@
+import './monacoSetup';
+import './styles/editor-layout.css';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import type { editor as MonacoEditorNS } from 'monaco-editor';
 import { memo, type MouseEventHandler } from 'react';
@@ -42,8 +44,6 @@ export type EditorMainPanelProps = {
 	markdownPaneMode: MarkdownTabView | null;
 	setMarkdownPaneMode: (mode: MarkdownTabView) => void;
 	onLoadFile: () => void;
-	tsLspPillClassName: string;
-	tsLspPillTitle: string;
 	onSaveFile: () => void;
 	showPlanFileEditorChrome: boolean;
 	editorPlanFileIsBuilt: boolean;
@@ -97,10 +97,8 @@ export const EditorMainPanel = memo(function EditorMainPanel({
 	filePath,
 	markdownPaneMode,
 	setMarkdownPaneMode,
-	onLoadFile,
-	tsLspPillClassName,
-	tsLspPillTitle,
-	onSaveFile,
+		onLoadFile,
+		onSaveFile,
 	showPlanFileEditorChrome,
 	editorPlanFileIsBuilt,
 	onExecutePlanFromEditor,
@@ -238,13 +236,11 @@ export const EditorMainPanel = memo(function EditorMainPanel({
 										>
 											<IconRefresh />
 										</button>
-										<span className={tsLspPillClassName} title={tsLspPillTitle}>
-											LSP
-										</span>
 										<button
 											type="button"
 											className="ref-editor-save"
-											disabled={!filePath}
+											disabled
+											title={t('app.editorReadOnlySaveHint')}
 											onClick={onSaveFile}
 										>
 											{t('common.save')}
