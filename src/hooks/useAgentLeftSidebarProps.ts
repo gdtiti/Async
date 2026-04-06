@@ -7,9 +7,7 @@ import type { AgentLeftSidebarProps, AgentSidebarWorkspace } from '../AgentLeftS
 export type UseAgentLeftSidebarPropsParams = {
 	t: TFunction;
 	agentSidebarWorkspaces: AgentSidebarWorkspace[];
-	todayThreads: ThreadInfo[];
-	archivedThreads: ThreadInfo[];
-	renderThreadItem: (thread: ThreadInfo) => ReactNode;
+	renderThreadItem: (thread: ThreadInfo, threadListWorkspace: string) => ReactNode;
 	editingWorkspacePath: string | null;
 	editingWorkspaceNameDraft: string;
 	setEditingWorkspaceNameDraft: Dispatch<SetStateAction<string>>;
@@ -68,8 +66,6 @@ export function useAgentLeftSidebarProps(p: UseAgentLeftSidebarPropsParams): Age
 		() => ({
 			t: p.t,
 			agentSidebarWorkspaces: p.agentSidebarWorkspaces,
-			todayThreads: p.todayThreads,
-			archivedThreads: p.archivedThreads,
 			renderThreadItem: p.renderThreadItem,
 			editingWorkspacePath: p.editingWorkspacePath,
 			editingWorkspaceNameDraft: p.editingWorkspaceNameDraft,
@@ -91,8 +87,6 @@ export function useAgentLeftSidebarProps(p: UseAgentLeftSidebarPropsParams): Age
 		[
 			p.t,
 			p.agentSidebarWorkspaces,
-			p.todayThreads,
-			p.archivedThreads,
 			p.renderThreadItem,
 			p.editingWorkspacePath,
 			p.editingWorkspaceNameDraft,

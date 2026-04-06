@@ -26,7 +26,9 @@ function firstLine(text: string, maxLen: number): string {
 	return line.length > maxLen ? `${line.slice(0, maxLen)}…` : line;
 }
 
-export function summarizeThreadForSidebar(thread: { messages: ChatMessage[] }): ThreadRowSummary {
+const summaryCache = new Map<string, { updatedAt: number; summary: ThreadRowSummary }>();
+
+function computeThreadRowSummary(thread: { messages: ChatMessage[] }): ThreadRowSummary {
 	const vis = visibleMessages(thread.messages);
 	const last = vis[vis.length - 1];
 	const prev = vis.length >= 2 ? vis[vis.length - 2] : undefined;
@@ -79,6 +81,20 @@ export function summarizeThreadForSidebar(thread: { messages: ChatMessage[] }): 
 		fileCount,
 		subtitleFallback,
 	};
+}
+
+export function summarizeThreadForSidebar(thread: {
+	id: string;
+	updatedAt: number;
+	messages: ChatMessage[];
+}): ThreadRowSummary {
+	const cached = summaryCache.get(thread.id);
+	if (cached && cached.updatedAt === thread.updatedAt) {
+		return cached.summary;
+	}
+	const summary = computeThreadRowSummary(thread);
+	summaryCache.set(thread.id, { updatedAt: thread.updatedAt, summary });
+	return summary;
 }
 
 export function isTimestampToday(ts: number, now = Date.now()): boolean {

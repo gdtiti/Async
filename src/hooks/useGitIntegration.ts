@@ -4,6 +4,19 @@ import type { GitPathStatusMap } from '../WorkspaceExplorer';
 type Shell = NonNullable<Window['asyncShell']>;
 type DiffPreview = { diff: string; isBinary: boolean; additions: number; deletions: number };
 
+type FullStatusOk = {
+	ok: true;
+	branch: string;
+	lines: string[];
+	pathStatus: GitPathStatusMap;
+	changedPaths: string[];
+	branches: string[];
+	current: string;
+	previews: Record<string, DiffPreview>;
+};
+
+type FullStatusFail = { ok: false; error?: string };
+
 /**
  * 管理所有 Git 相关状态：分支、状态、diff 预览、分支列表。
  * 在 workspace 变化或文件系统触碰时自动刷新。
@@ -25,38 +38,55 @@ export function useGitIntegration(shell: Shell | undefined, workspace: string | 
 	const [gitBranchPickerOpen, setGitBranchPickerOpen] = useState(false);
 
 	const refreshGit = useCallback(async () => {
-		if (!shell) return;
-		type StatusR =
-			| { ok: true; branch: string; lines: string[]; pathStatus?: GitPathStatusMap; changedPaths?: string[] }
-			| { ok: false; error?: string };
-		type ListR = { ok: true; branches: string[]; current: string } | { ok: false; error?: string };
-		const [r, lb] = (await Promise.all([
-			shell.invoke('git:status'),
-			shell.invoke('git:listBranches'),
-		])) as [StatusR, ListR];
-		if (r.ok) {
-			setGitStatusOk(true);
-			setGitBranch(r.branch || 'master');
-			setGitLines(r.lines);
-			setGitPathStatus(r.pathStatus ?? {});
-			setGitChangedPaths(r.changedPaths ?? []);
-			if (lb.ok) {
-				setGitBranchList(Array.isArray(lb.branches) ? lb.branches : []);
-				setGitBranchListCurrent(typeof lb.current === 'string' ? lb.current : '');
+		if (!shell) {
+			return;
+		}
+		const perfId = `void-git-${Date.now()}`;
+		const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
+		try {
+			if (typeof performance !== 'undefined' && performance.mark) {
+				performance.mark(`${perfId}-start`);
+			}
+		} catch {
+			/* ignore */
+		}
+		setDiffLoading(true);
+		try {
+			const r = (await shell.invoke('git:fullStatus')) as FullStatusOk | FullStatusFail;
+			if (r.ok) {
+				setGitStatusOk(true);
+				setGitBranch(r.branch || 'master');
+				setGitLines(r.lines);
+				setGitPathStatus(r.pathStatus ?? {});
+				setGitChangedPaths(r.changedPaths ?? []);
+				setGitBranchList(Array.isArray(r.branches) ? r.branches : []);
+				setGitBranchListCurrent(typeof r.current === 'string' ? r.current : '');
+				setDiffPreviews(r.previews ?? {});
 			} else {
+				setGitStatusOk(false);
+				setGitBranch('—');
+				setGitLines([r.error ?? 'Failed to load changes']);
+				setGitPathStatus({});
+				setGitChangedPaths([]);
 				setGitBranchList([]);
 				setGitBranchListCurrent('');
+				setDiffPreviews({});
 			}
-		} else {
-			setGitStatusOk(false);
-			setGitBranch('—');
-			setGitLines([r.error ?? 'Failed to load changes']);
-			setGitPathStatus({});
-			setGitChangedPaths([]);
-			setGitBranchList([]);
-			setGitBranchListCurrent('');
+			setTreeEpoch((n) => n + 1);
+		} finally {
+			setDiffLoading(false);
+			try {
+				if (typeof performance !== 'undefined' && performance.mark && performance.measure) {
+					performance.mark(`${perfId}-end`);
+					performance.measure('void-git:refresh', `${perfId}-start`, `${perfId}-end`);
+				}
+			} catch {
+				/* ignore */
+			}
+			if (t0 && typeof performance !== 'undefined') {
+				console.log(`[perf] refreshGit: ${(performance.now() - t0).toFixed(1)}ms`);
+			}
 		}
-		setTreeEpoch((n) => n + 1);
 	}, [shell]);
 
 	const onGitBranchListFresh = useCallback((b: string[], c: string) => {
@@ -66,42 +96,23 @@ export function useGitIntegration(shell: Shell | undefined, workspace: string | 
 
 	// workspace 变化时刷新 git 状态
 	useEffect(() => {
-		if (!workspace || !shell) return;
+		if (!workspace || !shell) {
+			return;
+		}
 		void refreshGit();
 	}, [workspace, shell, refreshGit]);
 
 	// 文件系统变化时刷新 git 状态
 	useEffect(() => {
 		const sub = shell?.subscribeWorkspaceFsTouched;
-		if (!shell || !sub) return;
+		if (!shell || !sub) {
+			return;
+		}
 		const unsub = sub(() => {
 			void refreshGit();
 		});
 		return unsub;
 	}, [shell, refreshGit]);
-
-	// gitChangedPaths → 加载 diff 预览
-	const gitPathsKey = useMemo(() => gitChangedPaths.join('\n'), [gitChangedPaths]);
-
-	useEffect(() => {
-		if (!shell || gitChangedPaths.length === 0) {
-			setDiffPreviews({});
-			setDiffLoading(false);
-			return;
-		}
-		setDiffLoading(true);
-		let cancelled = false;
-		void (async () => {
-			const r = (await shell.invoke('git:diffPreviews', gitChangedPaths)) as
-				| { ok: true; previews: Record<string, DiffPreview> }
-				| { ok: false };
-			if (!cancelled && r.ok) setDiffPreviews(r.previews);
-			if (!cancelled) setDiffLoading(false);
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [shell, treeEpoch, gitPathsKey]);
 
 	const diffTotals = useMemo(() => {
 		let additions = 0,
@@ -131,7 +142,6 @@ export function useGitIntegration(shell: Shell | undefined, workspace: string | 
 		treeEpoch,
 		gitBranchPickerOpen,
 		setGitBranchPickerOpen,
-		gitPathsKey,
 		diffTotals,
 		refreshGit,
 		onGitBranchListFresh,

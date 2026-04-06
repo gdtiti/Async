@@ -18,14 +18,14 @@ export type AgentSidebarWorkspace = {
 	isCurrent: boolean;
 	isCollapsed: boolean;
 	threadCount: number;
+	todayThreads: ThreadInfo[];
+	archivedThreads: ThreadInfo[];
 };
 
 export type AgentLeftSidebarProps = {
 	t: TFunction;
 	agentSidebarWorkspaces: AgentSidebarWorkspace[];
-	todayThreads: ThreadInfo[];
-	archivedThreads: ThreadInfo[];
-	renderThreadItem: (thread: ThreadInfo) => ReactNode;
+	renderThreadItem: (thread: ThreadInfo, threadListWorkspace: string) => ReactNode;
 	editingWorkspacePath: string | null;
 	editingWorkspaceNameDraft: string;
 	workspaceNameInputRef: RefObject<HTMLInputElement | null>;
@@ -47,8 +47,6 @@ export type AgentLeftSidebarProps = {
 export const AgentLeftSidebar = memo(function AgentLeftSidebar({
 	t,
 	agentSidebarWorkspaces,
-	todayThreads,
-	archivedThreads,
 	renderThreadItem,
 	editingWorkspacePath,
 	editingWorkspaceNameDraft,
@@ -128,7 +126,7 @@ export const AgentLeftSidebar = memo(function AgentLeftSidebar({
 								</div>
 							) : (
 								agentSidebarWorkspaces.map((ws) => {
-									const hasThreads = ws.isCurrent && ws.threadCount > 0;
+									const hasThreads = ws.threadCount > 0;
 									const showThreads = !ws.isCollapsed;
 									const isEditingWorkspace = editingWorkspacePath === ws.path;
 									return (
@@ -258,16 +256,16 @@ export const AgentLeftSidebar = memo(function AgentLeftSidebar({
 																	{t('app.today')}
 																</div>
 																<div className="ref-thread-list ref-thread-list--nested">
-																	{todayThreads.map(renderThreadItem)}
+																	{ws.todayThreads.map((th) => renderThreadItem(th, ws.path))}
 																</div>
 															</div>
-															{archivedThreads.length > 0 ? (
+															{ws.archivedThreads.length > 0 ? (
 																<div className="ref-agent-thread-cluster">
 																	<div className="ref-thread-section-label ref-thread-section-label--archived ref-thread-section-label--nested">
 																		{t('app.archived')}
 																	</div>
 																	<div className="ref-thread-list ref-thread-list--nested">
-																		{archivedThreads.map(renderThreadItem)}
+																		{ws.archivedThreads.map((th) => renderThreadItem(th, ws.path))}
 																	</div>
 																</div>
 															) : null}

@@ -116,6 +116,10 @@ import {
 } from '../workspaceAgentStore.js';
 import { summarizeThreadForSidebar, isTimestampToday } from '../threadListSummary.js';
 import { registerTerminalPtyIpc } from '../terminalPty.js';
+
+function logIpcDuration(channel: string, started: number): void {
+	console.log(`[ipc] ${channel}: ${(performance.now() - started).toFixed(1)}ms`);
+}
 import {
 	getTsLspSessionForWebContents,
 	disposeTsLspSessionForWebContents,
@@ -146,6 +150,33 @@ const execFileAsync = promisify(execFile);
 
 function senderWorkspaceRoot(event: { sender: WebContents }): string | null {
 	return getWorkspaceRootForWebContents(event.sender);
+}
+
+function workspaceRootsEqual(a: string | null | undefined, b: string | null | undefined): boolean {
+	if (!a || !b) {
+		return false;
+	}
+	const na = path.resolve(a).replace(/\\/g, '/').toLowerCase();
+	const nb = path.resolve(b).replace(/\\/g, '/').toLowerCase();
+	return na === nb;
+}
+
+/** 可选覆盖工作区根路径（须为已存在目录），否则使用当前窗口绑定的工作区 */
+function resolveWorkspaceScopeForThreads(
+	event: { sender: WebContents },
+	workspaceRootOverride?: unknown
+): string | null {
+	if (typeof workspaceRootOverride === 'string' && workspaceRootOverride.trim()) {
+		try {
+			const resolved = path.resolve(workspaceRootOverride.trim());
+			if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+				return resolved;
+			}
+		} catch {
+			/* ignore */
+		}
+	}
+	return senderWorkspaceRoot(event);
 }
 
 /**
@@ -1151,11 +1182,61 @@ export function registerIpc(): void {
 	});
 
 	ipcMain.handle('threads:list', (event) => {
-		const scope = senderWorkspaceRoot(event);
-		ensureDefaultThread(scope);
-		const now = Date.now();
-		return {
-			threads: listThreads(scope).map((t) => {
+		const t0 = performance.now();
+		try {
+			const scope = senderWorkspaceRoot(event);
+			ensureDefaultThread(scope);
+			const now = Date.now();
+			return {
+				threads: listThreads(scope).map((t) => {
+					const sum = summarizeThreadForSidebar(t);
+					return {
+						id: t.id,
+						title: t.title,
+						updatedAt: t.updatedAt,
+						createdAt: t.createdAt,
+						previewCount: t.messages.filter((m) => m.role !== 'system').length,
+						hasUserMessages: threadHasUserMessages(t),
+						isToday: isTimestampToday(t.updatedAt, now),
+						tokenUsage: t.tokenUsage,
+						fileStateCount: t.fileStates ? Object.keys(t.fileStates).length : 0,
+						...sum,
+					};
+				}),
+				currentId: getCurrentThreadId(scope),
+			};
+		} finally {
+			logIpcDuration('threads:list', t0);
+		}
+	});
+
+	ipcMain.handle('threads:listAgentSidebar', (event, rawPaths: unknown) => {
+		const t0 = performance.now();
+		try {
+			const activeRoot = senderWorkspaceRoot(event);
+			const paths = Array.isArray(rawPaths)
+				? rawPaths.map((p) => String(p ?? '').trim()).filter((p) => p.length > 0)
+				: [];
+			const now = Date.now();
+			const workspaces = paths.map((dirPath) => {
+			let resolved: string;
+			try {
+				resolved = path.resolve(dirPath);
+				if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+					return {
+						requestedPath: dirPath,
+						resolvedPath: null as string | null,
+						threads: [],
+						currentId: null as string | null,
+					};
+				}
+			} catch {
+				return { requestedPath: dirPath, resolvedPath: null, threads: [], currentId: null };
+			}
+			if (activeRoot && workspaceRootsEqual(resolved, activeRoot)) {
+				ensureDefaultThread(activeRoot);
+			}
+			const threads = listThreads(resolved).map((t) => {
 				const sum = summarizeThreadForSidebar(t);
 				return {
 					id: t.id,
@@ -1169,9 +1250,18 @@ export function registerIpc(): void {
 					fileStateCount: t.fileStates ? Object.keys(t.fileStates).length : 0,
 					...sum,
 				};
-			}),
-			currentId: getCurrentThreadId(scope),
-		};
+			});
+			return {
+				requestedPath: dirPath,
+				resolvedPath: resolved,
+				threads,
+				currentId: getCurrentThreadId(resolved),
+			};
+		});
+			return { workspaces };
+		} finally {
+			logIpcDuration('threads:listAgentSidebar', t0);
+		}
 	});
 
 	ipcMain.handle('threads:fileStates', (_e, threadId: string) => {
@@ -1206,14 +1296,19 @@ export function registerIpc(): void {
 	});
 
 	ipcMain.handle('threads:messages', (_e, threadId: string) => {
-		const t = getThread(threadId);
-		if (!t) {
-			return { ok: false as const };
+		const t0 = performance.now();
+		try {
+			const t = getThread(threadId);
+			if (!t) {
+				return { ok: false as const };
+			}
+			return {
+				ok: true as const,
+				messages: t.messages.filter((m) => m.role !== 'system'),
+			};
+		} finally {
+			logIpcDuration('threads:messages', t0);
 		}
-		return {
-			ok: true as const,
-			messages: t.messages.filter((m) => m.role !== 'system'),
-		};
 	});
 
 	ipcMain.handle('threads:create', (event) => {
@@ -1221,20 +1316,22 @@ export function registerIpc(): void {
 		return { id: t.id };
 	});
 
-	ipcMain.handle('threads:select', (event, id: string) => {
-		const t = selectThread(senderWorkspaceRoot(event), id);
+	ipcMain.handle('threads:select', (event, id: string, workspaceRootOverride?: unknown) => {
+		const scope = resolveWorkspaceScopeForThreads(event, workspaceRootOverride);
+		const t = selectThread(scope, id);
 		return { ok: !!t };
 	});
 
-	ipcMain.handle('threads:delete', (event, id: string) => {
-		const scope = senderWorkspaceRoot(event);
+	ipcMain.handle('threads:delete', (event, id: string, workspaceRootOverride?: unknown) => {
+		const scope = resolveWorkspaceScopeForThreads(event, workspaceRootOverride);
 		deleteThread(scope, id);
 		ensureDefaultThread(scope);
 		return { ok: true as const, currentId: getCurrentThreadId(scope) };
 	});
 
-	ipcMain.handle('threads:rename', (event, id: string, title: string) => {
-		const ok = setThreadTitle(senderWorkspaceRoot(event), String(id ?? ''), String(title ?? ''));
+	ipcMain.handle('threads:rename', (event, id: string, title: string, workspaceRootOverride?: unknown) => {
+		const scope = resolveWorkspaceScopeForThreads(event, workspaceRootOverride);
+		const ok = setThreadTitle(scope, String(id ?? ''), String(title ?? ''));
 		return { ok };
 	});
 
@@ -2100,45 +2197,115 @@ ipcMain.handle(
 	});
 
 	ipcMain.handle('git:status', async (event) => {
-		const root = senderWorkspaceRoot(event);
-		if (!root) {
-			return { ok: false as const, error: 'No workspace' };
-		}
-		return gitService.withGitWorkspaceRootAsync(root, async () => {
-			try {
-				const probe = await gitService.gitProbeContext();
-				if (!probe.ok) {
-					return { ok: false as const, error: probe.message };
-				}
-				const gitTop = probe.topLevel;
-				const [porcelain, branch] = await Promise.all([gitService.gitStatusPorcelain(), gitService.gitBranch()]);
-				const lines = porcelain ? porcelain.split('\n').filter(Boolean) : [];
-				const rawPathStatus = gitService.parseGitPathStatus(lines);
-				const rawOrdered = gitService.listPorcelainPaths(lines);
-				const pathStatus: Record<string, gitService.PathStatusEntry> = {};
-				for (const [repoRel, entry] of Object.entries(rawPathStatus)) {
-					const wsRel = gitService.workspaceRelativeFromRepoRelative(repoRel, root, gitTop);
-					if (wsRel) {
-						pathStatus[wsRel] = entry;
-					}
-				}
-				const changedPaths: string[] = [];
-				const seen = new Set<string>();
-				for (const repoRel of rawOrdered) {
-					const wsRel = gitService.workspaceRelativeFromRepoRelative(repoRel, root, gitTop);
-					if (wsRel && !seen.has(wsRel)) {
-						seen.add(wsRel);
-						changedPaths.push(wsRel);
-					}
-				}
-				return { ok: true as const, branch, lines, pathStatus, changedPaths };
-			} catch (e) {
-				return {
-					ok: false as const,
-					error: gitService.normalizeGitFailureMessage(e, 'Failed to load changes'),
-				};
+		const t0 = performance.now();
+		try {
+			const root = senderWorkspaceRoot(event);
+			if (!root) {
+				return { ok: false as const, error: 'No workspace' };
 			}
-		});
+			return await gitService.withGitWorkspaceRootAsync(root, async () => {
+				try {
+					const probe = await gitService.gitProbeContext();
+					if (!probe.ok) {
+						return { ok: false as const, error: probe.message };
+					}
+					const gitTop = probe.topLevel;
+					const [porcelain, branch] = await Promise.all([
+						gitService.gitStatusPorcelain(),
+						gitService.gitBranch(),
+					]);
+					const lines = porcelain ? porcelain.split('\n').filter(Boolean) : [];
+					const rawPathStatus = gitService.parseGitPathStatus(lines);
+					const rawOrdered = gitService.listPorcelainPaths(lines);
+					const pathStatus: Record<string, gitService.PathStatusEntry> = {};
+					for (const [repoRel, entry] of Object.entries(rawPathStatus)) {
+						const wsRel = gitService.workspaceRelativeFromRepoRelative(repoRel, root, gitTop);
+						if (wsRel) {
+							pathStatus[wsRel] = entry;
+						}
+					}
+					const changedPaths: string[] = [];
+					const seen = new Set<string>();
+					for (const repoRel of rawOrdered) {
+						const wsRel = gitService.workspaceRelativeFromRepoRelative(repoRel, root, gitTop);
+						if (wsRel && !seen.has(wsRel)) {
+							seen.add(wsRel);
+							changedPaths.push(wsRel);
+						}
+					}
+					return { ok: true as const, branch, lines, pathStatus, changedPaths };
+				} catch (e) {
+					return {
+						ok: false as const,
+						error: gitService.normalizeGitFailureMessage(e, 'Failed to load changes'),
+					};
+				}
+			});
+		} finally {
+			logIpcDuration('git:status', t0);
+		}
+	});
+
+	ipcMain.handle('git:fullStatus', async (event) => {
+		const t0 = performance.now();
+		try {
+			const root = senderWorkspaceRoot(event);
+			if (!root) {
+				return { ok: false as const, error: 'No workspace' };
+			}
+			return await gitService.withGitWorkspaceRootAsync(root, async () => {
+				try {
+					const probe = await gitService.gitProbeContext();
+					if (!probe.ok) {
+						return { ok: false as const, error: probe.message };
+					}
+					const gitTop = probe.topLevel;
+					const [porcelain, branch, branchListOut, fullDiffRaw] = await Promise.all([
+						gitService.gitStatusPorcelain(),
+						gitService.gitBranch(),
+						gitService.gitListLocalBranches(),
+						gitService.gitDiffHeadUnified(root),
+					]);
+					const lines = porcelain ? porcelain.split('\n').filter(Boolean) : [];
+					const rawPathStatus = gitService.parseGitPathStatus(lines);
+					const rawOrdered = gitService.listPorcelainPaths(lines);
+					const pathStatus: Record<string, gitService.PathStatusEntry> = {};
+					for (const [repoRel, entry] of Object.entries(rawPathStatus)) {
+						const wsRel = gitService.workspaceRelativeFromRepoRelative(repoRel, root, gitTop);
+						if (wsRel) {
+							pathStatus[wsRel] = entry;
+						}
+					}
+					const changedPaths: string[] = [];
+					const seen = new Set<string>();
+					for (const repoRel of rawOrdered) {
+						const wsRel = gitService.workspaceRelativeFromRepoRelative(repoRel, root, gitTop);
+						if (wsRel && !seen.has(wsRel)) {
+							seen.add(wsRel);
+							changedPaths.push(wsRel);
+						}
+					}
+					const previews = await gitService.buildDiffPreviewsMap(changedPaths, fullDiffRaw, root, gitTop);
+					return {
+						ok: true as const,
+						branch,
+						lines,
+						pathStatus,
+						changedPaths,
+						branches: branchListOut.branches,
+						current: branchListOut.current,
+						previews,
+					};
+				} catch (e) {
+					return {
+						ok: false as const,
+						error: gitService.normalizeGitFailureMessage(e, 'Failed to load changes'),
+					};
+				}
+			});
+		} finally {
+			logIpcDuration('git:fullStatus', t0);
+		}
 	});
 
 	ipcMain.handle('git:stageAll', async (event) => {
@@ -2187,25 +2354,28 @@ ipcMain.handle(
 	});
 
 	ipcMain.handle('git:diffPreviews', async (event, relPaths: string[]) => {
-		const root = senderWorkspaceRoot(event);
-		if (!root) {
-			return { ok: false as const, error: 'No workspace' };
-		}
-		const list = Array.isArray(relPaths) ? relPaths : [];
+		const t0 = performance.now();
 		try {
-			const entries = await Promise.all(
-				list.map(async (p): Promise<[string, gitService.DiffPreview]> => {
-					try {
-						return [p, await gitService.getDiffPreview(p, undefined, root)];
-					} catch {
-						return [p, { diff: '', isBinary: false, additions: 0, deletions: 0 }];
+			const root = senderWorkspaceRoot(event);
+			if (!root) {
+				return { ok: false as const, error: 'No workspace' };
+			}
+			const list = Array.isArray(relPaths) ? relPaths : [];
+			try {
+				return await gitService.withGitWorkspaceRootAsync(root, async () => {
+					const probe = await gitService.gitProbeContext();
+					if (!probe.ok) {
+						return { ok: false as const, error: probe.message };
 					}
-				})
-			);
-			const previews: Record<string, gitService.DiffPreview> = Object.fromEntries(entries);
-			return { ok: true as const, previews };
-		} catch (e) {
-			return { ok: false as const, error: String(e) };
+					const fullDiffRaw = await gitService.gitDiffHeadUnified(root);
+					const previews = await gitService.buildDiffPreviewsMap(list, fullDiffRaw, root, probe.topLevel);
+					return { ok: true as const, previews };
+				});
+			} catch (e) {
+				return { ok: false as const, error: String(e) };
+			}
+		} finally {
+			logIpcDuration('git:diffPreviews', t0);
 		}
 	});
 
@@ -2246,25 +2416,30 @@ ipcMain.handle(
 	);
 
 	ipcMain.handle('git:listBranches', async (event) => {
-		const root = senderWorkspaceRoot(event);
-		if (!root) {
-			return { ok: false as const, error: 'No workspace' };
-		}
-		return gitService.withGitWorkspaceRootAsync(root, async () => {
-			try {
-				const probe = await gitService.gitProbeContext();
-				if (!probe.ok) {
-					return { ok: false as const, error: probe.message };
-				}
-				const { branches, current } = await gitService.gitListLocalBranches();
-				return { ok: true as const, branches, current };
-			} catch (e) {
-				return {
-					ok: false as const,
-					error: gitService.normalizeGitFailureMessage(e, 'Could not load branches'),
-				};
+		const t0 = performance.now();
+		try {
+			const root = senderWorkspaceRoot(event);
+			if (!root) {
+				return { ok: false as const, error: 'No workspace' };
 			}
-		});
+			return await gitService.withGitWorkspaceRootAsync(root, async () => {
+				try {
+					const probe = await gitService.gitProbeContext();
+					if (!probe.ok) {
+						return { ok: false as const, error: probe.message };
+					}
+					const { branches, current } = await gitService.gitListLocalBranches();
+					return { ok: true as const, branches, current };
+				} catch (e) {
+					return {
+						ok: false as const,
+						error: gitService.normalizeGitFailureMessage(e, 'Could not load branches'),
+					};
+				}
+			});
+		} finally {
+			logIpcDuration('git:listBranches', t0);
+		}
 	});
 
 	ipcMain.handle('git:checkoutBranch', async (event, branch: string) => {

@@ -86,6 +86,16 @@ async function git(args: string[], cwd?: string): Promise<string> {
 	return stdout.trim();
 }
 
+/** 单次 `git diff HEAD`（全量），用于批量构建各文件预览，避免每文件起一个子进程。 */
+export async function gitDiffHeadUnified(workspaceRootAbs: string): Promise<string> {
+	const root = path.resolve(workspaceRootAbs);
+	try {
+		return await git(['diff', 'HEAD', '--no-ext-diff', '--unified=3'], root);
+	} catch {
+		return '';
+	}
+}
+
 export async function gitBranch(): Promise<string> {
 	try {
 		return await git(['branch', '--show-current']);
@@ -161,6 +171,24 @@ export function workspaceRelativeFromRepoRelative(
 		return null;
 	}
 	const rel = path.relative(ws, full);
+	if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
+		return null;
+	}
+	return rel.split(path.sep).join('/');
+}
+
+/** 工作区相对路径 → 仓库相对路径（与 `workspaceRelativeFromRepoRelative` 互逆）。 */
+export function repoRelativeFromWorkspaceRel(
+	workspaceRelPath: string,
+	workspaceRoot: string,
+	gitTopLevel: string
+): string | null {
+	const norm = workspaceRelPath.replace(/\\/g, '/').replace(/^\.\/+/, '');
+	const full = path.resolve(workspaceRoot, norm);
+	if (!isPathInsideRoot(full, gitTopLevel)) {
+		return null;
+	}
+	const rel = path.relative(gitTopLevel, full);
 	if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
 		return null;
 	}
@@ -355,6 +383,88 @@ function clipDiff(text: string, maxChars?: number | null): string {
 
 export type DiffPreview = { diff: string; isBinary: boolean; additions: number; deletions: number };
 type DiffPreviewOptions = { maxChars?: number | null };
+
+/**
+ * 将单次 `git diff HEAD` 输出按文件拆成块，键为仓库相对路径（`diff --git` 的 b/ 侧）。
+ */
+export function splitUnifiedDiff(raw: string): Record<string, string> {
+	const out: Record<string, string> = {};
+	const text = raw.replace(/^\uFEFF/, '');
+	if (!text.trim()) {
+		return out;
+	}
+	const lines = text.split(/\r?\n/);
+	let buf: string[] = [];
+	const flush = () => {
+		if (buf.length === 0) {
+			return;
+		}
+		const chunk = buf.join('\n');
+		const head = buf[0] ?? '';
+		const m = /^diff --git a\/(.+?) b\/(.+)$/.exec(head);
+		if (m) {
+			const key = m[2]!.replace(/\\/g, '/').replace(/^\.\/+/, '');
+			out[key] = chunk;
+		}
+		buf = [];
+	};
+	for (const line of lines) {
+		if (line.startsWith('diff --git ') && buf.length > 0) {
+			flush();
+		}
+		buf.push(line);
+	}
+	flush();
+	return out;
+}
+
+/**
+ * 用一次全量 diff 文本为 `changedPaths` 构建预览；无对应 hunk 的路径回退为 `getDiffPreview`（如未跟踪文件）。
+ */
+export async function buildDiffPreviewsMap(
+	changedPaths: string[],
+	fullDiffRaw: string,
+	workspaceRootAbs: string,
+	gitTopLevel: string
+): Promise<Record<string, DiffPreview>> {
+	const split = splitUnifiedDiff(fullDiffRaw);
+	const root = path.resolve(workspaceRootAbs);
+	const maxChars = 14_000;
+	const out: Record<string, DiffPreview> = {};
+	const fallbacks: string[] = [];
+
+	for (const wsRel of changedPaths) {
+		const repoRel = repoRelativeFromWorkspaceRel(wsRel, root, gitTopLevel);
+		const chunk = repoRel ? split[repoRel] : undefined;
+		if (chunk && (/Binary files .* differ/i.test(chunk) || /GIT binary patch/i.test(chunk))) {
+			out[wsRel] = { diff: 'Binary file not shown.', isBinary: true, additions: 0, deletions: 0 };
+			continue;
+		}
+		if (chunk?.trim()) {
+			const { additions, deletions } = countDiffLineStats(chunk);
+			out[wsRel] = { diff: clipDiff(chunk, maxChars), isBinary: false, additions, deletions };
+			continue;
+		}
+		fallbacks.push(wsRel);
+	}
+
+	if (fallbacks.length > 0) {
+		const settled = await Promise.all(
+			fallbacks.map(async (wsRel) => {
+				try {
+					return [wsRel, await getDiffPreview(wsRel, { maxChars }, root)] as const;
+				} catch {
+					return [wsRel, { diff: '', isBinary: false, additions: 0, deletions: 0 } as DiffPreview] as const;
+				}
+			})
+		);
+		for (const [wsRel, preview] of settled) {
+			out[wsRel] = preview;
+		}
+	}
+
+	return out;
+}
 
 /** Unified diff vs HEAD, or synthetic “all added” for untracked text files. */
 export async function getDiffPreview(

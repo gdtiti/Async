@@ -13,8 +13,10 @@ import {
 	type RefObject,
 } from 'react';
 import type { editor as MonacoEditorNS } from 'monaco-editor';
-import { createTwoFilesPatch } from 'diff';
-import { DrawerPtyTerminal } from './DrawerPtyTerminal';
+
+const DrawerPtyTerminal = lazy(() =>
+	import('./DrawerPtyTerminal').then((m) => ({ default: m.DrawerPtyTerminal }))
+);
 import { ChatMarkdown } from './ChatMarkdown';
 import { OpenWorkspaceModal } from './OpenWorkspaceModal';
 import { type WorkspaceExplorerActions } from './WorkspaceExplorer';
@@ -143,6 +145,7 @@ import { useEditorMainPanelProps } from './hooks/useEditorMainPanelProps';
 import { useWorkspaceManager } from './hooks/useWorkspaceManager';
 import { useThreads } from './hooks/useThreads';
 import { type ThreadInfo } from './threadTypes';
+import { normWorkspaceRootKey } from './workspaceRootKey';
 import { useAgentFileReview, type AgentFilePreviewState } from './hooks/useAgentFileReview';
 import { useComposer } from './hooks/useComposer';
 import { useEditorTabs, type EditorInlineDiffState, clampEditorTerminalHeight } from './hooks/useEditorTabs';
@@ -544,9 +547,13 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 		setThreadNavigation,
 		skipThreadNavigationRecordRef,
 		refreshThreads,
+		refreshAgentSidebarThreads,
+		sidebarThreadsByPathKey,
 		loadMessages,
 		resetThreadState,
 	} = useThreads(shell);
+
+	const [editingThreadWorkspacePath, setEditingThreadWorkspacePath] = useState<string | null>(null);
 	// ─────────────────────────────────────────────────────────────────────────
 
 	const {
@@ -966,7 +973,6 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 		() => new Set(collapsedAgentWorkspacePaths),
 		[collapsedAgentWorkspacePaths]
 	);
-	const currentWorkspaceThreadCount = todayThreads.length + archivedThreads.length;
 
 	const agentSidebarWorkspaceCandidates = useMemo(() => {
 		const seen = new Set<string>();
@@ -997,25 +1003,77 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 		});
 	}, [agentSidebarWorkspaceCandidates]);
 
+	const agentSidebarThreadPaths = useMemo(
+		() =>
+			agentWorkspaceOrder
+				.filter((path) => !hiddenAgentWorkspacePathSet.has(path))
+				.slice(0, 8),
+		[agentWorkspaceOrder, hiddenAgentWorkspacePathSet]
+	);
+
+	useEffect(() => {
+		if (!shell) {
+			return;
+		}
+		if (layoutMode !== 'agent') {
+			void refreshAgentSidebarThreads([]);
+			return;
+		}
+		const idle = window.requestIdleCallback ?? ((cb: IdleRequestCallback) => window.setTimeout(() => cb({ didTimeout: true, timeRemaining: () => 0 } as IdleDeadline), 1));
+		const cancel = window.cancelIdleCallback ?? ((id: number) => window.clearTimeout(id));
+		const id = idle(
+			() => {
+				void refreshAgentSidebarThreads(agentSidebarThreadPaths);
+			},
+			{ timeout: 3000 }
+		);
+		return () => cancel(id);
+	}, [shell, layoutMode, agentSidebarThreadPaths, refreshAgentSidebarThreads]);
+
 	const agentSidebarWorkspaces = useMemo(() => {
-		return agentWorkspaceOrder
-			.filter((path) => !hiddenAgentWorkspacePathSet.has(path))
-			.slice(0, 8)
-			.map((path) => ({
+		const q = threadSearch.trim().toLowerCase();
+		return agentSidebarThreadPaths.map((path) => {
+			const rowsSource =
+				workspace && normWorkspaceRootKey(path) === normWorkspaceRootKey(workspace)
+					? threads
+					: (sidebarThreadsByPathKey[normWorkspaceRootKey(path)] ?? []);
+			const visible = rowsSource.filter((thread) => thread.hasUserMessages);
+			const list = q
+				? visible.filter(
+						(t) =>
+							t.title.toLowerCase().includes(q) ||
+							(t.subtitleFallback ?? '').toLowerCase().includes(q)
+					)
+				: visible;
+			const today: ThreadInfo[] = [];
+			const archived: ThreadInfo[] = [];
+			for (const t of list) {
+				if (t.isToday) {
+					today.push(t);
+				} else {
+					archived.push(t);
+				}
+			}
+			return {
 				path,
 				name: workspaceAliases[path]?.trim() || workspacePathDisplayName(path),
 				parent: workspacePathParent(path),
 				isCurrent: path === workspace,
-				isCollapsed: path === workspace ? collapsedAgentWorkspacePathSet.has(path) : !collapsedAgentWorkspacePathSet.has(path),
-				threadCount: path === workspace ? currentWorkspaceThreadCount : 0,
-			}));
+				isCollapsed:
+					path === workspace ? collapsedAgentWorkspacePathSet.has(path) : !collapsedAgentWorkspacePathSet.has(path),
+				threadCount: list.length,
+				todayThreads: today,
+				archivedThreads: archived,
+			};
+		});
 	}, [
-		agentWorkspaceOrder,
+		agentSidebarThreadPaths,
 		workspace,
-		hiddenAgentWorkspacePathSet,
+		threads,
+		sidebarThreadsByPathKey,
+		threadSearch,
 		workspaceAliases,
 		collapsedAgentWorkspacePathSet,
-		currentWorkspaceThreadCount,
 	]);
 
 	const hasConversation = messages.length > 0 || !!streaming;
@@ -1667,21 +1725,41 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 		void loadMessages(currentId);
 	}, [shell, currentId, loadMessages]);
 
+	const workspaceSwitchSeqRef = useRef(0);
 	const applyWorkspacePath = useCallback(
 		async (next: string) => {
+			const seq = ++workspaceSwitchSeqRef.current;
+			const mark = (suffix: string) => {
+				try {
+					performance.mark(`void-ws-${seq}-${suffix}`);
+				} catch {
+					/* ignore */
+				}
+			};
+			const measure = (name: string, startSuffix: string, endSuffix: string) => {
+				try {
+					performance.measure(name, `void-ws-${seq}-${startSuffix}`, `void-ws-${seq}-${endSuffix}`);
+				} catch {
+					/* ignore */
+				}
+			};
+			mark('start');
 			clearWorkspaceConversationState();
 			setWorkspace(next);
+			mark('workspace-set');
 			// 并行而非串行，且 refreshGit 由 workspace 变化的 effect 触发，此处不重复调用
 			await refreshThreads();
+			mark('threads-done');
+			measure('void-ws:apply-path:threads', 'start', 'threads-done');
 		},
 		[clearWorkspaceConversationState, refreshThreads]
 	);
 
 	const openWorkspaceByPath = useCallback(
-		async (path: string) => {
+		async (path: string): Promise<boolean> => {
 			if (!shell) {
 				setWorkspacePickerOpen(true);
-				return;
+				return false;
 			}
 			const r = (await shell.invoke('workspace:openPath', path)) as {
 				ok: boolean;
@@ -1690,9 +1768,10 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 			};
 			if (r.ok && r.path) {
 				await applyWorkspacePath(r.path);
-			} else {
-				setWorkspacePickerOpen(true);
+				return true;
 			}
+			setWorkspacePickerOpen(true);
+			return false;
 		},
 		[shell, applyWorkspacePath]
 	);
@@ -1840,7 +1919,10 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 			}
 			if (workspacePath !== workspace) {
 				setHiddenAgentWorkspacePaths((prev) => prev.filter((item) => item !== workspacePath));
-				await openWorkspaceByPath(workspacePath);
+				const opened = await openWorkspaceByPath(workspacePath);
+				if (!opened) {
+					return;
+				}
 			}
 			await onNewThreadRef.current();
 		},
@@ -1859,10 +1941,17 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 	}, []);
 
 	const onSelectThread = useCallback(
-		async (id: string) => {
+		async (id: string, threadWorkspaceRoot?: string | null) => {
 			setEditorThreadHistoryOpen(false);
 			if (!shell) {
 				return;
+			}
+			const tw = threadWorkspaceRoot?.trim();
+			if (tw && (!workspace || normWorkspaceRootKey(tw) !== normWorkspaceRootKey(workspace))) {
+				const opened = await openWorkspaceByPath(tw);
+				if (!opened) {
+					return;
+				}
 			}
 			await shell.invoke('threads:select', id);
 			setCurrentId(id);
@@ -1881,7 +1970,7 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 			setInlineResendSegments([]);
 			await loadMessages(id);
 		},
-		[shell, loadMessages, clearStreamingToolPreviewNow, resetLiveAgentBlocks]
+		[shell, workspace, openWorkspaceByPath, loadMessages, clearStreamingToolPreviewNow, resetLiveAgentBlocks]
 	);
 
 	const selectThreadByHistoryIndex = useCallback(
@@ -1998,41 +2087,63 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 		}
 		if (!shell) {
 			setEditingThreadId(null);
+			setEditingThreadWorkspacePath(null);
 			setEditingThreadTitleDraft('');
 			return;
 		}
 		const id = editingThreadId;
+		const scopePath = editingThreadWorkspacePath;
 		const draft = threadTitleDraftRef.current.trim();
-		const prev = threads.find((x) => x.id === id)?.title ?? '';
+		const scopeKey = normWorkspaceRootKey(scopePath ?? workspace ?? '');
+		const sameBucketAsPrimary =
+			!!workspace && !!scopePath && normWorkspaceRootKey(workspace) === normWorkspaceRootKey(scopePath);
+		const prev = sameBucketAsPrimary
+			? threads.find((x) => x.id === id)?.title ?? ''
+			: (sidebarThreadsByPathKey[scopeKey] ?? []).find((x) => x.id === id)?.title ?? '';
 		setEditingThreadId(null);
+		setEditingThreadWorkspacePath(null);
 		setEditingThreadTitleDraft('');
 		if (!draft || draft === prev) {
 			return;
 		}
-		const r = (await shell.invoke('threads:rename', id, draft)) as { ok?: boolean };
+		const r = (await shell.invoke('threads:rename', id, draft, scopePath ?? undefined)) as { ok?: boolean };
 		if (r?.ok) {
 			await refreshThreads();
 		}
-	}, [shell, editingThreadId, threads, refreshThreads]);
+	}, [
+		shell,
+		editingThreadId,
+		editingThreadWorkspacePath,
+		workspace,
+		threads,
+		sidebarThreadsByPathKey,
+		refreshThreads,
+	]);
 
 	const cancelThreadTitleEdit = useCallback(() => {
 		setEditingThreadId(null);
+		setEditingThreadWorkspacePath(null);
 		setEditingThreadTitleDraft('');
 	}, []);
 
-	const beginThreadTitleEdit = useCallback((t: ThreadInfo) => {
+	const beginThreadTitleEdit = useCallback((t: ThreadInfo, threadListWorkspace?: string | null) => {
 		setEditingThreadId(t.id);
+		setEditingThreadWorkspacePath(threadListWorkspace ?? workspace);
 		setEditingThreadTitleDraft(t.title);
 		threadTitleDraftRef.current = t.title;
-	}, []);
+	}, [workspace]);
 
 	const performThreadDelete = useCallback(
-		async (id: string) => {
+		async (id: string, threadWorkspaceRoot?: string | null) => {
 			if (!shell) {
 				return;
 			}
 			voidShellDebugLog('thread-delete:perform', { threadId: id });
-			const wasCurrent = id === currentId;
+			const wasCurrent =
+				id === currentId &&
+				(!threadWorkspaceRoot ||
+					!workspace ||
+					normWorkspaceRootKey(threadWorkspaceRoot) === normWorkspaceRootKey(workspace));
 			if (wasCurrent && awaitingReply) {
 				await shell.invoke('chat:abort', id);
 				setAwaitingReply(false);
@@ -2043,7 +2154,11 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 				streamStartedAtRef.current = null;
 				firstTokenAtRef.current = null;
 			}
+			const wasEditingTitle = editingThreadId === id;
 			setEditingThreadId((ed) => (ed === id ? null : ed));
+			if (wasEditingTitle) {
+				setEditingThreadWorkspacePath(null);
+			}
 			if (wasCurrent) {
 				setMessages([]);
 				setMessagesThreadId(null);
@@ -2053,16 +2168,25 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 				setInlineResendSegments([]);
 				setResendFromUserIndex(null);
 			}
-			await shell.invoke('threads:delete', id);
+			await shell.invoke('threads:delete', id, threadWorkspaceRoot ?? undefined);
 			clearPersistedAgentFileChanges(id);
 			planQuestionDismissedByThreadRef.current.delete(id);
 			await refreshThreads();
 		},
-		[shell, currentId, awaitingReply, refreshThreads, clearStreamingToolPreviewNow, resetLiveAgentBlocks]
+		[
+			shell,
+			currentId,
+			editingThreadId,
+			awaitingReply,
+			refreshThreads,
+			workspace,
+			clearStreamingToolPreviewNow,
+			resetLiveAgentBlocks,
+		]
 	);
 
 	const onDeleteThread = useCallback(
-		async (e: React.MouseEvent, id: string) => {
+		async (e: React.MouseEvent, id: string, threadWorkspaceRoot?: string | null) => {
 			e.preventDefault();
 			e.stopPropagation();
 			voidShellDebugLog('thread-delete:left-list-click', { threadId: id, step: confirmDeleteId === id ? 'confirm' : 'arm' });
@@ -2085,7 +2209,7 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 				clearTimeout(confirmDeleteTimerRef.current);
 				confirmDeleteTimerRef.current = null;
 			}
-			await performThreadDelete(id);
+			await performThreadDelete(id, threadWorkspaceRoot);
 		},
 		[shell, confirmDeleteId, performThreadDelete]
 	);
@@ -2641,6 +2765,7 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 						| { ok?: false };
 					if (snapshotResult?.ok && snapshotResult.hasSnapshot) {
 						const previousContent = snapshotResult.previousContent ?? '';
+						const { createTwoFilesPatch } = await import('diff');
 						previewDiff = createTwoFilesPatch(
 							`a/${normalizedRel}`,
 							`b/${normalizedRel}`,
@@ -4676,8 +4801,11 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 				: modelPillInlineRef;
 
 	const renderThreadItem = useCallback(
-		(th: ThreadInfo) => {
-			const isActive = th.id === currentId;
+		(th: ThreadInfo, threadListWorkspace?: string | null) => {
+			const owningWs = threadListWorkspace ?? workspace;
+			const isActive =
+				th.id === currentId &&
+				(!workspace || !owningWs || normWorkspaceRootKey(owningWs) === normWorkspaceRootKey(workspace));
 			return (
 				<div
 					key={th.id}
@@ -4714,10 +4842,10 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 						<button
 							type="button"
 							className="ref-thread-row ref-thread-row--rich"
-							onClick={() => void onSelectThread(th.id)}
+							onClick={() => void onSelectThread(th.id, threadListWorkspace)}
 							onDoubleClick={(e) => {
 								e.preventDefault();
-								beginThreadTitleEdit(th);
+								beginThreadTitleEdit(th, threadListWorkspace);
 							}}
 						>
 							<span className="ref-thread-row-lead" aria-hidden>
@@ -4790,7 +4918,7 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 							onMouseDown={(e) => e.preventDefault()}
 							onClick={(e) => {
 								e.stopPropagation();
-								beginThreadTitleEdit(th);
+								beginThreadTitleEdit(th, threadListWorkspace);
 							}}
 						>
 							<IconPencil className="ref-thread-action-svg" />
@@ -4803,7 +4931,7 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 							title={confirmDeleteId === th.id ? t('common.confirmDelete') : t('common.delete')}
 							aria-label={confirmDeleteId === th.id ? t('common.confirmDelete') : t('common.deleteThread')}
 							onMouseDown={(e) => e.preventDefault()}
-							onClick={(e) => void onDeleteThread(e, th.id)}
+							onClick={(e) => void onDeleteThread(e, th.id, threadListWorkspace)}
 						>
 							{confirmDeleteId === th.id ? (
 								<span className="ref-thread-action-confirm-label">{t('common.confirm')}</span>
@@ -4829,14 +4957,13 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 			onSelectThread,
 			confirmDeleteId,
 			onDeleteThread,
+			workspace,
 		]
 	);
 
 	const agentLeftSidebarProps = useAgentLeftSidebarProps({
 		t,
 		agentSidebarWorkspaces,
-		todayThreads,
-		archivedThreads,
 		renderThreadItem,
 		editingWorkspacePath,
 		editingWorkspaceNameDraft,
@@ -6009,7 +6136,9 @@ export default function App({ appSurface }: { appSurface?: LayoutMode } = {}) {
 						</button>
 					</div>
 					<div className="ref-drawer-terminal">
-						<DrawerPtyTerminal placeholder={t('app.terminalStarting')} />
+						<Suspense fallback={<div className="ref-drawer-terminal-loading" />}>
+							<DrawerPtyTerminal placeholder={t('app.terminalStarting')} />
+						</Suspense>
 					</div>
 				</section>
 			) : null}

@@ -78,6 +78,9 @@ let storePath = '';
 let data: StoreFile = { version: 2, buckets: {} };
 let migrationWorkspaceRoot: string | null = null;
 
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let writeTail: Promise<void> = Promise.resolve();
+
 function normalizeBucketKey(workspaceRoot: string | null | undefined): string {
 	const raw = String(workspaceRoot ?? '').trim();
 	if (!raw) {
@@ -131,7 +134,7 @@ export function initThreadStore(userData: string, initialWorkspaceRoot: string |
 function load(): void {
 	if (!fs.existsSync(storePath)) {
 		data = { version: 2, buckets: {} };
-		save();
+		saveImmediate();
 		return;
 	}
 	try {
@@ -157,14 +160,54 @@ function load(): void {
 			currentThreadId: legacy?.currentThreadId ?? null,
 			threads: legacy?.threads ?? {},
 		});
-		save();
+		saveImmediate();
 	} catch {
 		data = { version: 2, buckets: {} };
 	}
 }
 
-function save(): void {
+function saveImmediate(): void {
+	if (!storePath) {
+		return;
+	}
+	if (saveTimer) {
+		clearTimeout(saveTimer);
+		saveTimer = null;
+	}
+	writeTail = Promise.resolve();
 	fs.writeFileSync(storePath, JSON.stringify(data, null, 2), 'utf8');
+}
+
+function save(): void {
+	if (!storePath) {
+		return;
+	}
+	if (saveTimer) {
+		clearTimeout(saveTimer);
+	}
+	saveTimer = setTimeout(() => {
+		saveTimer = null;
+		const json = JSON.stringify(data, null, 2);
+		writeTail = writeTail.then(() =>
+			fs.promises.writeFile(storePath, json, 'utf8').catch((err) => console.error('[threadStore] save error:', err))
+		);
+	}, 100);
+}
+
+/** 退出前等待挂起的异步写入落盘（配合 `before-quit` 使用）。 */
+export async function flushPendingSave(): Promise<void> {
+	if (!storePath) {
+		return;
+	}
+	if (saveTimer) {
+		clearTimeout(saveTimer);
+		saveTimer = null;
+	}
+	const json = JSON.stringify(data, null, 2);
+	writeTail = writeTail.then(() =>
+		fs.promises.writeFile(storePath, json, 'utf8').catch((err) => console.error('[threadStore] flush error:', err))
+	);
+	await writeTail;
 }
 
 export function ensureDefaultThread(workspaceRoot: string | null | undefined = null): void {

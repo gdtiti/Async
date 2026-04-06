@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { initWindowsConsoleUtf8 } from './winUtf8.js';
 import { initSettingsStore, getRestorableWorkspace } from './settingsStore.js';
-import { ensureDefaultThread, initThreadStore } from './threadStore.js';
+import { ensureDefaultThread, flushPendingSave, initThreadStore } from './threadStore.js';
 import { registerIpc } from './ipc/register.js';
 import { configureAppWindowIcon, createAppWindow } from './appWindow.js';
 
@@ -25,6 +25,18 @@ function resolveAppIconPath(): string | undefined {
 }
 
 initWindowsConsoleUtf8();
+
+let quittingAfterThreadStoreFlush = false;
+app.on('before-quit', (e) => {
+	if (quittingAfterThreadStoreFlush) {
+		return;
+	}
+	quittingAfterThreadStoreFlush = true;
+	e.preventDefault();
+	void flushPendingSave().finally(() => {
+		app.quit();
+	});
+});
 
 app.whenReady().then(() => {
 	const t0 = Date.now();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyGitFailure, normalizeGitFailureMessage } from './gitService';
+import { classifyGitFailure, normalizeGitFailureMessage, splitUnifiedDiff } from './gitService';
 
 describe('gitService Git failure classification', () => {
 	it('recognizes missing Git from ENOENT spawn errors', () => {
@@ -26,5 +26,26 @@ describe('gitService Git failure classification', () => {
 		const error = new Error('permission denied');
 		expect(classifyGitFailure(error)).toBe('unknown');
 		expect(normalizeGitFailureMessage(error, 'fallback')).toBe('fallback');
+	});
+});
+
+describe('splitUnifiedDiff', () => {
+	it('splits multi-file unified diff by path', () => {
+		const raw = `diff --git a/foo.txt b/foo.txt
+--- a/foo.txt
++++ b/foo.txt
+@@ -1 +1 @@
+-old
++new
+diff --git a/bar/baz.ts b/bar/baz.ts
+--- a/bar/baz.ts
++++ b/bar/baz.ts
+@@ -0,0 +1 @@
++hi
+`;
+		const m = splitUnifiedDiff(raw);
+		expect(Object.keys(m).sort()).toEqual(['bar/baz.ts', 'foo.txt']);
+		expect(m['foo.txt']).toContain('-old');
+		expect(m['bar/baz.ts']).toContain('+hi');
 	});
 });

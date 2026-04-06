@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type ChatMessage, type ThreadInfo, normalizeThreadRow } from '../threadTypes';
+import { normWorkspaceRootKey } from '../workspaceRootKey';
 
 type Shell = NonNullable<Window['asyncShell']>;
 
@@ -26,6 +27,10 @@ export function useThreads(shell: Shell | undefined) {
 	const messagesRef = useRef(messages);
 	messagesRef.current = messages;
 	const [messagesThreadId, setMessagesThreadId] = useState<string | null>(null);
+
+	/** Agent 侧栏：按工作区根路径归一化键索引的线程摘要（非当前工作区不经过 threads:list） */
+	const [sidebarThreadsByPathKey, setSidebarThreadsByPathKey] = useState<Record<string, ThreadInfo[]>>({});
+	const sidebarFetchGenRef = useRef(0);
 
 	const [resendFromUserIndex, setResendFromUserIndex] = useState<number | null>(null);
 	const resendIdxRef = useRef<number | null>(null);
@@ -56,22 +61,63 @@ export function useThreads(shell: Shell | undefined) {
 
 	const refreshThreads = useCallback(async () => {
 		if (!shell) return null;
+		const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
 		const r = (await shell.invoke('threads:list')) as {
 			threads: ThreadInfo[];
 			currentId: string | null;
 		};
 		setThreads((r.threads ?? []).map(normalizeThreadRow));
 		setCurrentId(r.currentId);
+		if (t0 && typeof performance !== 'undefined') {
+			console.log(`[perf] refreshThreads: ${(performance.now() - t0).toFixed(1)}ms`);
+		}
 		return r.currentId;
 	}, [shell]);
+
+	const refreshAgentSidebarThreads = useCallback(
+		async (paths: string[]) => {
+			if (!shell) {
+				return;
+			}
+			const gen = ++sidebarFetchGenRef.current;
+			if (paths.length === 0) {
+				setSidebarThreadsByPathKey({});
+				return;
+			}
+			const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
+			const r = (await shell.invoke('threads:listAgentSidebar', paths)) as {
+				workspaces?: Array<{ requestedPath: string; resolvedPath: string | null; threads: ThreadInfo[] }>;
+			};
+			if (t0 && typeof performance !== 'undefined') {
+				console.log(`[perf] refreshAgentSidebarThreads: ${(performance.now() - t0).toFixed(1)}ms`);
+			}
+			if (gen !== sidebarFetchGenRef.current) {
+				return;
+			}
+			const next: Record<string, ThreadInfo[]> = {};
+			for (const w of r.workspaces ?? []) {
+				const keySource = w.resolvedPath ?? w.requestedPath;
+				if (!keySource) {
+					continue;
+				}
+				next[normWorkspaceRootKey(keySource)] = (w.threads ?? []).map(normalizeThreadRow);
+			}
+			setSidebarThreadsByPathKey(next);
+		},
+		[shell]
+	);
 
 	const loadMessages = useCallback(
 		async (id: string) => {
 			if (!shell) return;
+			const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
 			const r = (await shell.invoke('threads:messages', id)) as {
 				ok: boolean;
 				messages?: ChatMessage[];
 			};
+			if (t0 && typeof performance !== 'undefined') {
+				console.log(`[perf] loadMessages: ${(performance.now() - t0).toFixed(1)}ms`);
+			}
 			if (r.ok && r.messages) {
 				if (currentIdRef.current !== id) return;
 				setMessages(r.messages);
@@ -94,6 +140,8 @@ export function useThreads(shell: Shell | undefined) {
 		setEditingThreadTitleDraft('');
 		threadTitleDraftRef.current = '';
 		setThreadNavigation({ history: [], index: -1 });
+		sidebarFetchGenRef.current++;
+		setSidebarThreadsByPathKey({});
 	}, []);
 
 	return {
@@ -125,6 +173,8 @@ export function useThreads(shell: Shell | undefined) {
 		setThreadNavigation,
 		skipThreadNavigationRecordRef,
 		refreshThreads,
+		refreshAgentSidebarThreads,
+		sidebarThreadsByPathKey,
 		loadMessages,
 		resetThreadState,
 	};
