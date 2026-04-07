@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import '../styles/editor-layout.css';
 import { BrandLogo } from '../BrandLogo';
 import { IconExplorer, IconCloudOutline, IconServerOutline } from '../icons';
 import type { TFunction } from '../i18n';
