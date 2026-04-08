@@ -3,6 +3,7 @@ import {
 	memo,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -144,6 +145,25 @@ export type AgentChatPanelProps = {
  */
 const MESSAGE_LIST_VIRTUAL_ENABLE_THRESHOLD = 28;
 const MESSAGE_LIST_VIRTUAL_DISABLE_THRESHOLD = 20;
+const MESSAGE_LIST_VIRTUAL_ESTIMATE_SIZE = 160;
+
+type MessageVirtualHeightCache = Map<number, number>;
+
+/**
+ * 按会话缓存已测得的消息高度。
+ * 这样重新进入工作区 / 线程，或在平面列表与虚拟列表之间切换时，
+ * 虚拟列表可以直接带着更接近真实值的 estimate 启动，减少滚动条跳动。
+ */
+const messageVirtualHeightsByConversation = new Map<string, MessageVirtualHeightCache>();
+
+function getMessageVirtualHeightCache(conversationKey: string): MessageVirtualHeightCache {
+	let bucket = messageVirtualHeightsByConversation.get(conversationKey);
+	if (!bucket) {
+		bucket = new Map<number, number>();
+		messageVirtualHeightsByConversation.set(conversationKey, bucket);
+	}
+	return bucket;
+}
 
 /** 仅长列表挂载：短对话不调用 useVirtualizer，避免与 composer 测高等同步布局挤在同一任务 */
 const AgentMessagesVirtualizedTrack = memo(function AgentMessagesVirtualizedTrack({
@@ -152,6 +172,7 @@ const AgentMessagesVirtualizedTrack = memo(function AgentMessagesVirtualizedTrac
 	conversationRenderKey,
 	messageTrackGap,
 	count,
+	heightCache,
 	renderRow,
 }: {
 	viewportRef: RefObject<HTMLDivElement | null>;
@@ -159,6 +180,7 @@ const AgentMessagesVirtualizedTrack = memo(function AgentMessagesVirtualizedTrac
 	conversationRenderKey: string;
 	messageTrackGap: number;
 	count: number;
+	heightCache: MessageVirtualHeightCache;
 	renderRow: (index: number) => ReactNode;
 }) {
 	/** 条数不多时 overscan 过大等于整表挂载（如 count=20, overscan=12 → 常渲染全部行） */
@@ -166,11 +188,56 @@ const AgentMessagesVirtualizedTrack = memo(function AgentMessagesVirtualizedTrac
 	const virtualizer = useVirtualizer({
 		count,
 		getScrollElement: () => viewportRef.current,
-		estimateSize: () => 160,
+		estimateSize: (index) => heightCache.get(index) ?? MESSAGE_LIST_VIRTUAL_ESTIMATE_SIZE,
 		overscan,
 		gap: messageTrackGap,
 		getItemKey: (index) => `${conversationRenderKey}-${index}`,
+		/**
+		 * 动态测高导致上方项尺寸修正时，保持当前视口锚点不被往回拽到中段。
+		 * 这对“从会话中间继续滚动”“返回旧工作区后继续浏览”两类场景最关键。
+		 */
+		shouldAdjustScrollPositionOnItemSizeChange: (item, delta, instance) => {
+			if (Math.abs(delta) < 1) {
+				return false;
+			}
+			return item.start < instance.scrollOffset;
+		},
 	});
+
+	useEffect(() => {
+		for (const index of [...heightCache.keys()]) {
+			if (index >= count) {
+				heightCache.delete(index);
+			}
+		}
+	}, [count, heightCache]);
+
+	useLayoutEffect(() => {
+		const track = trackRef.current;
+		if (!track) {
+			return;
+		}
+		const rows = track.querySelectorAll<HTMLElement>('.ref-msg-virtual-row[data-index]');
+		for (const row of rows) {
+			const raw = row.dataset.index;
+			if (!raw) {
+				continue;
+			}
+			const index = Number(raw);
+			if (!Number.isFinite(index)) {
+				continue;
+			}
+			const next = Math.ceil(row.getBoundingClientRect().height);
+			if (next > 0) {
+				heightCache.set(index, next);
+			}
+		}
+	});
+
+	useEffect(() => {
+		virtualizer.measure();
+	}, [virtualizer, conversationRenderKey, count]);
+
 	return (
 		<div
 			key={`messages-track-${conversationRenderKey}`}
@@ -316,9 +383,39 @@ export const AgentChatPanel = memo(function AgentChatPanel({
 	}, []);
 	const conversationRenderKey = messagesThreadId ?? 'no-thread';
 	const messageTrackGap = isEditorRail ? 20 : 22;
+	const virtualHeightCache = useMemo(
+		() => getMessageVirtualHeightCache(conversationRenderKey),
+		[conversationRenderKey]
+	);
 	const [virtualListEnabled, setVirtualListEnabled] = useState(
 		() => hasConversation && displayMessages.length >= MESSAGE_LIST_VIRTUAL_ENABLE_THRESHOLD
 	);
+
+	const captureFlatTrackMessageHeights = useCallback(() => {
+		const track = messagesTrackRef.current;
+		if (!track || virtualListEnabled) {
+			return;
+		}
+		const rows = Array.from(track.children) as HTMLElement[];
+		rows.forEach((row, index) => {
+			const next = Math.ceil(row.getBoundingClientRect().height);
+			if (next > 0) {
+				virtualHeightCache.set(index, next);
+			}
+		});
+	}, [messagesTrackRef, virtualHeightCache, virtualListEnabled]);
+
+	useLayoutEffect(() => {
+		if (!hasConversation || virtualListEnabled) {
+			return;
+		}
+		captureFlatTrackMessageHeights();
+	}, [
+		hasConversation,
+		virtualListEnabled,
+		displayMessages,
+		captureFlatTrackMessageHeights,
+	]);
 
 	useEffect(() => {
 		// 线程切换时按新会话长度重新决定起始模式，避免沿用上一线程的虚拟化状态。
@@ -599,6 +696,7 @@ export const AgentChatPanel = memo(function AgentChatPanel({
 					conversationRenderKey={conversationRenderKey}
 					messageTrackGap={messageTrackGap}
 					count={displayMessages.length}
+					heightCache={virtualHeightCache}
 					renderRow={messageNodeAtIndex}
 				/>
 			) : (
