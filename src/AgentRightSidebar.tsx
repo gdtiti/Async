@@ -75,6 +75,7 @@ function CommitModal({
 	gitBranch,
 	changeCount,
 	diffTotals,
+	diffLoading,
 	commitMsg,
 	setCommitMsg,
 	onClose,
@@ -85,6 +86,7 @@ function CommitModal({
 	gitBranch: string;
 	changeCount: number;
 	diffTotals: { additions: number; deletions: number };
+	diffLoading: boolean;
 	commitMsg: string;
 	setCommitMsg: (msg: string) => void;
 	onClose: () => void;
@@ -124,10 +126,10 @@ function CommitModal({
 						<span className="ref-commit-modal-label">{t('app.changes')}</span>
 						<span className="ref-commit-modal-value">
 							{t('app.commitFiles', { count: String(changeCount) })}
-							{diffTotals.additions > 0 && (
+							{!diffLoading && diffTotals.additions > 0 && (
 								<span className="ref-commit-stat-add">+{diffTotals.additions}</span>
 							)}
-							{diffTotals.deletions > 0 && (
+							{!diffLoading && diffTotals.deletions > 0 && (
 								<span className="ref-commit-stat-del">-{diffTotals.deletions}</span>
 							)}
 						</span>
@@ -626,12 +628,15 @@ const AgentRightSidebarGitPanel = memo(function AgentRightSidebarGitPanel({
 		gitActionError,
 		refreshGit,
 		diffTotals,
+		loadGitDiffPreviews,
 	} = useAppShellGit();
 
 	const changeCount = gitChangedPaths.length;
 	const gitUnavailableReason: GitUnavailableReason = gitStatusOk
 		? 'none'
 		: classifyGitUnavailableReason(gitLines[0]);
+	const hasMissingGitPreviews = gitChangedPaths.some((path) => diffPreviews[path] == null);
+	const showCompleteDiffTotals = !diffLoading && !hasMissingGitPreviews;
 
 	useEffect(() => {
 		if (gitViewActive) {
@@ -698,10 +703,10 @@ const AgentRightSidebarGitPanel = memo(function AgentRightSidebarGitPanel({
 							) : (
 								<span className="ref-git-count ref-git-count--muted">{t('app.gitNoChanges')}</span>
 							)}
-							{gitUnavailableReason === 'none' && diffTotals.additions > 0 ? (
+							{gitUnavailableReason === 'none' && showCompleteDiffTotals && diffTotals.additions > 0 ? (
 								<span className="ref-git-stat-add">+{diffTotals.additions}</span>
 							) : null}
-							{gitUnavailableReason === 'none' && diffTotals.deletions > 0 ? (
+							{gitUnavailableReason === 'none' && showCompleteDiffTotals && diffTotals.deletions > 0 ? (
 								<span className="ref-git-stat-del">-{diffTotals.deletions}</span>
 							) : null}
 						</div>
@@ -716,6 +721,9 @@ const AgentRightSidebarGitPanel = memo(function AgentRightSidebarGitPanel({
 									diffLoading={diffLoading}
 									t={t}
 									onOpenGitDiff={onOpenGitDiff}
+									onEnsurePreviews={(paths) => {
+										void loadGitDiffPreviews(paths);
+									}}
 								/>
 							) : null}
 							{gitUnavailableReason === 'none' && gitActionError ? (
@@ -732,6 +740,7 @@ const AgentRightSidebarGitPanel = memo(function AgentRightSidebarGitPanel({
 					gitBranch={gitBranch}
 					changeCount={changeCount}
 					diffTotals={diffTotals}
+					diffLoading={!showCompleteDiffTotals}
 					commitMsg={commitMsg}
 					setCommitMsg={setCommitMsg}
 					onClose={() => setShowCommitModal(false)}

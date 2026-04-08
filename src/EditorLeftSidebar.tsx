@@ -45,7 +45,7 @@ const EditorExplorerGitRefreshButton = memo(function EditorExplorerGitRefreshBut
 	);
 });
 
-/** 活动栏 Git 标签：内部拉取 refresh + diff 预览，父组件不必传 Git 回调。 */
+/** 活动栏 Git 标签：只刷新轻状态，预览由 Git 面板缺口检测后后台补齐。 */
 const EditorGitTabButton = memo(function EditorGitTabButton({
 	isActive,
 	onActivate,
@@ -55,7 +55,6 @@ const EditorGitTabButton = memo(function EditorGitTabButton({
 }) {
 	const { t } = useAppShellChrome();
 	const { refreshGit } = useAppShellGitActions();
-	const { loadGitDiffPreviews } = useAppShellGitFiles();
 	return (
 		<button
 			type="button"
@@ -65,7 +64,7 @@ const EditorGitTabButton = memo(function EditorGitTabButton({
 			aria-pressed={isActive}
 			onClick={() => {
 				onActivate();
-				void Promise.resolve(refreshGit()).then(() => loadGitDiffPreviews());
+				void refreshGit();
 			}}
 		>
 			<IconGitSCM />
@@ -90,19 +89,34 @@ const EditorLeftSidebarGitPane = memo(function EditorLeftSidebarGitPane({
 	const { t } = useAppShellChrome();
 	const { workspace } = useAppShellWorkspace();
 	const { refreshGit } = useAppShellGitActions();
-	const { gitLines, gitStatusOk } = useAppShellGitMeta();
-	const { gitChangedPaths, gitPathStatus, loadGitDiffPreviews } = useAppShellGitFiles();
+	const { gitLines, gitStatusOk, diffLoading } = useAppShellGitMeta();
+	const { gitChangedPaths, gitPathStatus, diffPreviews, loadGitDiffPreviews } = useAppShellGitFiles();
 
 	const gitUnavailableReason: GitUnavailableReason = gitStatusOk
 		? 'none'
 		: classifyGitUnavailableReason(gitLines[0]);
+	const hasMissingGitPreviews = gitChangedPaths.some((path) => diffPreviews[path] == null);
 
 	useEffect(() => {
-		if (!hasShellAndWorkspace) {
+		if (
+			!hasShellAndWorkspace ||
+			!gitStatusOk ||
+			gitChangedPaths.length === 0 ||
+			diffLoading ||
+			!hasMissingGitPreviews
+		) {
 			return;
 		}
 		void loadGitDiffPreviews();
-	}, [hasShellAndWorkspace, workspace, loadGitDiffPreviews]);
+	}, [
+		hasShellAndWorkspace,
+		workspace,
+		gitStatusOk,
+		gitChangedPaths,
+		diffLoading,
+		hasMissingGitPreviews,
+		loadGitDiffPreviews,
+	]);
 
 	return (
 		<>
@@ -117,7 +131,7 @@ const EditorLeftSidebarGitPane = memo(function EditorLeftSidebarGitPane({
 							className="ref-editor-sidebar-action"
 							aria-label={t('app.explorerRefreshAria')}
 							title={t('common.refresh')}
-							onClick={() => void Promise.resolve(refreshGit()).then(() => loadGitDiffPreviews())}
+							onClick={() => void refreshGit()}
 						>
 							<IconRefresh />
 						</button>
