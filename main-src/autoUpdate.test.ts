@@ -215,8 +215,8 @@ describe('AutoUpdate Settings Configuration', () => {
 				build: {
 					publish: {
 						provider: 'github',
-						owner: 'your-username',
-						repo: 'async-ide',
+						owner: 'ZYKJShadow',
+						repo: 'Async',
 						releaseType: 'release',
 					},
 				},

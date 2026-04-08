@@ -48,8 +48,8 @@ function configureUpdater(): void {
 	// 设置 GitHub 仓库（从 package.json 的 repository 或硬编码）
 	autoUpdater.setFeedURL({
 		provider: 'github',
-		owner: 'your-username', // TODO: 替换为实际的 GitHub 用户名
-		repo: 'async-ide', // TODO: 替换为实际的仓库名
+		owner: 'ZYKJShadow',
+		repo: 'Async',
 	});
 
 	autoUpdater.on('checking-for-update', () => {
