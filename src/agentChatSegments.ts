@@ -1741,6 +1741,10 @@ function mergeAdjacentMarkdown(segs: AssistantSegment[]): AssistantSegment[] {
 	return m;
 }
 
+function isExplorationActivity(seg: ActivitySegment): boolean {
+	return seg.resultKind === 'search' || seg.resultKind === 'read' || seg.resultKind === 'dir';
+}
+
 /** 为一组 activity 生成摘要标签（仿 Cursor "Explored N files, M searches"） */
 function buildGroupSummary(items: ActivitySegment[]): string {
 	let reads = 0, searches = 0, dirs = 0, cmds = 0, writes = 0, others = 0;
@@ -1780,14 +1784,23 @@ function groupActivities(segs: AssistantSegment[]): AssistantSegment[] {
 			i++;
 			continue;
 		}
-		// 收集连续的 activity（允许中间夹 file_edit，file_edit 不进 group）
+		const firstActivity = s as ActivitySegment;
+		if (!isExplorationActivity(firstActivity)) {
+			out.push(s);
+			i++;
+			continue;
+		}
+		// 仅收集连续的“探索类” activity（允许中间夹 file_edit，file_edit 不进 group）
 		const groupItems: ActivitySegment[] = [];
 		let j = i;
-		const firstNest = (s as ActivitySegment).nestParent ?? '';
+		const firstNest = firstActivity.nestParent ?? '';
 		while (j < segs.length && (segs[j]!.type === 'activity' || segs[j]!.type === 'file_edit')) {
 			if (segs[j]!.type === 'activity') {
 				const aj = segs[j] as ActivitySegment;
 				if ((aj.nestParent ?? '') !== firstNest) {
+					break;
+				}
+				if (!isExplorationActivity(aj)) {
 					break;
 				}
 				groupItems.push(aj);
