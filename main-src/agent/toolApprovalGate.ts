@@ -34,7 +34,7 @@ export function createToolApprovalBeforeExecute(
 	return async (call) => {
 		const agent = getAgent() ?? {};
 
-		if (call.name === 'execute_command') {
+		if (call.name === 'Bash' || call.name === 'execute_command') {
 			const confirmShell = agent.confirmShellCommands !== false;
 			if (!confirmShell) {
 				return { proceed: true };
@@ -74,11 +74,11 @@ export function createToolApprovalBeforeExecute(
 			});
 		}
 
-		if (call.name === 'write_to_file' || call.name === 'str_replace') {
+		if (call.name === 'Write' || call.name === 'Edit' || call.name === 'write_to_file' || call.name === 'str_replace') {
 			if (agent.confirmWritesBeforeExecute !== true) {
 				return { proceed: true };
 			}
-			const relPath = String(call.arguments.path ?? '');
+			const relPath = String(call.arguments.file_path ?? call.arguments.path ?? '');
 			const id = `ta-${threadId}-${Date.now()}-${++seq}`;
 			return await new Promise<BeforeExecuteToolResult>((resolve) => {
 				if (signal.aborted) {

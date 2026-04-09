@@ -1,7 +1,7 @@
 /**
- * AI 工具调用成功结果的可折叠内联卡片（search_files / read_file / list_dir / execute_command）。
+ * AI 工具调用成功结果的可折叠内联卡片（Read / Glob / Grep / Bash 等）。
  *
- * 动画：播放时固定高度 + overflow-y:auto（滚动条），逐行追加并自动滚底（read_file / list_dir 不播放，直接展示全文）。
+ * 动画：播放时固定高度 + overflow-y:auto（滚动条），逐行追加并自动滚底（Read / Glob 等不播放，直接展示全文）。
  * 播完后：read/search/命令输出用 Monaco colorize 做语法高亮（与编辑器主题一致）。
  *
  * 性能：视口外不着色（IntersectionObserver + requestIdleCallback）、Monaco 全局并发池、
@@ -89,7 +89,7 @@ function prefersReducedMotion(): boolean {
 type Props = {
 	lines: ActivityResultLine[];
 	kind: 'search' | 'read' | 'dir' | 'plain';
-	/** read_file：用于选择 Monaco 语言 */
+	/** Read：用于选择 Monaco 语言 */
 	readSourcePath?: string;
 	onOpenFile?: (relPath: string, revealLine?: number) => void;
 	/**

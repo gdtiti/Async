@@ -41,7 +41,7 @@ describe('repairAnthropicToolPairing', () => {
 				role: 'assistant',
 				content: [
 					{ type: 'text', text: 't' },
-					{ type: 'tool_use', id: 'tu_1', name: 'read_file', input: { path: 'a.ts' } },
+					{ type: 'tool_use', id: 'tu_1', name: 'Read', input: { file_path: 'a.ts' } },
 				],
 			},
 		];

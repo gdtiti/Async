@@ -27,7 +27,7 @@ function IconShield({ className }: { className?: string }) {
 function IconSpark({ className }: { className?: string }) {
 	return (
 		<svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-			<path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3z" strokeLinejoin="round" />
+			<path d="M12 5l1.7 5.3L19 12l-5.3 1.7L12 19l-1.7-5.3L5 12l5.3-1.7L12 5z" strokeLinejoin="round" />
 		</svg>
 	);
 }
@@ -230,8 +230,12 @@ export function AgentCommandPermissionDropdown({
 				<span className="ref-command-permission-trigger-ico-wrap">
 					<SelectedIcon className="ref-command-permission-trigger-ico" />
 				</span>
-				<span className="ref-command-permission-trigger-label">{selected.label}</span>
-				<IconChevron className="ref-command-permission-trigger-chev" />
+				<span className="ref-command-permission-trigger-label">
+					<span className="ref-command-permission-trigger-label-text">{selected.label}</span>
+				</span>
+				<span className="ref-command-permission-trigger-chev-wrap" aria-hidden>
+					<IconChevron className="ref-command-permission-trigger-chev" />
+				</span>
 			</button>
 			{typeof document !== 'undefined' && menu ? createPortal(menu, document.body) : null}
 		</div>

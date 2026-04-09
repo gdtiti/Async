@@ -54,12 +54,12 @@ export type AgentCustomization = {
 	subagents?: AgentSubagent[];
 	commands?: AgentCommand[];
 	/**
-	 * 是否在执行 `execute_command` 前弹出确认（默认 true）。
+	 * 是否在执行 **Bash**（兼容历史名 `execute_command`）前弹出确认（默认 true）。
 	 * 设为 false 时命令将直接执行（仍有工作区目录限制）。
 	 */
 	confirmShellCommands?: boolean;
 	/**
-	 * 是否在 `write_to_file` / `str_replace` 写入前暂停等待确认（默认 false，依赖事后撤销）。
+	 * 是否在 `Write` / `Edit`（及旧工具名）写入前暂停等待确认（默认 false，依赖事后撤销）。
 	 */
 	confirmWritesBeforeExecute?: boolean;
 	/**

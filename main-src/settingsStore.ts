@@ -72,7 +72,7 @@ export type ShellUiSettings = {
 
 /** 工作区索引（未设置字段视为开启，与旧 settings.json 兼容） */
 export type ShellIndexingSettings = {
-	/** 导出符号索引：Quick Open @、search_files(symbol) */
+	/** 导出符号索引：Quick Open @、Grep(symbol) */
 	symbolIndexEnabled?: boolean;
 	/** 本地 TF-IDF 语义块：构建索引并注入 Agent/Plan/Debug 对话上下文 */
 	semanticIndexEnabled?: boolean;
@@ -87,6 +87,25 @@ const INDEXING_DEFAULTS: Required<ShellIndexingSettings> = {
 	semanticIndexEnabled: true,
 	tsLspEnabled: true,
 	gitContextEnabled: true,
+};
+
+/**
+ * 旧版在 settings.json 中登记 LSP 的方式；**优先推荐**与 Claude Code 一致：
+ * 在 `<asyncData>/plugins/<name>/` 或 `<workspace>/.async/plugins/<name>/` 下放置 `.lsp.json` 或 `plugin.json#lspServers`。
+ * 保留本结构仅为兼容已有配置（会合并为 `plugin:settings:<id>`）。
+ */
+export type ShellLspUserServer = {
+	/** 唯一 id，用于日志与多服务器区分 */
+	id: string;
+	command: string;
+	args?: string[];
+	extensions: string[];
+	extensionToLanguage?: Record<string, string>;
+	cwd?: string;
+};
+
+export type ShellLspSettings = {
+	servers?: ShellLspUserServer[];
 };
 
 export type ShellSettings = {
@@ -133,6 +152,8 @@ export type ShellSettings = {
 	ui?: ShellUiSettings;
 	/** 索引与 LSP */
 	indexing?: ShellIndexingSettings;
+	/** @deprecated 兼容字段；LSP 主要来自插件目录，此项若存在会一并合并 */
+	lsp?: ShellLspSettings;
 	/** MCP 服务器配置 */
 	mcpServers?: McpServerConfig[];
 	/**
