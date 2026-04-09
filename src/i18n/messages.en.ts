@@ -488,6 +488,9 @@ export const messagesEn: Record<string, string> = {
 	'settings.modelAdvanced': 'Advanced',
 	'settings.maxOutputTokens': 'Max output tokens',
 	'settings.maxOutputTokensHint': 'Cap per completion; default is 16384—lower if your gateway enforces a smaller max (e.g. 8192).',
+	'settings.contextWindowTokens': 'Context window (input tokens)',
+	'settings.contextWindowTokensHint':
+		'Optional. Drives send-time compaction threshold (same idea as Claude Code context window). If empty, uses OpenAI-compatible /v1/models cache, heuristics, or 200k default.',
 	'settings.useCustomConnection': 'Custom base URL & API key',
 	'settings.useCustomConnectionHint': 'When off, this model uses the global key/base for its paradigm.',
 	'settings.customBaseUrl': 'Base URL (optional)',

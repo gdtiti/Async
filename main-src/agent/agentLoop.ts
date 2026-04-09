@@ -313,11 +313,15 @@ async function prepareMcpConnectionsForSession(composerMode: ComposerMode): Prom
 	if (composerMode !== 'agent' && composerMode !== 'plan') {
 		return;
 	}
+	const mcpT0 = Date.now();
 	const mgr = getMcpManager();
 	mgr.loadConfigs(getMcpServerConfigs());
 	await mgr.startAll().catch((e) => {
 		console.warn('[AgentLoop] MCP startAll:', e instanceof Error ? e.message : e);
 	});
+	console.log(
+		`[AgentLoop] MCP prepare done (${Date.now() - mcpT0}ms) mode=${composerMode} — slow here usually means MCP servers starting or timing out`
+	);
 }
 
 export async function runAgentLoop(
@@ -326,8 +330,18 @@ export async function runAgentLoop(
 	options: AgentLoopOptions,
 	handlers: AgentLoopHandlers
 ): Promise<void> {
+	const loopT0 = Date.now();
+	const tid = options.threadId ?? 'n/a';
+	console.log(
+		`[AgentLoop] runAgentLoop enter thread=${tid} paradigm=${options.paradigm} mode=${options.composerMode} msgCount=${threadMessages.length}`
+	);
+	const repairStart = Date.now();
 	const messagesForApi = repairAgentThreadMessagesForApi(threadMessages);
+	console.log(`[AgentLoop] repairAgentThreadMessagesForApi (${Date.now() - repairStart}ms) thread=${tid}`);
 	await prepareMcpConnectionsForSession(options.composerMode);
+	console.log(
+		`[AgentLoop] after MCP prepare, before ${options.paradigm === 'anthropic' ? 'Anthropic' : 'OpenAI'} loop (${Date.now() - loopT0}ms since runAgentLoop enter) thread=${tid}`
+	);
 	switch (options.paradigm) {
 		case 'anthropic':
 			return runAnthropicLoop(settings, messagesForApi, options, handlers);
@@ -437,6 +451,8 @@ async function runOpenAILoop(
 	const baseURL = options.requestBaseURL?.trim() || undefined;
 	const model = options.requestModelId.trim();
 	if (!model) { handlers.onError('模型请求名称为空。请在 Models 中编辑该模型的「请求名称」。'); return; }
+
+	const openaiSyncPrepStart = Date.now();
 
 	const proxyRaw = (options.requestProxyUrl?.trim() || settings.openAI?.proxyUrl?.trim()) ?? '';
 	let httpAgent: InstanceType<typeof HttpsProxyAgent> | undefined;
@@ -604,6 +620,9 @@ async function runOpenAILoop(
 
 	const streamTimeoutConfig = resolveStreamTimeouts(settings);
 	const maxRounds = resolveAgentMaxRounds(settings);
+	console.log(
+		`[AgentLoop] OpenAI sync prep done (${Date.now() - openaiSyncPrepStart}ms) convMsgs=${conversation.length} tools=${tools.length} thread=${options.threadId ?? 'n/a'}`
+	);
 	console.log(
 		`[AgentLoop] OpenAI loop start — idleMs=${streamTimeoutConfig.idleMs} hardMs=${streamTimeoutConfig.hardMs} watchdog=${streamTimeoutConfig.idleWatchdogEnabled} maxRounds=${maxRounds ?? '∞'}`
 	);

@@ -490,6 +490,9 @@ export const messagesZhCN: Record<string, string> = {
 	'settings.modelAdvanced': '高级选项',
 	'settings.maxOutputTokens': '最大输出 token',
 	'settings.maxOutputTokensHint': '单次回复长度上限；默认 16384，若网关仅支持更低（如 8192）请按服务商说明改小。',
+	'settings.contextWindowTokens': '上下文窗口（输入 token）',
+	'settings.contextWindowTokensHint':
+		'可选。用于发送前压缩阈值（对齐 Claude Code 的上下文窗口逻辑）。留空则按 OpenAI 兼容 /v1/models 缓存、启发式或默认 200k。',
 	'settings.useCustomConnection': '独立 Base URL 与 API 密钥',
 	'settings.useCustomConnectionHint': '关闭时使用上方「全局默认连接」中、与本条范式对应的密钥与地址。',
 	'settings.customBaseUrl': 'Base URL（可选）',

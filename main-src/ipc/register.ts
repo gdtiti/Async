@@ -82,6 +82,7 @@ import * as gitService from '../gitService.js';
 import { parseComposerMode, type ComposerMode } from '../llm/composerMode.js';
 import { resolveModelRequest, resolveThinkingLevelForSelection } from '../llm/modelResolve.js';
 import { preconnectLlmBaseUrlIfEligible } from '../llm/apiPreconnect.js';
+import { scheduleRefreshOpenAiModelCapabilitiesIfStale } from '../llm/modelContext.js';
 import { streamChatUnified } from '../llm/llmRouter.js';
 import { formatLlmSdkError } from '../llm/formatLlmSdkError.js';
 import {
@@ -214,6 +215,20 @@ function appendSystemBlock(base: string | undefined, block: string): string {
 		return base ?? '';
 	}
 	return base && base.trim() ? `${base}\n\n---\n${trimmed}` : trimmed;
+}
+
+/** 主进程控制台：排查从 IPC 发送到 AgentLoop 首条日志之间的阶段性耗时 */
+function logChatPipelineLatency(
+	channel: string,
+	threadId: string,
+	epochMs: number,
+	phase: string,
+	extra?: Record<string, string | number | boolean | null | undefined>
+): void {
+	const delta = Date.now() - epochMs;
+	const tail =
+		extra && Object.keys(extra).length > 0 ? ` ${JSON.stringify(extra)}` : '';
+	console.log(`[${channel}] thread=${threadId} +${delta}ms ${phase}${tail}`);
 }
 
 async function appendMemoryAndRetrievalContext(params: {
@@ -375,7 +390,12 @@ function runChatStream(
 	abortByThread.set(threadId, ac);
 
 	void (async () => {
+		const streamLatencyT0 = Date.now();
 		try {
+			logChatPipelineLatency('chat:stream', threadId, streamLatencyT0, 'runChatStream async entered', {
+				mode: String(mode),
+				msgCount: messages.length,
+			});
 			const settings = getSettings();
 			const workspaceRoot = getWorkspaceRootForWebContents(win.webContents);
 			const workspaceLspManager = getWorkspaceLspManagerForWebContents(win.webContents);
@@ -385,6 +405,9 @@ function runChatStream(
 				emitStreamError(resolved.message);
 				return;
 			}
+			logChatPipelineLatency('chat:stream', threadId, streamLatencyT0, 'after resolveModelRequest', {
+				paradigm: String(resolved.paradigm),
+			});
 
 			// 与 Claude Code `apiPreconnect.ts` 一致：首条对话前预热到当前模型 API 基址的 TCP/TLS（无代理时）
 			preconnectLlmBaseUrlIfEligible({
@@ -392,9 +415,17 @@ function runChatStream(
 				baseURL: resolved.baseURL,
 				appProxyUrl: resolved.proxyUrl?.trim() || settings.openAI?.proxyUrl?.trim() || undefined,
 			});
+			logChatPipelineLatency('chat:stream', threadId, streamLatencyT0, 'after preconnectLlm (fire-and-forget HEAD)');
 
 			// 发送端压缩：超长线程仅压缩发给 LLM 的副本，磁盘保留完整历史
 			const thread = getThread(threadId);
+			if (resolved.paradigm === 'openai-compatible') {
+				scheduleRefreshOpenAiModelCapabilitiesIfStale({
+					baseURL: resolved.baseURL,
+					apiKey: resolved.apiKey,
+					proxyUrl: resolved.proxyUrl,
+				});
+			}
 			const compressOptions = {
 				mode: mode as import('../llm/composerMode.js').ComposerMode,
 				signal: ac.signal,
@@ -404,8 +435,12 @@ function runChatStream(
 				requestBaseURL: resolved.baseURL,
 				requestProxyUrl: resolved.proxyUrl,
 				maxOutputTokens: resolved.maxOutputTokens,
+				...(resolved.contextWindowTokens != null
+					? { contextWindowTokens: resolved.contextWindowTokens }
+					: {}),
 				thinkingLevel,
 			};
+			const compressStarted = Date.now();
 			const compressResult = await compressForSend(
 				messages,
 				settings,
@@ -413,6 +448,11 @@ function runChatStream(
 				thread?.summary,
 				thread?.summaryCoversMessageCount
 			);
+			logChatPipelineLatency('chat:stream', threadId, streamLatencyT0, 'after compressForSend', {
+				compressMs: Date.now() - compressStarted,
+				triggeredNewSummary: Boolean(compressResult.newSummary),
+				outMsgCount: compressResult.messages.length,
+			});
 			let sendMessages = compressResult.messages;
 			if (compressResult.newSummary && compressResult.newSummaryCoversCount !== undefined) {
 				saveSummary(threadId, compressResult.newSummary, compressResult.newSummaryCoversCount);
@@ -474,11 +514,17 @@ function runChatStream(
 						emit: (evt) => send({ threadId, ...evt }),
 					});
 				}
-				const messagesForAgent = modeExpandsWorkspaceFileContext(
-					mode as import('../llm/composerMode.js').ComposerMode
-				)
+				const expandMode = mode as import('../llm/composerMode.js').ComposerMode;
+				const doAtExpand = modeExpandsWorkspaceFileContext(expandMode);
+				const expandStarted = Date.now();
+				const messagesForAgent = doAtExpand
 					? cloneMessagesWithExpandedLastUser(sendMessages, workspaceRoot)
 					: sendMessages;
+				logChatPipelineLatency('chat:stream', threadId, streamLatencyT0, 'after @-workspace expand', {
+					expandMs: Date.now() - expandStarted,
+					didExpand: doAtExpand,
+				});
+				logChatPipelineLatency('chat:stream', threadId, streamLatencyT0, 'before runAgentLoop');
 				await runAgentLoop(
 					settings,
 					messagesForAgent,
@@ -563,6 +609,7 @@ function runChatStream(
 			return;
 		}
 
+		logChatPipelineLatency('chat:stream', threadId, streamLatencyT0, 'before streamChatUnified (non-agent path)');
 		await streamChatUnified(
 			settings,
 			sendMessages,
@@ -1540,6 +1587,12 @@ export function registerIpc(): void {
 				return { ok: false as const, error: 'no-model' as const };
 			}
 
+			const chatSendLatencyT0 = Date.now();
+			logChatPipelineLatency('chat:ipc', threadId, chatSendLatencyT0, 'chat:send entered', {
+				mode: String(mode),
+				streamNonce: typeof streamNonce === 'number' ? streamNonce : -1,
+			});
+
 			const settings = getSettings();
 			const root = senderWorkspaceRoot(event);
 			let workspaceFiles: string[] = [];
@@ -1550,6 +1603,10 @@ export function registerIpc(): void {
 					workspaceFiles = [];
 				}
 			}
+			logChatPipelineLatency('chat:ipc', threadId, chatSendLatencyT0, 'after ensureWorkspaceFileIndex', {
+				fileCount: workspaceFiles.length,
+				hasRoot: Boolean(root),
+			});
 			const projectAgent = readWorkspaceAgentProjectSlice(root);
 			const agentForTurn = mergeAgentWithProjectSlice(settings.agent, projectAgent);
 
@@ -1705,10 +1762,16 @@ export function registerIpc(): void {
 				atPaths,
 				modelSelection,
 			});
+			logChatPipelineLatency('chat:ipc', threadId, chatSendLatencyT0, 'after appendMemoryAndRetrievalContext', {
+				mode: String(mode),
+			});
 
 			finalSystemAppend = appendPlanExecuteToSystem(finalSystemAppend, payload.planExecute, root);
 
 			const t = appendMessage(threadId, { role: 'user', content: userText });
+			logChatPipelineLatency('chat:ipc', threadId, chatSendLatencyT0, 'before runChatStream (IPC returns soon)', {
+				persistedMsgCount: t.messages.length,
+			});
 			runChatStream(win, threadId, t.messages, mode, modelSelection, finalSystemAppend, streamNonce);
 
 			return { ok: true as const };

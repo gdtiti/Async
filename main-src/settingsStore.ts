@@ -49,6 +49,11 @@ export type UserModelEntry = {
 	 * 未设置时在解析层使用默认（当前为 16384）；若网关上限更低请在模型高级选项中调小。
 	 */
 	maxOutputTokens?: number;
+	/**
+	 * 模型输入上下文上限（tokens），用于发送前压缩阈值等与 Claude Code `getContextWindowForModel` 对齐。
+	 * 不填则使用 OpenAI 兼容 `/v1/models` 缓存、启发式或默认 200k。
+	 */
+	contextWindowTokens?: number;
 };
 
 export type LLMProviderId = ModelRequestParadigm;
