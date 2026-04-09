@@ -19,6 +19,10 @@ import {
 
 export type AtComposerSlot = 'hero' | 'bottom' | 'inline';
 
+/** 与 claude-code 统一建议量级接近：控制菜单高度与主进程 top-K */
+const AT_MENU_FILE_RESULTS_LIMIT = 15;
+const AT_MENU_SEARCH_DEBOUNCE_MS = 50;
+
 type RichRefs = {
 	hero: React.RefObject<HTMLDivElement | null>;
 	bottom: React.RefObject<HTMLDivElement | null>;
@@ -35,6 +39,8 @@ export function useComposerAtMention(
 		/** 按需搜索工作区文件（IPC，主进程侧过滤） */
 		searchFiles: (query: string, gitChangedPaths: string[], limit?: number) => Promise<WorkspaceFileSearchItem[]>;
 		onFileChipPreview: (relPath: string) => void;
+		/** 主进程首次索引扫描完成时递增，用于菜单打开期间重跑当前 query */
+		fileIndexReadyTick?: number;
 	}
 ) {
 	const atSlotRef = useRef<AtComposerSlot>('bottom');
@@ -56,21 +62,29 @@ export function useComposerAtMention(
 
 	// ── 文件搜索（按需 IPC，不依赖预加载的全量文件列表）──────────────────────
 	const [fileItems, setFileItems] = useState<AtMenuItem[]>([]);
+	const [atFileSearchLoading, setAtFileSearchLoading] = useState(false);
 	const searchSeqRef = useRef(0);
 
 	useEffect(() => {
 		if (!atOpen) {
 			setFileItems([]);
+			setAtFileSearchLoading(false);
 			return;
 		}
 		const seq = ++searchSeqRef.current;
-		// 有查询词时 debounce 80ms，无查询词时立即发起（首次打开菜单需要即时反馈）
-		const delay = atQuery ? 80 : 0;
+		const delay = atQuery ? AT_MENU_SEARCH_DEBOUNCE_MS : 0;
+		setAtFileSearchLoading(true);
 		const timer = window.setTimeout(() => {
 			void (async () => {
 				try {
-					const items = await opts.searchFiles(atQuery, opts.gitChangedPaths, 60);
-					if (seq !== searchSeqRef.current) return;
+					const items = await opts.searchFiles(
+						atQuery,
+						opts.gitChangedPaths,
+						AT_MENU_FILE_RESULTS_LIMIT
+					);
+					if (seq !== searchSeqRef.current) {
+						return;
+					}
 					setFileItems(
 						items.map((it) => ({
 							id: `ws:${it.path}`,
@@ -82,20 +96,28 @@ export function useComposerAtMention(
 					);
 				} catch {
 					/* ignore */
+				} finally {
+					if (seq === searchSeqRef.current) {
+						setAtFileSearchLoading(false);
+					}
 				}
 			})();
 		}, delay);
 		return () => {
 			window.clearTimeout(timer);
 		};
-	}, [atOpen, atQuery, opts.searchFiles, opts.gitChangedPaths]);
+	}, [atOpen, atQuery, opts.searchFiles, opts.gitChangedPaths, opts.fileIndexReadyTick ?? 0]);
 
 	const filteredStatic = useMemo(
 		() => filterAtMenuItems(staticItems, atQuery),
 		[staticItems, atQuery]
 	);
 
-	const filtered = useMemo(() => [...fileItems, ...filteredStatic], [fileItems, filteredStatic]);
+	/** 文件命中优先，静态项殿后；文件条数已由 IPC limit 收紧 */
+	const filtered = useMemo(
+		() => [...fileItems, ...filteredStatic],
+		[fileItems, filteredStatic]
+	);
 
 	const filteredRef = useRef(filtered);
 	const highlightRef = useRef(atHighlight);
@@ -321,6 +343,7 @@ export function useComposerAtMention(
 		atMenuOpen: atOpen,
 		atMenuItems: filtered,
 		atMenuHighlight: atHighlight,
+		atMenuFileSearchLoading: atFileSearchLoading,
 		atCaretRect,
 		syncAtFromRich,
 		setAtMenuHighlight: setAtHighlight,

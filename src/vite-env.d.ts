@@ -8,6 +8,8 @@ export interface AsyncShellAPI {
 	subscribeThemeMode?(callback: (payload: unknown) => void): () => void;
 	/** 工作区目录内文件在磁盘上增删改（外部编辑器保存等），主进程经 chokidar 防抖后广播 */
 	subscribeWorkspaceFsTouched?(callback: () => void): () => void;
+	/** 工作区文件索引首次全量扫描完成（与当前窗口 root 比对由订阅方完成） */
+	subscribeWorkspaceFileIndexReady?(callback: (workspaceRootNorm: string) => void): () => void;
 	/** PTY 终端输出（按 session id 区分） */
 	subscribeTerminalPtyData?(callback: (id: string, data: string) => void): () => void;
 	subscribeTerminalPtyExit?(callback: (id: string, code: unknown) => void): () => void;

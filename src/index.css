@@ -6433,6 +6433,14 @@ html[data-theme-switching='true'] .ref-editor-welcome-panel {
 	text-align: center;
 }
 
+.ref-at-menu-loading-hint {
+	font-size: 11px;
+	color: var(--void-fg-3);
+	padding: 6px 10px 8px;
+	margin: -2px 0 2px;
+	border-bottom: 1px solid var(--void-border-soft);
+}
+
 .ref-at-menu-row {
 	display: flex;
 	align-items: flex-start;

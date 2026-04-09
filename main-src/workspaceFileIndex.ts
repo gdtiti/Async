@@ -42,6 +42,10 @@ export const MAX_WORKSPACE_FILES = 50_000;
 type FileIndexBucket = {
 	rootNorm: string;
 	relPathSet: Set<string>;
+	/** 整库扫描后的有序快照；watcher 变更后置空，搜索时再按需重建 */
+	sortedPathsSnapshot: string[] | null;
+	/** basename 前两字符（小写）→ 路径；与 relPathSet 同步，在快照失效时清空 */
+	basenameTwoCharBuckets: Map<string, Set<string>> | null;
 	watcher: chokidar.FSWatcher | null;
 	inFlightRefresh: Promise<string[]> | null;
 	persistTimer: ReturnType<typeof setTimeout> | null;
@@ -50,12 +54,21 @@ type FileIndexBucket = {
 
 const buckets = new Map<string, FileIndexBucket>();
 
+/** 首次全量扫描完成后通知渲染进程（用于 @ 菜单重跑最后一次查询） */
+let notifyFileIndexReady: ((rootNorm: string) => void) | null = null;
+
+export function setWorkspaceFileIndexReadyBroadcaster(cb: ((rootNorm: string) => void) | null): void {
+	notifyFileIndexReady = cb;
+}
+
 function getBucket(rootNorm: string): FileIndexBucket {
 	let b = buckets.get(rootNorm);
 	if (!b) {
 		b = {
 			rootNorm,
 			relPathSet: new Set(),
+			sortedPathsSnapshot: null,
+			basenameTwoCharBuckets: null,
 			watcher: null,
 			inFlightRefresh: null,
 			persistTimer: null,
@@ -100,7 +113,14 @@ function destroyBucket(b: FileIndexBucket): void {
 		b.persistTimer = null;
 	}
 	b.relPathSet = new Set();
+	b.sortedPathsSnapshot = null;
+	b.basenameTwoCharBuckets = null;
 	b.inFlightRefresh = null;
+}
+
+function invalidateSortedPathsSnapshot(b: FileIndexBucket): void {
+	b.sortedPathsSnapshot = null;
+	b.basenameTwoCharBuckets = null;
 }
 
 export function getWorkspaceFileIndexLiveStatsForRoot(rootAbs: string | null): { root: string | null; fileCount: number } {
@@ -131,6 +151,7 @@ export function registerKnownWorkspaceRelPath(relPath: string, rootAbs: string):
 		return;
 	}
 	b.relPathSet.add(norm);
+	invalidateSortedPathsSnapshot(b);
 	schedulePersistWorkspaceFileIndex(b);
 }
 
@@ -380,6 +401,7 @@ function attachWatcher(b: FileIndexBucket): void {
 			const rel = normalizeRel(rootNorm, absPath);
 			if (rel) {
 				b.relPathSet.add(rel);
+				invalidateSortedPathsSnapshot(b);
 				schedulePersistWorkspaceFileIndex(b);
 				void indexWorkspaceSourceFile(rootNorm, rel);
 				scheduleWorkspaceFsTouchNotify();
@@ -394,6 +416,7 @@ function attachWatcher(b: FileIndexBucket): void {
 		const rel = normalizeRel(rootNorm, absPath);
 		if (rel) {
 			b.relPathSet.add(rel);
+			invalidateSortedPathsSnapshot(b);
 			schedulePersistWorkspaceFileIndex(b);
 			void indexWorkspaceSourceFile(rootNorm, rel);
 			scheduleWorkspaceFsTouchNotify();
@@ -407,6 +430,7 @@ function attachWatcher(b: FileIndexBucket): void {
 		const rel = normalizeRel(rootNorm, absPath);
 		if (rel) {
 			b.relPathSet.delete(rel);
+			invalidateSortedPathsSnapshot(b);
 			schedulePersistWorkspaceFileIndex(b);
 			removeWorkspaceSymbolsForRel(rootNorm, rel);
 			scheduleWorkspaceFsTouchNotify();
@@ -427,6 +451,7 @@ function attachWatcher(b: FileIndexBucket): void {
 				b.relPathSet.delete(k);
 			}
 		}
+		invalidateSortedPathsSnapshot(b);
 		schedulePersistWorkspaceFileIndex(b);
 		removeWorkspaceSymbolsUnderPrefix(rootNorm, rel);
 		scheduleWorkspaceFsTouchNotify();
@@ -449,6 +474,146 @@ export type FileSearchItem = {
 	description: string;
 };
 
+type ScoredPath = { path: string; score: number };
+
+function compareScoredPath(a: ScoredPath, b: ScoredPath): number {
+	if (a.score !== b.score) {
+		return a.score - b.score;
+	}
+	const ab = (a.path.split('/').pop() || a.path).toLowerCase();
+	const bb = (b.path.split('/').pop() || b.path).toLowerCase();
+	const c = ab.localeCompare(bb, undefined, { sensitivity: 'base' });
+	if (c !== 0) {
+		return c;
+	}
+	return a.path.localeCompare(b.path, undefined, { sensitivity: 'base' });
+}
+
+/** 维护按 compareScoredPath 升序的前 limit 条，避免对全量结果 O(N log N) 排序 */
+function insertTopScored(top: ScoredPath[], item: ScoredPath, limit: number): void {
+	if (limit <= 0) {
+		return;
+	}
+	let lo = 0;
+	let hi = top.length;
+	while (lo < hi) {
+		const mid = (lo + hi) >> 1;
+		if (compareScoredPath(item, top[mid]!) < 0) {
+			hi = mid;
+		} else {
+			lo = mid + 1;
+		}
+	}
+	top.splice(lo, 0, item);
+	if (top.length > limit) {
+		top.length = limit;
+	}
+}
+
+/** 按 basename 前两字符分桶；模糊查询时先扫与 query 前缀一致的桶，再扫其余路径，避免漏匹配且常减少首轮无效打分 */
+function ensureBasenameTwoCharBuckets(b: FileIndexBucket): Map<string, Set<string>> {
+	let m = b.basenameTwoCharBuckets;
+	if (m) {
+		return m;
+	}
+	m = new Map<string, Set<string>>();
+	for (const p of b.relPathSet) {
+		const bn = (p.split('/').pop() || p).toLowerCase();
+		const key = bn.length < 2 ? bn : bn.slice(0, 2);
+		let s = m.get(key);
+		if (!s) {
+			s = new Set();
+			m.set(key, s);
+		}
+		s.add(p);
+	}
+	b.basenameTwoCharBuckets = m;
+	return m;
+}
+
+function isPathLikeFileQuery(q: string): boolean {
+	return q.includes('/') || q.includes('\\') || q.startsWith('.');
+}
+
+function scorePathForQuery(p: string, q: string, gitSet: Set<string>, pathLike: boolean): number | null {
+	const pl = p.toLowerCase();
+	const base = (p.split('/').pop() || p).toLowerCase();
+	if (pathLike) {
+		if (!pl.includes(q) && !base.includes(q)) {
+			return null;
+		}
+		let score = 20;
+		if (pl.startsWith(q)) {
+			score = 3;
+		} else if (pl.includes(q)) {
+			score = 8;
+		} else if (base.includes(q)) {
+			score = 12;
+		}
+		if (gitSet.has(p)) {
+			score -= 1;
+		}
+		return score;
+	}
+	if (!pl.includes(q) && !base.includes(q)) {
+		return null;
+	}
+	let score = 20;
+	if (base === q) {
+		score = 0;
+	} else if (base.startsWith(q)) {
+		score = 2;
+	} else if (base.includes(q)) {
+		score = 5;
+	} else if (pl.includes(q)) {
+		score = 10;
+	}
+	if (gitSet.has(p)) {
+		score -= 1;
+	}
+	return score;
+}
+
+function emptyQueryTopPaths(b: FileIndexBucket, gitSet: Set<string>, limit: number): ScoredPath[] {
+	const snap = b.sortedPathsSnapshot;
+	if (snap && snap.length === b.relPathSet.size) {
+		const out: ScoredPath[] = [];
+		for (const p of snap) {
+			if (out.length >= limit) {
+				break;
+			}
+			if (gitSet.has(p)) {
+				out.push({ path: p, score: 0 });
+			}
+		}
+		if (out.length < limit) {
+			for (const p of snap) {
+				if (out.length >= limit) {
+					break;
+				}
+				if (!gitSet.has(p)) {
+					out.push({ path: p, score: 2 });
+				}
+			}
+		}
+		return out;
+	}
+	const top: ScoredPath[] = [];
+	for (const p of b.relPathSet) {
+		insertTopScored(top, { path: p, score: gitSet.has(p) ? 0 : 2 }, limit);
+	}
+	return top;
+}
+
+function relPathToSearchItem(slash: string): FileSearchItem {
+	const idx = slash.lastIndexOf('/');
+	return {
+		path: slash,
+		label: idx >= 0 ? slash.slice(idx + 1) : slash,
+		description: idx >= 0 ? slash.slice(0, idx) : '',
+	};
+}
+
 /**
  * 在已建好的文件索引上执行过滤搜索，返回评分后的 top-N 结果。
  * 如果索引未就绪，先 await 构建完成。
@@ -461,7 +626,6 @@ export async function searchWorkspaceFiles(
 	limit = 60
 ): Promise<FileSearchItem[]> {
 	const rootNorm = path.normalize(path.resolve(rootAbs));
-	// 确保索引已就绪
 	await ensureWorkspaceFileIndex(rootAbs);
 	const b = buckets.get(rootNorm);
 	if (!b || b.relPathSet.size === 0) {
@@ -469,50 +633,48 @@ export async function searchWorkspaceFiles(
 	}
 	const gitSet = new Set(gitChangedPaths.map((p) => p.replace(/\\/g, '/')));
 	const q = query.trim().toLowerCase();
-
-	type Scored = { path: string; score: number };
-	const scored: Scored[] = [];
+	const cap = Math.max(1, Math.min(limit, 200));
 
 	if (!q) {
-		// 无查询词：git 变更文件优先，其余按字典序
-		for (const p of b.relPathSet) {
-			scored.push({ path: p, score: gitSet.has(p) ? 0 : 2 });
-		}
-		scored.sort((a, c) => {
-			if (a.score !== c.score) return a.score - c.score;
-			return a.path.localeCompare(c.path, undefined, { sensitivity: 'base' });
-		});
-	} else {
-		for (const p of b.relPathSet) {
-			const pl = p.toLowerCase();
-			const base = (p.split('/').pop() || p).toLowerCase();
-			if (!pl.includes(q) && !base.includes(q)) continue;
-			let score = 20;
-			if (base === q) score = 0;
-			else if (base.startsWith(q)) score = 2;
-			else if (base.includes(q)) score = 5;
-			else if (pl.includes(q)) score = 10;
-			if (gitSet.has(p)) score -= 1;
-			scored.push({ path: p, score });
-		}
-		scored.sort((a, c) => {
-			if (a.score !== c.score) return a.score - c.score;
-			const ab = (a.path.split('/').pop() || a.path).toLowerCase();
-			const bb = (c.path.split('/').pop() || c.path).toLowerCase();
-			const cmp = ab.localeCompare(bb);
-			if (cmp !== 0) return cmp;
-			return a.path.localeCompare(c.path);
-		});
+		return emptyQueryTopPaths(b, gitSet, cap).map((s) => relPathToSearchItem(s.path));
 	}
 
-	return scored.slice(0, limit).map(({ path: slash }) => {
-		const idx = slash.lastIndexOf('/');
-		return {
-			path: slash,
-			label: idx >= 0 ? slash.slice(idx + 1) : slash,
-			description: idx >= 0 ? slash.slice(0, idx) : '',
-		};
-	});
+	const pathLike = isPathLikeFileQuery(q);
+	const top: ScoredPath[] = [];
+
+	const scoreIntoTop = (p: string): void => {
+		const sc = scorePathForQuery(p, q, gitSet, pathLike);
+		if (sc == null) {
+			return;
+		}
+		insertTopScored(top, { path: p, score: sc }, cap);
+	};
+
+	if (!pathLike && q.length >= 2) {
+		const primary = ensureBasenameTwoCharBuckets(b).get(q.slice(0, 2));
+		if (primary && primary.size > 0) {
+			for (const p of primary) {
+				scoreIntoTop(p);
+			}
+			for (const p of b.relPathSet) {
+				if (primary.has(p)) {
+					continue;
+				}
+				scoreIntoTop(p);
+			}
+			return top.map((s) => relPathToSearchItem(s.path));
+		}
+	}
+
+	for (const p of b.relPathSet) {
+		scoreIntoTop(p);
+	}
+	return top.map((s) => relPathToSearchItem(s.path));
+}
+
+/** 后台构建文件索引，避免用户首次输入 @ 时才触发整库扫描 */
+export function prewarmWorkspaceFileIndex(rootAbs: string): void {
+	void ensureWorkspaceFileIndex(rootAbs).catch(() => {});
 }
 
 export async function ensureWorkspaceFileIndex(rootAbs: string): Promise<string[]> {
@@ -532,9 +694,15 @@ export async function ensureWorkspaceFileIndex(rootAbs: string): Promise<string[
 		const list = await scanFullAsync(rootNorm);
 		console.log(`[fileIndex] scan done: ${list.length} files in ${Date.now() - t0}ms`);
 		b.relPathSet = new Set(list);
+		b.sortedPathsSnapshot = list;
 		attachWatcher(b);
 		console.log(`[fileIndex] watcher attached: +${Date.now() - t0}ms`);
 		schedulePersistWorkspaceFileIndex(b);
+		try {
+			notifyFileIndexReady?.(rootNorm);
+		} catch {
+			/* ignore */
+		}
 		return sortedFromSet(b);
 	})();
 

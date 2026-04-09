@@ -524,6 +524,21 @@ function AppMainWorkspaceInner() {
 		setCollapsedAgentWorkspacePaths,
 	} = useAppShellWorkspace();
 
+	const [atFileIndexReadyTick, setAtFileIndexReadyTick] = useState(0);
+	useEffect(() => {
+		const sub = shell?.subscribeWorkspaceFileIndexReady;
+		if (!sub || !workspace) {
+			return;
+		}
+		return sub((rootNorm) => {
+			const a = workspace.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+			const b = String(rootNorm).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+			if (a === b) {
+				setAtFileIndexReadyTick((k) => k + 1);
+			}
+		});
+	}, [shell, workspace]);
+
 	const { refreshGit, setGitActionError, setGitBranchPickerOpen } = useAppShellGitActions();
 	const { gitStatusOk } = useAppShellGitMeta();
 	const { gitChangedPaths, diffPreviews } = useAppShellGitFiles();
@@ -4136,6 +4151,7 @@ function AppMainWorkspaceInner() {
 		workspaceOpen: !!workspace,
 		searchFiles,
 		onFileChipPreview: onAtMentionFileChipPreview,
+		fileIndexReadyTick: atFileIndexReadyTick,
 	});
 	const slashCommand = useComposerSlashCommand(getComposerSegmentsSetter, composerRichSurface, {
 		t,
@@ -5832,6 +5848,7 @@ function AppMainWorkspaceInner() {
 				setThinkingByModelId={setThinkingByModelId}
 				atMenuOpen={atMention.atMenuOpen}
 				atMenuItems={atMention.atMenuItems}
+				atMenuFileSearchLoading={atMention.atMenuFileSearchLoading}
 				atMenuHighlight={atMention.atMenuHighlight}
 				atCaretRect={atMention.atCaretRect}
 				setAtMenuHighlight={atMention.setAtMenuHighlight}

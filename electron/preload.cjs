@@ -12,6 +12,7 @@ const INVOKE_CHANNELS = new Set([
 	'workspace:deleteSkillFromDisk',
 	'workspace:listFiles',
 	'workspace:searchFiles',
+	'workspace:prewarmFileIndex',
 	'workspace:saveComposerAttachment',
 	'workspace:searchSymbols',
 	'lsp:ts:start',
@@ -110,6 +111,9 @@ let themeModeSeq = 0;
 const workspaceFsTouchedHandlers = new Map();
 let workspaceFsTouchedSeq = 0;
 
+const workspaceFileIndexReadyHandlers = new Map();
+let workspaceFileIndexReadySeq = 0;
+
 ipcRenderer.on('async-shell:chat', (_event, payload) => {
 	for (const fn of chatHandlers.values()) {
 		try {
@@ -144,6 +148,16 @@ ipcRenderer.on('async-shell:workspaceFsTouched', () => {
 	for (const fn of workspaceFsTouchedHandlers.values()) {
 		try {
 			fn();
+		} catch (e) {
+			console.error(e);
+		}
+	}
+});
+
+ipcRenderer.on('async-shell:workspaceFileIndexReady', (_event, rootNorm) => {
+	for (const fn of workspaceFileIndexReadyHandlers.values()) {
+		try {
+			fn(String(rootNorm ?? ''));
 		} catch (e) {
 			console.error(e);
 		}
@@ -203,6 +217,11 @@ contextBridge.exposeInMainWorld('asyncShell', {
 		const id = ++workspaceFsTouchedSeq;
 		workspaceFsTouchedHandlers.set(id, callback);
 		return () => workspaceFsTouchedHandlers.delete(id);
+	},
+	subscribeWorkspaceFileIndexReady(callback) {
+		const id = ++workspaceFileIndexReadySeq;
+		workspaceFileIndexReadyHandlers.set(id, callback);
+		return () => workspaceFileIndexReadyHandlers.delete(id);
 	},
 	subscribeAutoUpdateStatus(callback) {
 		const id = ++autoUpdateStatusSeq;

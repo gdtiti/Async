@@ -136,6 +136,7 @@ export type AppShellOverlaysProps = {
 	setThinkingByModelId: Dispatch<SetStateAction<Record<string, ThinkingLevel>>>;
 	atMenuOpen: boolean;
 	atMenuItems: AtMenuItem[];
+	atMenuFileSearchLoading?: boolean;
 	atMenuHighlight: number;
 	atCaretRect: CaretRectSnapshot | null;
 	setAtMenuHighlight: (i: number) => void;
@@ -215,6 +216,7 @@ export const AppShellOverlays = memo(function AppShellOverlays({
 	setThinkingByModelId,
 	atMenuOpen,
 	atMenuItems,
+	atMenuFileSearchLoading = false,
 	atMenuHighlight,
 	atCaretRect,
 	setAtMenuHighlight,
@@ -396,6 +398,7 @@ export const AppShellOverlays = memo(function AppShellOverlays({
 			<ComposerAtMenu
 				open={atMenuOpen}
 				items={atMenuItems}
+				fileSearchLoading={atMenuFileSearchLoading}
 				highlightIndex={atMenuHighlight}
 				caretRect={atCaretRect}
 				onHighlight={setAtMenuHighlight}

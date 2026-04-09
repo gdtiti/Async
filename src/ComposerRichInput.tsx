@@ -170,6 +170,18 @@ export function ComposerRichInput({
 		placeCaretAfterFirstSlashChipElseEnd(el);
 	}, [segments, innerRef, domHandlers]);
 
+	/** 仅这些键会移动光标但不走 composition 的 input 事件，需补一次 @/slash overlay 同步 */
+	const KEYS_NEED_RICH_OVERLAY_RESYNC = new Set([
+		'ArrowLeft',
+		'ArrowRight',
+		'ArrowUp',
+		'ArrowDown',
+		'Home',
+		'End',
+		'PageUp',
+		'PageDown',
+	]);
+
 	const handleInput = () => {
 		emitFromDom();
 		const el = innerRef.current;
@@ -287,7 +299,8 @@ export function ComposerRichInput({
 				}}
 				onKeyUp={(e) => {
 					const el = innerRef.current;
-					if (el) {
+					/* onInput 已同步可打印字符；此处避免每键重复 syncComposerOverlays 造成卡顿 */
+					if (el && KEYS_NEED_RICH_OVERLAY_RESYNC.has(e.key)) {
 						onRichInput(el);
 					}
 					if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete') {

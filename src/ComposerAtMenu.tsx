@@ -71,6 +71,8 @@ function AtIcon({ kind }: { kind: AtMenuItem['icon'] }) {
 type Props = {
 	open: boolean;
 	items: AtMenuItem[];
+	/** 工作区文件 IPC 搜索进行中（可与静态项并存） */
+	fileSearchLoading?: boolean;
 	highlightIndex: number;
 	caretRect: CaretRectSnapshot | null;
 	onHighlight: (index: number) => void;
@@ -78,7 +80,16 @@ type Props = {
 	onClose: () => void;
 };
 
-export function ComposerAtMenu({ open, items, highlightIndex, caretRect, onHighlight, onSelect, onClose }: Props) {
+export function ComposerAtMenu({
+	open,
+	items,
+	fileSearchLoading = false,
+	highlightIndex,
+	caretRect,
+	onHighlight,
+	onSelect,
+	onClose,
+}: Props) {
 	const menuRef = useRef<HTMLDivElement>(null);
 
 	useLayoutEffect(() => {
@@ -117,8 +128,12 @@ export function ComposerAtMenu({ open, items, highlightIndex, caretRect, onHighl
 	const vw = typeof window !== 'undefined' ? window.innerWidth : 1024;
 	const vh = typeof window !== 'undefined' ? window.innerHeight : 768;
 	const menuWidth = Math.min(340, vw - 2 * POPOVER_VIEW_MARGIN);
-	const pretexMenuBodyPx = estimateAtMenuContentHeightPx(items, menuWidth);
-	const estHeight = Math.min(Math.max(pretexMenuBodyPx, items.length ? 48 : 44), vh * 0.45);
+	const loadingExtraPx = fileSearchLoading ? 28 : 0;
+	const pretexMenuBodyPx = estimateAtMenuContentHeightPx(items, menuWidth) + loadingExtraPx;
+	const estHeight = Math.min(
+		Math.max(pretexMenuBodyPx, items.length ? 48 : fileSearchLoading ? 52 : 44),
+		vh * 0.45
+	);
 
 	// 使用统一的 popover 定位逻辑（自动处理上/下展开、视口边界裁剪）
 	const anchorRect = new DOMRect(caretRect.left, caretRect.top, caretRect.width, caretRect.height);
@@ -152,7 +167,9 @@ export function ComposerAtMenu({ open, items, highlightIndex, caretRect, onHighl
 				onMouseDown={(e) => e.preventDefault()}
 				role="status"
 			>
-				<div className="ref-at-menu-empty-msg">无匹配项</div>
+				<div className="ref-at-menu-empty-msg">
+					{fileSearchLoading ? '正在加载文件索引…' : '无匹配项'}
+				</div>
 			</div>,
 			document.body
 		);
@@ -169,6 +186,11 @@ export function ComposerAtMenu({ open, items, highlightIndex, caretRect, onHighl
 			style={posStyle}
 			onMouseDown={(e) => e.preventDefault()}
 		>
+			{fileSearchLoading ? (
+				<div className="ref-at-menu-loading-hint" role="status">
+					正在更新文件匹配…
+				</div>
+			) : null}
 			{items.map((it, i) => (
 				<button
 					key={it.id}
