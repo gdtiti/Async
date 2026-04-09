@@ -4066,6 +4066,91 @@ html[data-theme-switching='true'] .ref-editor-welcome-panel {
 	gap: 8px;
 }
 
+/* 命令行整行可点：指针手势；箭头紧跟命令文字右侧，摘要靠右；不可拖选 */
+.ref-agent-activity-main--cmd-toggle {
+	cursor: pointer;
+	outline: none;
+	border-radius: 6px;
+	margin: -1px -4px;
+	padding: 1px 4px;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.ref-agent-activity-main--cmd-toggle,
+.ref-agent-activity-main--cmd-toggle * {
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.ref-agent-activity-cmd-inline {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	min-width: 0;
+	flex: 0 1 auto;
+	max-width: 100%;
+}
+
+/* 摘要紧跟箭头：不用全局 summary 的 margin-left，间距交给 cmd-inline 的 gap */
+.ref-agent-activity-cmd-inline .ref-agent-activity-summary,
+.ref-activity-group-row-cmd-inline .ref-agent-activity-summary {
+	margin-left: 0;
+}
+
+.ref-agent-activity-cmd-inline > :first-child {
+	min-width: 0;
+}
+
+.ref-agent-activity-main--cmd-toggle:hover {
+	background: color-mix(in srgb, var(--void-bg-3) 50%, transparent);
+}
+
+.ref-agent-activity-main--cmd-toggle:focus-visible {
+	outline: 2px solid var(--void-ring, #818cf8);
+	outline-offset: 1px;
+}
+
+.ref-agent-activity-text-cluster {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+}
+
+.ref-activity-inline-chevron {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	padding: 0;
+	border: none;
+	border-radius: 5px;
+	background: transparent;
+	color: var(--void-fg-3, #8a8a8a);
+	opacity: 0.62;
+	pointer-events: none;
+	flex-shrink: 0;
+	transition: opacity 0.14s ease, color 0.14s ease, transform 0.14s ease;
+}
+
+.ref-agent-activity-main--cmd-toggle:hover .ref-activity-inline-chevron,
+.ref-activity-group-row-top--cmd-toggle:hover .ref-activity-inline-chevron,
+.ref-activity-inline-chevron.is-open {
+	opacity: 0.95;
+	color: var(--void-fg-2, #b0b0b0);
+}
+
+.ref-activity-inline-chevron-svg {
+	transition: transform 0.16s ease;
+}
+
+.ref-activity-inline-chevron-svg.is-open {
+	transform: rotate(90deg);
+}
+
 .ref-agent-activity-dot {
 	flex-shrink: 0;
 	width: 8px;
@@ -4342,6 +4427,62 @@ html[data-theme-switching='true'] .ref-editor-welcome-panel {
 	align-items: flex-start;
 	gap: 8px;
 	min-width: 0;
+}
+
+.ref-activity-group-row-top--cmd-toggle {
+	align-items: center;
+	cursor: pointer;
+	outline: none;
+	border-radius: 6px;
+	margin: -1px -6px;
+	padding: 1px 6px;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.ref-activity-group-row-top--cmd-toggle,
+.ref-activity-group-row-top--cmd-toggle * {
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.ref-activity-group-row-top--cmd-toggle:hover {
+	background: color-mix(in srgb, var(--void-bg-3) 50%, transparent);
+}
+
+.ref-activity-group-row-top--cmd-toggle:focus-visible {
+	outline: 2px solid var(--void-ring, #818cf8);
+	outline-offset: 1px;
+}
+
+.ref-activity-group-row-top--cmd-toggle .ref-activity-group-row-dot-wrap {
+	align-self: center;
+}
+
+.ref-activity-group-row-main--cmd-head {
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.ref-activity-group-row-cmd-inline {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	min-width: 0;
+	flex: 0 1 auto;
+	max-width: 100%;
+}
+
+.ref-activity-group-row-cmd-inline > :first-child {
+	min-width: 0;
+}
+
+.ref-activity-group-row-text-cluster {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
 }
 
 /* ?????????????????????????? */
